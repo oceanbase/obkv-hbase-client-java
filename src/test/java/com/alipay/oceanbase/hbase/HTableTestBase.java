@@ -18,10 +18,12 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.PoolMap;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -31,6 +33,7 @@ import org.junit.rules.ExpectedException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
@@ -774,16 +777,58 @@ public abstract class HTableTestBase {
 
     @Test
     public void testScan() throws IOException {
+        String key1="key_1";
+        String key2="key_2";
+        String key3="key_3";
+        String key4="key_4";
+        String family = "family1";
+        String column = "column1_1";
+
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey4Family = new Delete(toBytes(key4));
+        deleteKey4Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column), toBytes("value1"));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key2));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column), toBytes("value2"));
+
+        Put putKey1Column1Value3 = new Put(toBytes(key3));
+        putKey1Column1Value3.add(toBytes(family), toBytes(column), toBytes("value3"));
+
+        Put putKey1Column1Value4 = new Put(toBytes(key4));
+        putKey1Column1Value4.add(toBytes(family), toBytes(column), toBytes("value4"));
+
+        hTable.put(putKey1Column1Value1);
+        hTable.put(putKey1Column1Value2);
+        hTable.put(putKey1Column1Value3);
+        hTable.put(putKey1Column1Value4);
+
         Scan scan = new Scan();
         scan.addColumn("family1".getBytes(), "column1_1".getBytes());
         scan.setStartRow("key_1".getBytes());
-        scan.setStopRow("key_9".getBytes());
-        scan.setMaxVersions(10);
+        scan.setStopRow("key_5".getBytes());
+        //scan.setMaxVersions(10);
+        scan.setBatch(1);
         ResultScanner scanner = hTable.getScanner(scan);
 
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.println("rowKey: " + new String(keyValue.getRow()) + " columnQualifier:"
+                System.out.println("func:rowKey: " + new String(keyValue.getRow()) + " columnQualifier:"
                                    + new String(keyValue.getQualifier()) + " timestamp:"
                                    + keyValue.getTimestamp() + " value:"
                                    + new String(keyValue.getValue()));

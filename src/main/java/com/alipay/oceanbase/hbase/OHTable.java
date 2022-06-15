@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.constants.OHConstants;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
+import com.alipay.oceanbase.hbase.result.ClientAsyncStreamScanner;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
@@ -33,7 +34,11 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateRequest;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
+import com.alipay.oceanbase.rpc.stream.QueryResultSet;
+import com.alipay.oceanbase.rpc.stream.async.ObTableClientQueryAsyncStreamResult;
+import com.alipay.oceanbase.rpc.table.api.TableQuery;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import org.apache.hadoop.conf.Configuration;
@@ -427,6 +432,63 @@ public class OHTable implements HTableInterface {
     public Result getRowOrBefore(byte[] row, byte[] family) {
         throw new FeatureNotSupportedException("not supported yet.");
     }
+//
+//    public ResultScanner getScanner(final Scan scan) throws IOException {
+//
+//        checkFamilyViolation(scan.getFamilyMap().keySet());
+//
+//        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
+//        ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
+//            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+//            operationTimeout) {
+//            public ResultScanner call() throws IOException {
+//                for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
+//                    byte[] f = entry.getKey();
+//                    try {
+//                        ObHTableFilter filter = buildObHTableFilter(scan.getFilter(),
+//                                scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
+//                        ObTableQuery obTableQuery;
+//                        if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
+//                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
+//                            obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
+//                        } else {
+//                            // not support reverse scan.
+//                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
+//                            // if (scan.getReversed()) {
+//                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+//                            //         scan.getStartRow(), true, scan.getBatch());
+//                            // } else {
+//                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+//                                    scan.getStopRow(), false, scan.getBatch());
+//                            // }
+//                        }
+//
+//                        // not support reverse scan.
+//                        // if (scan.getReversed()) { // reverse scan 时设置为逆序
+//                        //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
+//                        // }
+//
+//                        // no support set maxResultSize.
+//                        // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
+//
+//                        ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
+//                                getTargetTableName(tableNameString, Bytes.toString(f)));
+//                        ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
+//                                .execute(request);
+//                        return new ClientStreamScanner(clientQueryStreamResult, tableNameString, f);
+//                    } catch (Exception e) {
+//                        logger
+//                                .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
+//                        throw new IOException("scan table:" + tableNameString + " family "
+//                                + Bytes.toString(f) + " error.", e);
+//                    }
+//                }
+//
+//                throw new IOException("scan table:" + tableNameString + "has no family");
+//            }
+//        };
+//        return executeServerCallable(serverCallable);
+//    }
 
     public ResultScanner getScanner(final Scan scan) throws IOException {
 
@@ -434,49 +496,35 @@ public class OHTable implements HTableInterface {
 
         //be careful about the packet size ,may the packet exceed the max result size ,leading to error
         ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
-            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
-            operationTimeout) {
+                configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+                operationTimeout) {
             public ResultScanner call() throws IOException {
 
                 for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
                     byte[] f = entry.getKey();
                     try {
                         ObHTableFilter filter = buildObHTableFilter(scan.getFilter(),
-                            scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
-                        ObTableQuery obTableQuery;
+                                scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
+                        //ObTableQuery obTableQuery;
+                        TableQuery obTableQuery;
                         if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
-                            && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
-                            obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
+                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
+                            obTableQuery = buildObTableQueryAsync(getTargetTableName(tableNameString, Bytes.toString(f)),
+                                    filter, null, scan.getBatch());
                         } else {
-                            // not support reverse scan.
-                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
-                            // if (scan.getReversed()) {
-                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                            //         scan.getStartRow(), true, scan.getBatch());
-                            // } else {
-                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                scan.getStopRow(), false, scan.getBatch());
-                            // }
+                            obTableQuery = buildObTableQueryAsync(getTargetTableName(tableNameString, Bytes.toString(f)),
+                                    filter, scan.getStartRow(), true,
+                                    scan.getStopRow(), false, scan.getBatch());
                         }
 
-                        // not support reverse scan.
-                        // if (scan.getReversed()) { // reverse scan 时设置为逆序
-                        //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
-                        // }
+                        QueryResultSet queryResultSet = obTableQuery.execute();
+                        return new ClientAsyncStreamScanner(queryResultSet, tableNameString, f);
 
-                        // no support set maxResultSize.
-                        // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
-
-                        ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
-                            getTargetTableName(tableNameString, Bytes.toString(f)));
-                        ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-                            .execute(request);
-                        return new ClientStreamScanner(clientQueryStreamResult, tableNameString, f);
                     } catch (Exception e) {
                         logger
-                            .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
+                                .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
                         throw new IOException("scan table:" + tableNameString + " family "
-                                              + Bytes.toString(f) + " error.", e);
+                                + Bytes.toString(f) + " error.", e);
                     }
                 }
 
@@ -485,6 +533,7 @@ public class OHTable implements HTableInterface {
         };
         return executeServerCallable(serverCallable);
     }
+
 
     public ResultScanner getScanner(final byte[] family) throws IOException {
         Scan scan = new Scan();
@@ -1194,6 +1243,47 @@ public class OHTable implements HTableInterface {
         return obTableQuery;
     }
 
+    private TableQuery buildObTableQueryAsync(String tableNameString, ObHTableFilter filter, byte[] start,
+                                           boolean includeStart, byte[] stop, boolean includeStop,
+                                           int batchSize) {
+        ObNewRange obNewRange = new ObNewRange();
+
+        if (includeStart) {
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
+        } else {
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
+        }
+
+        if (Arrays.equals(stop, HConstants.EMPTY_START_ROW)) {
+            obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
+                    ObObj.getMax()));
+        } else if (includeStop) {
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
+        } else {
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), ObObj.getMin()));
+        }
+
+        return buildObTableQueryAsync(tableNameString, filter, obNewRange, batchSize);
+    }
+
+    private TableQuery buildObTableQueryAsync(String tableNameString, ObHTableFilter filter, ObNewRange obNewRange,
+                                           int batchSize) {
+        TableQuery tableQuery = this.obTableClient.queryByBatchV2(tableNameString);
+        ObTableQuery obTableQuery = tableQuery.getObTableQuery();
+        obTableQuery.setIndexName("PRIMARY");
+        obTableQuery.sethTableFilter(filter);
+        for (String column : ALL_COLUMNS) {
+            obTableQuery.addSelectColumn(column);
+        }
+        if (obNewRange != null) {
+            obTableQuery.addKeyRange(obNewRange);
+        }
+        if (batchSize > 0) {
+            obTableQuery.setBatchSize(batchSize);
+        }
+        return tableQuery;
+    }
+
     private ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
                                                              boolean putToAppend,
                                                              List<byte[]> qualifiers) {
@@ -1234,6 +1324,21 @@ public class OHTable implements HTableInterface {
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
+    }
+
+    private ObTableQueryAsyncRequest buildObTableQueryAsyncRequest(TableQuery obTableQuery,
+                                                                   String targetTableName) {
+
+        ObTableQueryAsyncRequest request_async = new ObTableQueryAsyncRequest();
+        request_async.setTableName(targetTableName);
+        request_async.setEntityType(ObTableEntityType.HKV);
+
+        ObTableQueryRequest request = new ObTableQueryRequest();
+        request.setEntityType(ObTableEntityType.HKV);
+        request.setTableQuery(obTableQuery.getObTableQuery());
+        request.setTableName(targetTableName);
+        request_async.setObTableQueryRequest(request);
+        return request_async;
     }
 
     private ObTableQueryRequest buildObTableQueryRequest(ObTableQuery obTableQuery,
