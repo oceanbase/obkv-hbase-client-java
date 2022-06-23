@@ -23,11 +23,11 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String PARAM_URL      = "http://11.158.97.241:28222/services?Action=ObRootServiceInfo&ObRegion=obcluster&Action=ObRootServiceInfo&ObCluster=obcluster&database=test";
-    public static String FULL_USER_NAME = "root@sys#obcluster";
+    public static String PARAM_URL      = "";
+    public static String FULL_USER_NAME = "";
     public static String PASSWORD       = "";
-    public static String SYS_USER_NAME  = "proxyro@sys";
-    public static String SYS_PASSWORD   = "yjl@2022";
+    public static String SYS_USER_NAME  = "";
+    public static String SYS_PASSWORD   = "";
 
     public static Configuration newConfiguration() {
         Configuration conf = new Configuration();
