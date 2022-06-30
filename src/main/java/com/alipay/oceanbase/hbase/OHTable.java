@@ -432,64 +432,65 @@ public class OHTable implements HTableInterface {
     public Result getRowOrBefore(byte[] row, byte[] family) {
         throw new FeatureNotSupportedException("not supported yet.");
     }
-//
-//    public ResultScanner getScanner(final Scan scan) throws IOException {
-//
-//        checkFamilyViolation(scan.getFamilyMap().keySet());
-//
-//        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
-//        ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
-//            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
-//            operationTimeout) {
-//            public ResultScanner call() throws IOException {
-//                for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
-//                    byte[] f = entry.getKey();
-//                    try {
-//                        ObHTableFilter filter = buildObHTableFilter(scan.getFilter(),
-//                                scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
-//                        ObTableQuery obTableQuery;
-//                        if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
-//                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
-//                            obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
-//                        } else {
-//                            // not support reverse scan.
-//                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
-//                            // if (scan.getReversed()) {
-//                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-//                            //         scan.getStartRow(), true, scan.getBatch());
-//                            // } else {
-//                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-//                                    scan.getStopRow(), false, scan.getBatch());
-//                            // }
-//                        }
-//
-//                        // not support reverse scan.
-//                        // if (scan.getReversed()) { // reverse scan 时设置为逆序
-//                        //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
-//                        // }
-//
-//                        // no support set maxResultSize.
-//                        // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
-//
-//                        ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
-//                                getTargetTableName(tableNameString, Bytes.toString(f)));
-//                        ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-//                                .execute(request);
-//                        return new ClientStreamScanner(clientQueryStreamResult, tableNameString, f);
-//                    } catch (Exception e) {
-//                        logger
-//                                .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
-//                        throw new IOException("scan table:" + tableNameString + " family "
-//                                + Bytes.toString(f) + " error.", e);
-//                    }
-//                }
-//
-//                throw new IOException("scan table:" + tableNameString + "has no family");
-//            }
-//        };
-//        return executeServerCallable(serverCallable);
-//    }
 
+/* use query async instand
+    public ResultScanner getScanner(final Scan scan) throws IOException {
+
+        checkFamilyViolation(scan.getFamilyMap().keySet());
+
+        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
+        ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
+            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+            operationTimeout) {
+            public ResultScanner call() throws IOException {
+                for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
+                    byte[] f = entry.getKey();
+                    try {
+                        ObHTableFilter filter = buildObHTableFilter(scan.getFilter(),
+                                scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
+                        ObTableQuery obTableQuery;
+                        if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
+                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
+                            obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
+                        } else {
+                            // not support reverse scan.
+                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
+                            // if (scan.getReversed()) {
+                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                            //         scan.getStartRow(), true, scan.getBatch());
+                            // } else {
+                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                    scan.getStopRow(), false, scan.getBatch());
+                            // }
+                        }
+
+                        // not support reverse scan.
+                        // if (scan.getReversed()) { // reverse scan 时设置为逆序
+                        //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                        // }
+
+                        // no support set maxResultSize.
+                        // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
+
+                        ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
+                                getTargetTableName(tableNameString, Bytes.toString(f)));
+                        ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
+                                .execute(request);
+                        return new ClientStreamScanner(clientQueryStreamResult, tableNameString, f);
+                    } catch (Exception e) {
+                        logger
+                                .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
+                        throw new IOException("scan table:" + tableNameString + " family "
+                                + Bytes.toString(f) + " error.", e);
+                    }
+                }
+
+                throw new IOException("scan table:" + tableNameString + "has no family");
+            }
+        };
+        return executeServerCallable(serverCallable);
+    }
+*/
     public ResultScanner getScanner(final Scan scan) throws IOException {
 
         checkFamilyViolation(scan.getFamilyMap().keySet());

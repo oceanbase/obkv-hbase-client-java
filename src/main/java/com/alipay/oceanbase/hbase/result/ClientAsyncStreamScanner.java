@@ -24,12 +24,7 @@ public class ClientAsyncStreamScanner extends AbstractClientScanner {
     private static final Logger logger     = TableHBaseLoggerFactory
             .getLogger(ClientAsyncStreamScanner.class);
 
-
-    //private final ObTableClientQueryAsyncStreamResult asyncStreamResult;
-
-    // private final ObTableQueryAsyncResultSet queryResultSet;
     private final QueryResultSet queryResultSet;
-    //private final QueryStreamResult queryStreamResult;
 
     private final String                         tableName;
 
@@ -40,13 +35,6 @@ public class ClientAsyncStreamScanner extends AbstractClientScanner {
     private boolean                              streamNext = true;
 
     private Map<String, Object>                  lastRow = null;
-
-//    public ClientAsyncStreamScanner(ObTableClientQueryAsyncStreamResult asyncStreamResult, String tableName,
-//                               byte[] family) {
-//        this.asyncStreamResult = asyncStreamResult;
-//        this.tableName = tableName;
-//        this.family = family;
-//    }
 
     public ClientAsyncStreamScanner(QueryResultSet queryResultSet,
                                     String tableName,
