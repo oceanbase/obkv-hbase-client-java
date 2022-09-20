@@ -49,7 +49,7 @@ public class OHTableClient implements HTableInterface, Lifecycle {
      * <p> NOTE: Required parameters in conf:</p>
      * <pre>
      *      Configuration conf = new Configuration();
-     *      conf.set(HBASE_OCEANBASE_PARAM_URL, "http://param_url.com?database=test");
+     *      conf.set(HBASE_OCEANBASE_PARAM_URL, "param_url");
      *      conf.set(HBASE_OCEANBASE_FULL_USER_NAME, "username");
      *      conf.set(HBASE_OCEANBASE_PASSWORD, "password");
      *      conf.set(HBASE_OCEANBASE_SYS_USER_NAME, "sys_user_name");
