@@ -40,7 +40,7 @@
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.encoding>UTF-8</project.encoding>
         <slf4j.version>1.7.21</slf4j.version>
-        <table.client.version>1.0.0-SNAPSHOT</table.client.version>
+        <table.client.version>1.0.1-SNAPSHOT</table.client.version>
     </properties>
 
     <dependencies>
@@ -58,8 +58,8 @@
                     <artifactId>jasper-runtime</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>>log4j</groupId>
-                    <artifactId>>log4j</artifactId>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>org.apache.avro</groupId>
@@ -87,11 +87,11 @@
                 </exclusion>
                 <exclusion>
                     <groupId>commons-configuration</groupId>
-                    <artifactId>commons-configuration@1.6</artifactId>
+                    <artifactId>commons-configuration</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-json@1.8</artifactId>
+                    <artifactId>jersey-json</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -120,6 +120,26 @@
                     <artifactId>oro</artifactId>
                     <groupId>oro</groupId>
                 </exclusion>
+                <exclusion>
+                    <groupId>tomcat</groupId>
+                    <artifactId>jasper-compiler</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>tomcat</groupId>
+                    <artifactId>jasper-runtime</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.codehaus.jackson</groupId>
+                    <artifactId>jackson-mapper-asl</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.codehaus.jettison</groupId>
+                    <artifactId>jettison</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-collections</groupId>
+                    <artifactId>commons-collections</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -135,7 +155,7 @@
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
+            <artifactId>slf4j-nop</artifactId>
             <version>${slf4j.version}</version>
             <scope>provided</scope>
         </dependency>
