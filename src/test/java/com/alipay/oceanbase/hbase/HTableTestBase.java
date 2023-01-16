@@ -35,6 +35,7 @@ import java.util.List;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 public abstract class HTableTestBase {
@@ -137,7 +138,7 @@ public abstract class HTableTestBase {
 
             Assert.assertEquals(9, count);
 
-            scan.setBatch(1);
+            // scan.setBatch(1);
 
             scanner = hTable.getScanner(scan);
             i = 0;
@@ -174,6 +175,7 @@ public abstract class HTableTestBase {
 
     @Test
     public void testHugeData() throws IOException {
+        int testNum = 1000;
         String key = "putkey";
         byte[] keyBytes = key.getBytes();
         String column1 = "putColumn1";
@@ -181,18 +183,21 @@ public abstract class HTableTestBase {
         String value = "value";
         String family = "family1";
         long startTimeBase = 1539700745718L;
-        //        for (int j = 0; j < 10000; j++) {
-        //            byte[] rowkey = new byte[keyBytes.length + 8];
-        //            long current = startTimeBase +j*10;
-        //            System.out.println(current);
-        //            byte[] currentBytes = Bytes.toBytes(current);
-        //            System.arraycopy(keyBytes , 0,rowkey,0,keyBytes.length);
-        //            System.arraycopy(currentBytes , 0,rowkey,keyBytes.length,currentBytes.length);
-        //            Put put = new Put(rowkey);
-        //            put.add("family1".getBytes(), column1.getBytes(), toBytes(value));
-        //            put.add("family1".getBytes(), column2.getBytes(), toBytes(value));
-        //            hTable.put(put);
-        //        }
+        for (int j = 1; j <= testNum; j++) {
+            byte[] rowkey = new byte[keyBytes.length + 8];
+            long current = startTimeBase +j*10;
+            // System.out.println(current);
+            byte[] currentBytes = Bytes.toBytes(current);
+            System.arraycopy(keyBytes , 0,rowkey,0,keyBytes.length);
+            System.arraycopy(currentBytes , 0,rowkey,keyBytes.length,currentBytes.length);
+            Put put = new Put(rowkey);
+            put.add("family1".getBytes(), column1.getBytes(), toBytes(value));
+            put.add("family1".getBytes(), column2.getBytes(), toBytes(value));
+            hTable.put(put);
+            if (0 == j % 250) {
+                System.out.println("has put " + j + " rows");
+            }
+        }
 
         Scan scan = new Scan();
         scan.addColumn("family1".getBytes(), column1.getBytes());
@@ -208,7 +213,7 @@ public abstract class HTableTestBase {
         scan.setStartRow(start);
         scan.setStopRow(end);
         scan.setMaxVersions(1);
-        scan.setBatch(100);
+        // scan.setBatch(100);
 
         ResultScanner scanner = hTable.getScanner(scan);
         int i = 0;
@@ -219,12 +224,13 @@ public abstract class HTableTestBase {
                 System.arraycopy(rowkey, 0, readKey, 0, keyBytes.length);
                 byte[] timestamp = new byte[8];
                 System.arraycopy(rowkey, keyBytes.length, timestamp, 0, 8);
-                System.out.println("key :" + Bytes.toString(readKey) + Bytes.toLong(timestamp)
-                                   + " column :" + Bytes.toString(keyValue.getQualifier()));
+                // System.out.println("key :" + Bytes.toString(readKey) + Bytes.toLong(timestamp)
+                //                    + " column :" + Bytes.toString(keyValue.getQualifier()));
             }
             i++;
         }
         System.out.println("count " + i);
+        assertEquals(testNum - 100 + 1, i);
     }
 
     @Test

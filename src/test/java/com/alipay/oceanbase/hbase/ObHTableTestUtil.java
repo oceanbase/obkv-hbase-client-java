@@ -31,11 +31,20 @@ public class ObHTableTestUtil {
 
     public static Configuration newConfiguration() {
         Configuration conf = new Configuration();
+        // OCP mode
         conf.set(HBASE_OCEANBASE_PARAM_URL, PARAM_URL);
         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
         conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
         conf.set(HBASE_OCEANBASE_SYS_USER_NAME, SYS_USER_NAME);
         conf.set(HBASE_OCEANBASE_SYS_PASSWORD, SYS_PASSWORD);
+
+        // ODP mode
+        // conf.set(HBASE_OCEANBASE_ODP_ADDR, "xx.xx.xx.xx");
+        // conf.setInt(HBASE_OCEANBASE_ODP_PORT, 8080);
+        // conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
+        // conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
+        // conf.setBoolean(HBASE_OCEANBASE_ODP_MODE, true);
+        // conf.set(HBASE_OCEANBASE_DATABASE, "daseName);
         return conf;
     }
 

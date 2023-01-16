@@ -1286,6 +1286,9 @@ public class OHTable implements HTableInterface {
     }
 
     public void refreshTableEntry(String familyString, boolean hasTestLoad) throws Exception {
+        if (this.obTableClient.isOdpMode()) {
+            return;
+        }
         this.obTableClient.getOrRefreshTableEntry(
             getNormalTargetTableName(tableNameString, familyString), true, true);
         if (hasTestLoad) {

@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase;
 
-
 import com.alipay.oceanbase.hbase.util.OHTableHotkeyThrottleUtil;
 import org.junit.Test;
 
@@ -27,7 +26,7 @@ import java.util.ArrayList;
 import static org.junit.Assert.*;
 
 public class OHTableHotkeyThrottleTest {
-    public int threadNum = 64;
+    public int threadNum    = 64;
     public int repeatKeyNum = 4;
 
     @Test

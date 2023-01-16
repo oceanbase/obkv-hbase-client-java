@@ -29,22 +29,25 @@ public class OHTableHotkeyThrottleUtil extends Thread {
     public enum TestType {
         random, specifiedKey
     }
+
     public enum OperationType {
         put, get, scan
     }
+
     protected HTableInterface hTable;
-    TestType testType;
-    OperationType operationType;
+    TestType                  testType;
+    OperationType             operationType;
 
-    int testNum = 500;
-    int throttleNum = 0;
-    int passNum = 0;
-    String key; // like key-1001
-    String column = "Column";
-    String value = "value";
-    String family = "familyThrottle";
+    int                       testNum     = 500;
+    int                       throttleNum = 0;
+    int                       passNum     = 0;
+    String                    key;                           // like key-1001
+    String                    column      = "Column";
+    String                    value       = "value";
+    String                    family      = "familyThrottle";
 
-    public void init(TestType testType, OperationType operationType, String... key) throws Exception {
+    public void init(TestType testType, OperationType operationType, String... key)
+                                                                                   throws Exception {
         this.testType = testType;
         this.operationType = operationType;
 
@@ -72,7 +75,7 @@ public class OHTableHotkeyThrottleUtil extends Thread {
 
     @Override
     public void run() {
-        try{
+        try {
             switch (testType) {
                 case random:
                     runRandom();
@@ -81,7 +84,8 @@ public class OHTableHotkeyThrottleUtil extends Thread {
                     runSpecifiedKey();
                     break;
                 default:
-                    System.out.println(Thread.currentThread().getName() + " has no test type to run");
+                    System.out.println(Thread.currentThread().getName()
+                                       + " has no test type to run");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -89,9 +93,10 @@ public class OHTableHotkeyThrottleUtil extends Thread {
     }
 
     private void runRandom() throws Exception {
-        System.out.println(Thread.currentThread().getName() + " begin to run random " + operationType + " test");
+        System.out.println(Thread.currentThread().getName() + " begin to run random "
+                           + operationType + " test");
         for (int i = 0; i < testNum; ++i) {
-            long randomNum = (long)(Math.random() * 500000);
+            long randomNum = (long) (Math.random() * 500000);
             String key = "key-" + randomNum;
             switch (operationType) {
                 case put:
@@ -108,8 +113,8 @@ public class OHTableHotkeyThrottleUtil extends Thread {
     }
 
     private void runSpecifiedKey() throws Exception {
-        System.out.println(Thread.currentThread().getName() + " begin to run specified key " + this.key
-                + ", type " + operationType + " test");
+        System.out.println(Thread.currentThread().getName() + " begin to run specified key "
+                           + this.key + ", type " + operationType + " test");
         for (int i = 0; i < testNum; ++i) {
             switch (operationType) {
                 case put:
@@ -138,8 +143,10 @@ public class OHTableHotkeyThrottleUtil extends Thread {
             if (e.getCause() instanceof ObTableUnexpectedException) {
                 if (((ObTableUnexpectedException) e.getCause()).getErrorCode() == -4039) {
                     if (++throttleNum % 50 == 0) {
-                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key + " has pass "
-                                + passNum + " operations, and has throttle " + throttleNum + " operations --putTest");
+                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key
+                                           + " has pass " + passNum
+                                           + " operations, and has throttle " + throttleNum
+                                           + " operations --putTest");
                     }
                 } else {
                     e.printStackTrace();
@@ -161,8 +168,10 @@ public class OHTableHotkeyThrottleUtil extends Thread {
             if (e.getCause() instanceof ObTableUnexpectedException) {
                 if (((ObTableUnexpectedException) e.getCause()).getErrorCode() == -4039) {
                     if (++throttleNum % 50 == 0) {
-                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key + " has pass "
-                                + passNum + " operations, and has throttle " + throttleNum + " operations --getTest");
+                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key
+                                           + " has pass " + passNum
+                                           + " operations, and has throttle " + throttleNum
+                                           + " operations --getTest");
                     }
                 } else {
                     e.printStackTrace();
@@ -188,8 +197,10 @@ public class OHTableHotkeyThrottleUtil extends Thread {
             if (e.getCause() instanceof ObTableUnexpectedException) {
                 if (((ObTableUnexpectedException) e.getCause()).getErrorCode() == -4039) {
                     if (++throttleNum % 50 == 0) {
-                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key + " has pass "
-                                + passNum + " operations, and has throttle " + throttleNum + " operations --scanTest");
+                        System.out.println(Thread.currentThread().getName() + " rowkey is " + key
+                                           + " has pass " + passNum
+                                           + " operations, and has throttle " + throttleNum
+                                           + " operations --scanTest");
                     }
                 } else {
                     e.printStackTrace();
@@ -202,5 +213,3 @@ public class OHTableHotkeyThrottleUtil extends Thread {
         }
     }
 }
-
-
