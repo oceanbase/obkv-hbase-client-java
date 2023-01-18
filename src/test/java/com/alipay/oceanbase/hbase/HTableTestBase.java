@@ -185,11 +185,11 @@ public abstract class HTableTestBase {
         long startTimeBase = 1539700745718L;
         for (int j = 1; j <= testNum; j++) {
             byte[] rowkey = new byte[keyBytes.length + 8];
-            long current = startTimeBase +j*10;
+            long current = startTimeBase + j * 10;
             // System.out.println(current);
             byte[] currentBytes = Bytes.toBytes(current);
-            System.arraycopy(keyBytes , 0,rowkey,0,keyBytes.length);
-            System.arraycopy(currentBytes , 0,rowkey,keyBytes.length,currentBytes.length);
+            System.arraycopy(keyBytes, 0, rowkey, 0, keyBytes.length);
+            System.arraycopy(currentBytes, 0, rowkey, keyBytes.length, currentBytes.length);
             Put put = new Put(rowkey);
             put.add("family1".getBytes(), column1.getBytes(), toBytes(value));
             put.add("family1".getBytes(), column2.getBytes(), toBytes(value));
