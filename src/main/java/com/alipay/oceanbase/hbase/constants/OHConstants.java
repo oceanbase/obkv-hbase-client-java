@@ -53,6 +53,26 @@ public final class OHConstants {
     public static final String   HBASE_OCEANBASE_BATCH_EXECUTOR              = "hbase.oceanbase.batch.executor";
 
     /**
+     * ocenbase hbase connect server ODP address
+     */
+    public static final String   HBASE_OCEANBASE_ODP_ADDR                    = "hbase.oceanbase.odpAddr";
+
+    /**
+     * ocenbase hbase connect server ODP port
+     */
+    public static final String   HBASE_OCEANBASE_ODP_PORT                    = "hbase.oceanbase.odpPort";
+
+    /**
+     * ocenbase hbase connect server ODP mode
+     */
+    public static final String   HBASE_OCEANBASE_ODP_MODE                    = "hbase.oceanbase.odpMode";
+
+    /**
+     * ocenbase hbase connect server database
+     */
+    public static final String   HBASE_OCEANBASE_DATABASE                    = "hbase.oceanbase.database";
+
+    /**
      * ocenbase hbase model is consist of following columns
      * K hbase row key
      * Q hbase qualifier

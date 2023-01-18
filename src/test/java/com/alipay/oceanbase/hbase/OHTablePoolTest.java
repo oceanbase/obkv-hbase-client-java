@@ -21,6 +21,7 @@ import com.alipay.remoting.util.ConcurrentHashSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.util.PoolMap;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,6 +51,11 @@ public class OHTablePoolTest extends HTableTestBase {
         ohTablePool = newOHTablePool(10, null);
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
         hTable = ohTablePool.getTable("test");
+    }
+
+    @After
+    public void finish() throws IOException {
+        hTable.close();
     }
 
     public void test_current_get_close(final OHTablePool ohTablePool, int concurrency, int maxSize) {

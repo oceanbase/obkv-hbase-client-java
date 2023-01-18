@@ -34,6 +34,11 @@ public class OHTableClientTest extends HTableTestBase {
         ((OHTableClient) hTable).init();
     }
 
+    @After
+    public void finish() throws IOException {
+        hTable.close();
+    }
+
     @Test
     public void testRefreshTableEntry() throws Exception {
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
