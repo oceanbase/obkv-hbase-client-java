@@ -4,7 +4,7 @@
 
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OceanBase JavaClient for HBaseApi</description>
@@ -19,8 +19,8 @@
 
     <developers>
         <developer>
-            <name>Jiali Yang</name>
-            <email>1623359870@qq.com</email>
+            <id>oceanbaseObkvDevelopers</id>
+            <name>oceanbase obkv developers</name>
             <organization>OceanBase</organization>
         </developer>
     </developers>
@@ -60,6 +60,14 @@
                 <exclusion>
                     <artifactId>log4j</artifactId>
                     <groupId>log4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
                 </exclusion>
                 <exclusion>
                     <artifactId>avro-ipc</artifactId>
@@ -151,13 +159,11 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-nop</artifactId>
             <version>${slf4j.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
