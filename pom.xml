@@ -30,6 +30,19 @@
         <url>https://github.com/oceanbase/obkv-hbase-client-java</url>
     </scm>
 
+    <distributionManagement>
+        <repository>
+            <id>obkv-hbase-client-staging</id>
+            <name>${project.name}</name>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+        <snapshotRepository>
+            <id>obkv-hbase-client-snapshot</id>
+            <name>${project.name}</name>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+
     <properties>
         <hadoop.version>1.2.1</hadoop.version>
         <hbase.version>0.94.27</hbase.version>
@@ -62,12 +75,12 @@
                     <groupId>log4j</groupId>
                 </exclusion>
                 <exclusion>
-                    <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-log4j12</artifactId>
+                    <groupId>org.slf4j</groupId>
                 </exclusion>
                 <exclusion>
-                    <groupId>log4j</groupId>
                     <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
                 </exclusion>
                 <exclusion>
                     <artifactId>avro-ipc</artifactId>

@@ -958,13 +958,13 @@ public abstract class HTableTestBase {
         hTable.delete(delete);
 
         // append an absent column is not supported yet
-//        Append append = new Append(key.getBytes());
-//        append.add("family1".getBytes(), column.getBytes(), toBytes("_append"));
-//        Result r = hTable.append(append);
-//        Assert.assertEquals(1, r.raw().length);
-//        for (KeyValue kv : r.raw()) {
-//            Assert.assertEquals("_append", Bytes.toString(kv.getValue()));
-//        }
+        //        Append append = new Append(key.getBytes());
+        //        append.add("family1".getBytes(), column.getBytes(), toBytes("_append"));
+        //        Result r = hTable.append(append);
+        //        Assert.assertEquals(1, r.raw().length);
+        //        for (KeyValue kv : r.raw()) {
+        //            Assert.assertEquals("_append", Bytes.toString(kv.getValue()));
+        //        }
 
         Put put = new Put(key.getBytes());
         put.add("family1".getBytes(), column.getBytes(), toBytes("value"));
@@ -987,13 +987,13 @@ public abstract class HTableTestBase {
         hTable.delete(delete);
 
         // increment an absent column is not supported yet
-//        Increment increment = new Increment(key.getBytes());
-//        increment.addColumn("family1".getBytes(), column.getBytes(), 1);
-//        Result r = hTable.increment(increment);
-//        Assert.assertEquals(1, r.raw().length);
-//        for (KeyValue kv : r.raw()) {
-//            Assert.assertEquals(1L, Bytes.toLong(kv.getValue()));
-//        }
+        //        Increment increment = new Increment(key.getBytes());
+        //        increment.addColumn("family1".getBytes(), column.getBytes(), 1);
+        //        Result r = hTable.increment(increment);
+        //        Assert.assertEquals(1, r.raw().length);
+        //        for (KeyValue kv : r.raw()) {
+        //            Assert.assertEquals(1L, Bytes.toLong(kv.getValue()));
+        //        }
 
         long timestamp = System.currentTimeMillis();
         Put put = new Put(key.getBytes());
@@ -1009,14 +1009,14 @@ public abstract class HTableTestBase {
         }
 
         // increment an absent column is not supported yet
-//        increment = new Increment(key.getBytes());
-//        increment.addColumn("family1".getBytes(), column.getBytes(), 1);
-//        increment.setTimeRange(timestamp + 3, timestamp + 8);
-//        r = hTable.increment(increment);
-//        Assert.assertEquals(1, r.raw().length);
-//        for (KeyValue kv : r.raw()) {
-//            Assert.assertEquals(1L, Bytes.toLong(kv.getValue()));
-//        }
+        //        increment = new Increment(key.getBytes());
+        //        increment.addColumn("family1".getBytes(), column.getBytes(), 1);
+        //        increment.setTimeRange(timestamp + 3, timestamp + 8);
+        //        r = hTable.increment(increment);
+        //        Assert.assertEquals(1, r.raw().length);
+        //        for (KeyValue kv : r.raw()) {
+        //            Assert.assertEquals(1L, Bytes.toLong(kv.getValue()));
+        //        }
 
         long ret = hTable.incrementColumnValue(key.getBytes(), "family1".getBytes(),
             column.getBytes(), 1);
