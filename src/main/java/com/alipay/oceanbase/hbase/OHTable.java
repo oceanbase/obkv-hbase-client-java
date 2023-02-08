@@ -695,6 +695,7 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setMutations(batchOperation);
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batchOperation, getTargetTableName(tableNameString, Bytes.toString(f)));
+            request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
@@ -754,7 +755,7 @@ public class OHTable implements HTableInterface {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f)));
-
+            request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
@@ -787,8 +788,8 @@ public class OHTable implements HTableInterface {
     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount)
                                                                                               throws IOException {
         try {
-
             List<byte[]> qualifiers = new ArrayList<byte[]>();
+            qualifiers.add(qualifier);
 
             ObTableBatchOperation batch = new ObTableBatchOperation();
             batch.addTableOperation(getInstance(INCREMENT, new Object[] { row, qualifier,
@@ -803,7 +804,7 @@ public class OHTable implements HTableInterface {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(family)));
-
+            request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
@@ -1265,6 +1266,7 @@ public class OHTable implements HTableInterface {
         request.setTableName(targetTableName);
         request.setTableQueryAndMutate(queryAndMutate);
         request.setEntityType(ObTableEntityType.HKV);
+        request.setReturningAffectedEntity(true);
         return request;
     }
 
