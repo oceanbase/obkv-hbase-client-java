@@ -37,11 +37,18 @@ public class OHTablePoolTest extends HTableTestBase {
 
     private OHTablePool newOHTablePool(final int maxSize, final PoolMap.PoolType poolType) {
         OHTablePool pool = new OHTablePool(new Configuration(), maxSize, poolType);
-        pool.setParamUrl("test", ObHTableTestUtil.PARAM_URL);
         pool.setFullUserName("test", ObHTableTestUtil.FULL_USER_NAME);
         pool.setPassword("test", ObHTableTestUtil.PASSWORD);
-        pool.setSysUserName("test", ObHTableTestUtil.SYS_USER_NAME);
-        pool.setSysPassword("test", ObHTableTestUtil.SYS_PASSWORD);
+        if (ObHTableTestUtil.ODP_MODE) {
+            pool.setOdpAddr("test", ObHTableTestUtil.ODP_ADDR);
+            pool.setOdpPort("test", ObHTableTestUtil.ODP_PORT);
+            pool.setOdpMode("test", ObHTableTestUtil.ODP_MODE);
+            pool.setDatabase("test", ObHTableTestUtil.DATABASE);
+        } else {
+            pool.setParamUrl("test", ObHTableTestUtil.PARAM_URL);
+            pool.setSysUserName("test", ObHTableTestUtil.SYS_USER_NAME);
+            pool.setSysPassword("test", ObHTableTestUtil.SYS_PASSWORD);
+        }
         return pool;
     }
 

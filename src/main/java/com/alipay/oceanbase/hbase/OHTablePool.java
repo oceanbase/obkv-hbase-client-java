@@ -491,6 +491,83 @@ public class OHTablePool implements Closeable {
         }
     }
 
+    /**
+     * Sets the ODP address for the specified tables in this pool.
+     *
+     * @param tableName table name
+     * @param odpAddr ODP address
+     */
+    public void setOdpAddr(final String tableName, String odpAddr) {
+        setTableAttribute(tableName, HBASE_OCEANBASE_ODP_ADDR, Bytes.toBytes(odpAddr));
+    }
+
+    /**
+     * Gets the ODP address for the specified tables in this pool.
+     *
+     * @param tableName table name
+     * @return the ODP address
+     */
+    public String getOdpAddr(String tableName) {
+        return Bytes.toString(getTableAttribute(tableName, HBASE_OCEANBASE_ODP_ADDR));
+    }
+
+    /**
+     * Sets the ODP port for the specified tables in this pool.
+     *
+     * @param tableName table name
+     * @param odpPort ODP port
+     */
+    public void setOdpPort(final String tableName, int odpPort) {
+        setTableAttribute(tableName, HBASE_OCEANBASE_ODP_PORT, Bytes.toBytes(odpPort));
+    }
+
+    /**
+     * Gets the ODP port for the specified tables in this pool.
+     * @param tableName table name
+     * @return the ODP port
+     */
+    public int getOdpPort(String tableName) {
+        byte[] attr = getTableAttribute(tableName, HBASE_OCEANBASE_ODP_PORT);
+        return attr == null ? this.config.getInt(HBASE_OCEANBASE_ODP_PORT, -1) : Bytes.toInt(attr);
+    }
+
+    /**
+     * Sets the ODP mode for the specified tables in this pool.
+     * @param tableName table name
+     * @param odpMode ODP mode
+     */
+    public void setOdpMode(final String tableName, boolean odpMode) {
+        setTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE, Bytes.toBytes(odpMode));
+    }
+
+    /**
+     * Gets the ODP mode for the specified tables in this pool.
+     * @param tableName table name
+     * @return the ODP mode
+     */
+    public boolean getOdpMode(String tableName) {
+        byte[] attr = getTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE);
+        return attr != null && Bytes.toBoolean(attr);
+    }
+
+    /**
+     * Sets the ODP database name for the specified tables in this pool.
+     * @param tableName table name
+     * @param database ODP database name
+     */
+    public void setDatabase(final String tableName, String database) {
+        setTableAttribute(tableName, HBASE_OCEANBASE_DATABASE, Bytes.toBytes(database));
+    }
+
+    /**
+     * Gets the ODP database name for the specified tables in this pool.
+     * @param tableName table name
+     * @return the ODP database name
+     */
+    public String getDatabase(String tableName) {
+        return Bytes.toString(getTableAttribute(tableName, HBASE_OCEANBASE_DATABASE));
+    }
+
     private void setTableAttribute(String tableName, String attributeName, byte[] value) {
         if (tableAttributes == null && value == null) {
             return;

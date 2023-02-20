@@ -23,28 +23,32 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String PARAM_URL      = "";
-    public static String FULL_USER_NAME = "";
-    public static String PASSWORD       = "";
-    public static String SYS_USER_NAME  = "";
-    public static String SYS_PASSWORD   = "";
+    public static String  PARAM_URL      = "";
+    public static String  FULL_USER_NAME = "";
+    public static String  PASSWORD       = "";
+    public static String  SYS_USER_NAME  = "";
+    public static String  SYS_PASSWORD   = "";
+    public static String  ODP_ADDR       = "";
+    public static int     ODP_PORT       = 0;
+    public static boolean ODP_MODE       = false;
+    public static String  DATABASE       = "";
 
     public static Configuration newConfiguration() {
         Configuration conf = new Configuration();
-        // OCP mode
-        conf.set(HBASE_OCEANBASE_PARAM_URL, PARAM_URL);
         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
         conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
-        conf.set(HBASE_OCEANBASE_SYS_USER_NAME, SYS_USER_NAME);
-        conf.set(HBASE_OCEANBASE_SYS_PASSWORD, SYS_PASSWORD);
-
-        // ODP mode
-        // conf.set(HBASE_OCEANBASE_ODP_ADDR, "xx.xx.xx.xx");
-        // conf.setInt(HBASE_OCEANBASE_ODP_PORT, 8080);
-        // conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
-        // conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
-        // conf.setBoolean(HBASE_OCEANBASE_ODP_MODE, true);
-        // conf.set(HBASE_OCEANBASE_DATABASE, "daseName);
+        if (ODP_MODE) {
+            // ODP mode
+            conf.set(HBASE_OCEANBASE_ODP_ADDR, ODP_ADDR);
+            conf.setInt(HBASE_OCEANBASE_ODP_PORT, ODP_PORT);
+            conf.setBoolean(HBASE_OCEANBASE_ODP_MODE, ODP_MODE);
+            conf.set(HBASE_OCEANBASE_DATABASE, DATABASE);
+        } else {
+            // OCP mode
+            conf.set(HBASE_OCEANBASE_PARAM_URL, PARAM_URL);
+            conf.set(HBASE_OCEANBASE_SYS_USER_NAME, SYS_USER_NAME);
+            conf.set(HBASE_OCEANBASE_SYS_PASSWORD, SYS_PASSWORD);
+        }
         return conf;
     }
 
