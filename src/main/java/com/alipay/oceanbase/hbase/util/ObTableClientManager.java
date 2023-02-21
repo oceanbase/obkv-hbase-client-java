@@ -96,18 +96,17 @@ public class ObTableClientManager {
             try {
                 if (OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey) == null) {
                     ObTableClient obTableClient = new ObTableClient();
+                    obTableClient.setFullUserName(obTableClientKey.getFullUserName());
+                    obTableClient.setPassword(obTableClientKey.getPassword());
                     if (obTableClientKey.getOdpMode()) {
                         obTableClient.setOdpAddr(obTableClientKey.getOdpAddr());
                         obTableClient.setOdpPort(obTableClientKey.getOdpPort());
-                        obTableClient.setFullUserName(obTableClientKey.getFullUserName());
-                        obTableClient.setPassword(obTableClientKey.getPassword());
                         obTableClient.setOdpMode(obTableClientKey.getOdpMode());
                         obTableClient.setDatabase(obTableClientKey.getDatabase());
+                        obTableClient.setProperties(obTableClientKey.getProperties());
                         obTableClient.setRunningMode(ObTableClient.RunningMode.HBASE);
                     } else {
                         obTableClient.setParamURL(obTableClientKey.getParamUrl());
-                        obTableClient.setFullUserName(obTableClientKey.getFullUserName());
-                        obTableClient.setPassword(obTableClientKey.getPassword());
                         obTableClient.setSysUserName(obTableClientKey.getSysUserName());
                         obTableClient.setSysPassword(obTableClientKey.getSysPassword());
                         obTableClient.setProperties(obTableClientKey.getProperties());
