@@ -23,9 +23,11 @@ Import the dependency for your maven project:
 <dependency>
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
 </dependency>
 ```
+**Note:**
+* This example version is not kept up-to-date. So check the [releases](https://github.com/oceanbase/obkv-hbase-client-java/releases) page for the latest version frequently.
 
 The code demo:
 ``` java
