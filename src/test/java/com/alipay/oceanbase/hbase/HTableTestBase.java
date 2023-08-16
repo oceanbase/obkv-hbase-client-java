@@ -29,6 +29,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -1528,4 +1529,82 @@ public abstract class HTableTestBase {
         Assert.assertEquals("", 0, result.raw().length);
     }
 
+    public class IncrementHelper implements Runnable {
+        private HTableInterface hTable;
+        private Increment       increment;
+
+        public IncrementHelper(HTableInterface hTable, Increment increment) {
+            this.hTable = hTable;
+            this.increment = increment;
+        }
+
+        @Override
+        public void run() {
+            try {
+                hTable.increment(increment);
+            } catch (Exception e) {
+                e.getMessage();
+            }
+        }
+    }
+
+    public class PutHelper implements Runnable {
+        private HTableInterface hTable;
+        private Put             put;
+
+        public PutHelper(HTableInterface hTable, Put put) {
+            this.hTable = hTable;
+            this.put = put;
+        }
+
+        @Override
+        public void run() {
+            try {
+                hTable.put(put);
+            } catch (Exception e) {
+                e.getMessage();
+            }
+        }
+    }
+
+    public static byte[] toByteArray(long value) {
+        return ByteBuffer.allocate(Long.SIZE / Byte.SIZE).putLong(value).array();
+    }
+
+    // increment并发结果的正确性测试
+    @Test
+    public void testIncrementConcurrency() throws Exception {
+        String column = "incrementColumn";
+        String key = "incrementKey";
+        Delete delete = new Delete(key.getBytes());
+        delete.deleteColumns("family1".getBytes(), column.getBytes());
+        hTable.delete(delete);
+
+        for (int i = 0; i < 100; i++) {
+            Increment increment = new Increment(key.getBytes());
+            increment.addColumn("family1".getBytes(), column.getBytes(), 1);
+            Thread t = new Thread(new IncrementHelper(hTable, increment));
+            t.start();
+        }
+        Thread.sleep(300);
+        Put put = new Put(key.getBytes());
+        put.add("family1".getBytes(), column.getBytes(), toByteArray(1));
+        Thread t = new Thread(new PutHelper(hTable, put));
+        t.start();
+        t.join();
+
+        Thread.sleep(8000);
+
+        Get get = new Get("incrementKey".getBytes());
+        get.addColumn("family1".getBytes(), "incrementColumn".getBytes());
+        Result result = hTable.get(get);
+        KeyValue kv = result.raw()[0];
+        System.out.println(Bytes.toLong(kv.getValue()));
+        Assert.assertTrue(Bytes.toLong(kv.getValue()) < 100);
+
+        Thread.sleep(2000);
+        get.setMaxVersions(200);
+        result = hTable.get(get);
+        assertEquals(101, result.raw().length);
+    }
 }
