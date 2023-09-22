@@ -45,15 +45,17 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
 public class OHTableFactory extends HTableFactory {
     private final ExecutorService threadPool;
     private final OHTablePool     tablePool;
-    private final int             maxThreads;
-    private final long            keepAliveTime;
 
     public OHTableFactory(Configuration conf, OHTablePool tablePool) {
-        this.maxThreads = conf.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-            DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
-        this.keepAliveTime = conf.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-            DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
-        this.threadPool = OHTable.createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+        this(conf, tablePool, OHTable
+            .createDefaultThreadPoolExecutor(1, conf.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
+                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX), conf.getLong(
+                HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME, DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME)));
+    }
+
+    public OHTableFactory(Configuration conf, OHTablePool tablePool,
+        ExecutorService createTableThreadPool) {
+        this.threadPool = createTableThreadPool;
         this.tablePool = tablePool;
     }
 
@@ -132,5 +134,14 @@ public class OHTableFactory extends HTableFactory {
             copy.set(entry.getKey(), entry.getValue());
         }
         return copy;
+    }
+
+    /**
+     * close the factory resources, example create table threadPool
+     */
+    public void close() {
+        if (threadPool != null && !threadPool.isShutdown()) {
+            threadPool.shutdown();
+        }
     }
 }
