@@ -113,14 +113,24 @@ public class OHTablePool implements Closeable {
      */
     public OHTablePool(final Configuration config, final int maxSize,
                        final HTableInterfaceFactory tableFactory, PoolMap.PoolType poolType) {
+        this(config, maxSize, null, null, poolType);
+    }
+
+    public OHTablePool(final Configuration config, final int maxSize,
+        final HTableInterfaceFactory tableFactory,
+        final ExecutorService createTableExecutor, PoolMap.PoolType poolType) {
         // Make a new configuration instance so I can safely cleanup when
         // done with the pool.
         this.config = config == null ? new Configuration() : config;
         // Initialize connection when constructing htablepool rather than creating
         // htable
         this.maxSize = maxSize;
-        this.tableFactory = tableFactory == null ? new OHTableFactory(this.config, this)
-            : tableFactory;
+        if (tableFactory == null) {
+            this.tableFactory = createTableExecutor == null ? new OHTableFactory(this.config, this)
+                : new OHTableFactory(this.config, this, createTableExecutor);
+        } else {
+            this.tableFactory = tableFactory;
+        }
         if (poolType == null) {
             this.poolType = PoolMap.PoolType.Reusable;
         } else {
@@ -134,7 +144,7 @@ public class OHTablePool implements Closeable {
                     break;
             }
         }
-        this.tables = new PoolMap<String, HTableInterface>(this.poolType, this.maxSize);
+        this.tables = new PoolMap<>(this.poolType, this.maxSize);
     }
 
     /**
@@ -279,6 +289,10 @@ public class OHTablePool implements Closeable {
             closeTablePool(tableName);
         }
         this.tables.clear();
+        // close resources if instance is OHTableFactory
+        if (tableFactory != null && tableFactory instanceof OHTableFactory) {
+            ((OHTableFactory)tableFactory).close();
+        }
     }
 
     int getCurrentPoolSize(String tableName) {
