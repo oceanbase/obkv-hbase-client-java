@@ -54,7 +54,7 @@ public class OHTableFactory extends HTableFactory {
     }
 
     public OHTableFactory(Configuration conf, OHTablePool tablePool,
-        ExecutorService createTableThreadPool) {
+                          ExecutorService createTableThreadPool) {
         this.threadPool = createTableThreadPool;
         this.tablePool = tablePool;
     }

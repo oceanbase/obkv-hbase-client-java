@@ -291,7 +291,7 @@ public class OHTablePool implements Closeable {
         this.tables.clear();
         // close resources if instance is OHTableFactory
         if (tableFactory != null && tableFactory instanceof OHTableFactory) {
-            ((OHTableFactory)tableFactory).close();
+            ((OHTableFactory) tableFactory).close();
         }
     }
 
