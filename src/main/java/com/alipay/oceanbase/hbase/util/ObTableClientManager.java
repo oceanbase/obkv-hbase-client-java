@@ -96,8 +96,6 @@ public class ObTableClientManager {
             try {
                 if (OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey) == null) {
                     ObTableClient obTableClient = new ObTableClient();
-                    obTableClient.setFullUserName(obTableClientKey.getFullUserName());
-                    obTableClient.setPassword(obTableClientKey.getPassword());
                     if (obTableClientKey.getOdpMode()) {
                         obTableClient.setOdpAddr(obTableClientKey.getOdpAddr());
                         obTableClient.setOdpPort(obTableClientKey.getOdpPort());
@@ -112,6 +110,8 @@ public class ObTableClientManager {
                         obTableClient.setProperties(obTableClientKey.getProperties());
                         obTableClient.setRunningMode(ObTableClient.RunningMode.HBASE);
                     }
+                    obTableClient.setFullUserName(obTableClientKey.getFullUserName());
+                    obTableClient.setPassword(obTableClientKey.getPassword());
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
