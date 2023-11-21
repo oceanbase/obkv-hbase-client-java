@@ -253,6 +253,19 @@ public abstract class HTableTestBase {
         puts.add(put1);
         puts.add(put2);
         hTable.put(puts);
+
+        // put same k, q, t
+        Put put3 = new Put(Bytes.toBytes("testKey"));
+        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
+        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
+
+        Put put4 = new Put(Bytes.toBytes("testKey"));
+        put4.add(toBytes(family), toBytes(column1), System.currentTimeMillis(), toBytes(value1));
+        put4.add(toBytes(family), toBytes(column1), System.currentTimeMillis(), toBytes(value1));
+        puts = new ArrayList<Put>();
+        puts.add(put3);
+        puts.add(put4);
+        hTable.put(puts);
     }
 
     @Test
