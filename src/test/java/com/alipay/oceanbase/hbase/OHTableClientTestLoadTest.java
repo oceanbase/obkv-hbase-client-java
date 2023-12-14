@@ -77,8 +77,12 @@ public class OHTableClientTestLoadTest extends HTableTestBase {
             while (t.getCause() != null) {
                 t = t.getCause();
             }
-            Assert.assertTrue(t instanceof ObTableNotExistException);
-            Assert.assertTrue(t.getMessage().contains("test_t$testload"));
+            if (ObHTableTestUtil.ODP_MODE) {
+                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+            } else {
+                Assert.assertTrue(t instanceof ObTableNotExistException);
+                Assert.assertTrue(t.getMessage().contains("test_t$testload"));
+            }
         }
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_SUFFIX, "_a");
         try {
@@ -90,8 +94,12 @@ public class OHTableClientTestLoadTest extends HTableTestBase {
             while (t.getCause() != null) {
                 t = t.getCause();
             }
-            Assert.assertTrue(t instanceof ObTableNotExistException);
-            Assert.assertTrue(t.getMessage().contains("test_a$testload"));
+            if (ObHTableTestUtil.ODP_MODE) {
+                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+            } else {
+                Assert.assertTrue(t instanceof ObTableNotExistException);
+                Assert.assertTrue(t.getMessage().contains("test_a$testload"));
+            }
         }
     }
 }
