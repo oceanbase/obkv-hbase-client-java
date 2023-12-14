@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTableInterface;
@@ -91,8 +92,12 @@ public class OHTablePoolLoadTest extends HTableTestBase {
             while (t.getCause() != null) {
                 t = t.getCause();
             }
-            Assert.assertTrue(t instanceof ObTableNotExistException);
-            Assert.assertTrue(t.getMessage().contains("test_t$testload"));
+            if (ObHTableTestUtil.ODP_MODE) {
+                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+            } else {
+                Assert.assertTrue(t instanceof ObTableNotExistException);
+                Assert.assertTrue(t.getMessage().contains("test_t$testload"));
+            }
         }
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_SUFFIX, "_a");
         try {
@@ -103,8 +108,12 @@ public class OHTablePoolLoadTest extends HTableTestBase {
             while (t.getCause() != null) {
                 t = t.getCause();
             }
-            Assert.assertTrue(t instanceof ObTableNotExistException);
-            Assert.assertTrue(t.getMessage().contains("test_a$testload"));
+            if (ObHTableTestUtil.ODP_MODE) {
+                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+            } else {
+                Assert.assertTrue(t instanceof ObTableNotExistException);
+                Assert.assertTrue(t.getMessage().contains("test_a$testload"));
+            }
         }
 
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "false");
