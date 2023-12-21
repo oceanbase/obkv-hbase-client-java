@@ -268,8 +268,13 @@ public abstract class HTableTestBase {
         hTable.put(puts);
     }
 
+    public void tryPut(HTableInterface hTable, Put put) throws Exception {
+        hTable.put(put);
+        Thread.sleep(1);
+    }
+
     @Test
-    public void testGetFilter() throws IOException {
+    public void testGetFilter() throws Exception {
         String key1 = "getKey1";
         String key2 = "getKey2";
         String column1 = "column1";
@@ -316,15 +321,15 @@ public abstract class HTableTestBase {
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         // prefix filter
         get = new Get(toBytes(key1));
@@ -360,15 +365,15 @@ public abstract class HTableTestBase {
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         // columnCountGetFilter filter
         get = new Get(toBytes(key1));
@@ -399,10 +404,10 @@ public abstract class HTableTestBase {
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -473,15 +478,15 @@ public abstract class HTableTestBase {
         //Qualifier Filter
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -522,15 +527,15 @@ public abstract class HTableTestBase {
         // filter list
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         FilterList filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(1));
@@ -619,15 +624,15 @@ public abstract class HTableTestBase {
         // singleColumnValue Filter
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         // 任何一个版本满足则返回本行
         SingleColumnValueFilter singleColumnValueFilter;
@@ -720,8 +725,8 @@ public abstract class HTableTestBase {
         // Skip Filter
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column2Value2);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column2Value2);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
             toBytes(value2)));
@@ -743,8 +748,8 @@ public abstract class HTableTestBase {
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
 
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
             toBytes(value2)));
@@ -769,15 +774,15 @@ public abstract class HTableTestBase {
         // WhileMatchFilter
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column1Value2);
-        hTable.put(putKey1Column1Value1);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey1Column2Value1);
-        hTable.put(putKey1Column2Value2);
-        hTable.put(putKey2Column2Value1);
-        hTable.put(putKey2Column2Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
 
         WhileMatchFilter whileMatchFilter;
 
