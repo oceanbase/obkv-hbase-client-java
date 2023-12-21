@@ -522,7 +522,12 @@ public class OHTablePool implements Closeable {
      * @return the ODP address
      */
     public String getOdpAddr(String tableName) {
-        return Bytes.toString(getTableAttribute(tableName, HBASE_OCEANBASE_ODP_ADDR));
+        byte[] attr = getTableAttribute(tableName, HBASE_OCEANBASE_ODP_ADDR);
+        if (attr == null) {
+            return "";
+        } else {
+            return Bytes.toString(attr);
+        }
     }
 
     /**
@@ -579,7 +584,12 @@ public class OHTablePool implements Closeable {
      * @return the ODP database name
      */
     public String getDatabase(String tableName) {
-        return Bytes.toString(getTableAttribute(tableName, HBASE_OCEANBASE_DATABASE));
+        byte[] attr = getTableAttribute(tableName, HBASE_OCEANBASE_DATABASE);
+        if (attr == null) {
+            return "";
+        } else {
+            return Bytes.toString(attr);
+        }
     }
 
     private void setTableAttribute(String tableName, String attributeName, byte[] value) {
