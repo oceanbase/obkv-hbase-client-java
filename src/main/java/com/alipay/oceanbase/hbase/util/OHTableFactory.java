@@ -88,42 +88,80 @@ public class OHTableFactory extends HTableFactory {
     }
 
     private Configuration adjustConfiguration(Configuration configuration, String tableName) {
-        if (tablePool.getOdpMode(tableName)) {
+        byte[] isOdpModeAttr = tablePool.getTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE);
+        if ((isOdpModeAttr != null && Bytes.toBoolean(isOdpModeAttr))
+            || (isOdpModeAttr == null && configuration.getBoolean(HBASE_OCEANBASE_ODP_MODE, false))) {
             // set odp mode
-            String odpAddr = tablePool.getOdpAddr(tableName);
-            int odpPort = tablePool.getOdpPort(tableName);
-            String database = tablePool.getDatabase(tableName);
-            checkArgument(isNotBlank(odpAddr), HBASE_OCEANBASE_ODP_ADDR + " is blank");
-            checkArgument(odpPort >= 0, HBASE_OCEANBASE_ODP_PORT + " is invalid");
-            checkArgument(isNotBlank(database), HBASE_OCEANBASE_DATABASE + " is blank");
-            configuration.set(HBASE_OCEANBASE_ODP_ADDR, odpAddr);
-            configuration.setInt(HBASE_OCEANBASE_ODP_PORT, odpPort);
             configuration.setBoolean(HBASE_OCEANBASE_ODP_MODE, true);
-            configuration.set(HBASE_OCEANBASE_DATABASE, database);
+
+            // set odp address
+            String odpAddr = tablePool.getOdpAddr(tableName);
+            if (!odpAddr.isEmpty()) {
+                configuration.set(HBASE_OCEANBASE_ODP_ADDR, odpAddr);
+            }
+            checkArgument(isNotBlank(configuration.get(HBASE_OCEANBASE_ODP_ADDR)),
+                HBASE_OCEANBASE_ODP_ADDR + " is blank");
+
+            // set odp port
+            int odpPort = tablePool.getOdpPort(tableName);
+            if (odpPort != -1) {
+                configuration.setInt(HBASE_OCEANBASE_ODP_PORT, odpPort);
+            }
+            checkArgument(configuration.getInt(HBASE_OCEANBASE_ODP_PORT, -1) >= 0,
+                HBASE_OCEANBASE_ODP_PORT + " is invalid");
+
+            // set database name
+            String database = tablePool.getDatabase(tableName);
+            if (!database.isEmpty()) {
+                configuration.set(HBASE_OCEANBASE_DATABASE, database);
+            }
+            checkArgument(isNotBlank(configuration.get(HBASE_OCEANBASE_DATABASE)),
+                HBASE_OCEANBASE_DATABASE + " is blank");
         } else {
             // set ocp mode
+            configuration.setBoolean(HBASE_OCEANBASE_ODP_MODE, false);
+
+            // set paramUrl
             String paramUrl = Bytes.toString(tablePool.getTableAttribute(tableName,
                 HBASE_OCEANBASE_PARAM_URL));
+            if (paramUrl != null) {
+                configuration.set(HBASE_OCEANBASE_PARAM_URL, paramUrl);
+            }
+            checkArgument(isNotBlank(configuration.get(HBASE_OCEANBASE_PARAM_URL)),
+                "table [" + tableName + "]" + HBASE_OCEANBASE_PARAM_URL + " is blank");
+
+            // set sys user name
             String sysUserName = Bytes.toString(tablePool.getTableAttribute(tableName,
                 HBASE_OCEANBASE_SYS_USER_NAME));
+            if (sysUserName != null) {
+                configuration.set(HBASE_OCEANBASE_SYS_USER_NAME, sysUserName);
+            }
+            checkArgument(isNotBlank(configuration.get(HBASE_OCEANBASE_SYS_USER_NAME)),
+                "table [" + tableName + "]" + HBASE_OCEANBASE_SYS_USER_NAME + " is blank");
+
+            // set sys password
             String sysPassword = Bytes.toString(tablePool.getTableAttribute(tableName,
                 HBASE_OCEANBASE_SYS_PASSWORD));
-            checkArgument(isNotBlank(paramUrl), "table [" + tableName + "]"
-                                                + HBASE_OCEANBASE_PARAM_URL + " is blank");
-            checkArgument(isNotBlank(sysUserName), "table [" + tableName + "]"
-                                                   + HBASE_OCEANBASE_SYS_USER_NAME + " is blank");
-            configuration.set(HBASE_OCEANBASE_PARAM_URL, paramUrl);
-            configuration.set(HBASE_OCEANBASE_SYS_USER_NAME, sysUserName);
-            configuration.set(HBASE_OCEANBASE_SYS_PASSWORD, sysPassword);
+            if (sysPassword != null) {
+                configuration.set(HBASE_OCEANBASE_SYS_PASSWORD, sysPassword);
+            }
         }
+        // set full user name
         String fullUsername = Bytes.toString(tablePool.getTableAttribute(tableName,
             HBASE_OCEANBASE_FULL_USER_NAME));
+        if (fullUsername != null) {
+            configuration.set(HBASE_OCEANBASE_FULL_USER_NAME, fullUsername);
+        }
+        checkArgument(isNotBlank(configuration.get(HBASE_OCEANBASE_FULL_USER_NAME)),
+            "table [" + tableName + "]" + HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
+
+        // set password
         String password = Bytes.toString(tablePool.getTableAttribute(tableName,
             HBASE_OCEANBASE_PASSWORD));
-        checkArgument(isNotBlank(fullUsername), "table [" + tableName + "]"
-                                                + HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
-        configuration.set(HBASE_OCEANBASE_FULL_USER_NAME, fullUsername);
-        configuration.set(HBASE_OCEANBASE_PASSWORD, password);
+        if (password != null) {
+            configuration.set(HBASE_OCEANBASE_PASSWORD, password);
+        }
+
         return configuration;
     }
 
