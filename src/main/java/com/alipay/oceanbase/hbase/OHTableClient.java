@@ -18,12 +18,19 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.core.Lifecycle;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 
 import java.io.IOException;
 import java.util.List;
@@ -106,51 +113,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
         if (!initialized) {
             throw new IllegalStateException("tableName " + tableNameString + " is not initialized");
         }
-    }
-
-    // Not support.
-    @Override
-    public RowLock lockRow(byte[] row) throws IOException {
-        checkStatus();
-        return ohTable.lockRow(row);
-    }
-
-    // Not support.
-    @Override
-    public void unlockRow(RowLock rl) throws IOException {
-        checkStatus();
-        ohTable.unlockRow(rl);
-    }
-
-    // Not support.
-    @Override
-    public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
-        checkStatus();
-        return ohTable.coprocessorProxy(protocol, row);
-    }
-
-    // Not support.
-    @Override
-    public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
-                                                                             byte[] startKey,
-                                                                             byte[] endKey,
-                                                                             Batch.Call<T, R> callable)
-                                                                                                       throws IOException,
-                                                                                                       Throwable {
-        checkStatus();
-        return ohTable.coprocessorExec(protocol, startKey, endKey, callable);
-    }
-
-    // Not support.
-    @Override
-    public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
-                                                                   byte[] startKey, byte[] endKey,
-                                                                   Batch.Call<T, R> callable,
-                                                                   Batch.Callback<R> callback)
-                                                                                              throws IOException,
-                                                                                              Throwable {
-        checkStatus();
-        ohTable.coprocessorExec(protocol, startKey, endKey, callable, callback);
     }
 
     @Override
@@ -359,5 +321,105 @@ public class OHTableClient implements HTableInterface, Lifecycle {
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
         return this.ohTable.getStartEndKeys();
+    }
+    @Override
+    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor var1,
+                                                                      Message var2, byte[] var3,
+                                                                      byte[] var4, R var5)
+                                                                                          throws ServiceException,
+                                                                                          Throwable {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor var1,
+                                                            Message var2, byte[] var3, byte[] var4,
+                                                            R var5, Batch.Callback<R> var6)
+                                                                                           throws ServiceException,
+                                                                                           Throwable {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public boolean checkAndMutate(byte[] var1, byte[] var2, byte[] var3,
+                                  CompareFilter.CompareOp var4, byte[] var5, RowMutations var6)
+                                                                                               throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public CoprocessorRpcChannel coprocessorService(byte[] var1) {
+        return null;
+    }
+
+    @Override
+    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> var1, byte[] var2,
+                                                                    byte[] var3,
+                                                                    Batch.Call<T, R> var4)
+                                                                                          throws ServiceException,
+                                                                                          Throwable {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public <T extends Service, R> void coprocessorService(Class<T> var1, byte[] var2, byte[] var3,
+                                                          Batch.Call<T, R> var4,
+                                                          Batch.Callback<R> var5)
+                                                                                 throws ServiceException,
+                                                                                 Throwable {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public long incrementColumnValue(byte[] var1, byte[] var2, byte[] var3, long var4,
+                                     Durability var6) throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public boolean checkAndDelete(byte[] var1, byte[] var2, byte[] var3,
+                                  CompareFilter.CompareOp var4, byte[] var5, Delete var6)
+                                                                                         throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public boolean checkAndPut(byte[] var1, byte[] var2, byte[] var3, CompareFilter.CompareOp var4,
+                               byte[] var5, Put var6) throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public <R> void batchCallback(List<? extends Row> var1, Object[] var2, Batch.Callback<R> var3)
+                                                                                                  throws IOException,
+                                                                                                  InterruptedException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public <R> Object[] batchCallback(List<? extends Row> var1, Batch.Callback<R> var2)
+                                                                                       throws IOException,
+                                                                                       InterruptedException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public TableName getName() {
+        return null;
+    }
+
+    @Override
+    public boolean[] existsAll(List<Get> var1) throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public Boolean[] exists(List<Get> var1) throws IOException {
+        throw new IllegalArgumentException("Not implemented");
+    }
+
+    @Override
+    public void setAutoFlushTo(boolean autoFlush) {
+        ohTable.setAutoFlush(autoFlush);
     }
 }

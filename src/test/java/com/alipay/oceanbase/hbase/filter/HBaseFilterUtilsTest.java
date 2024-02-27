@@ -122,6 +122,9 @@ public class HBaseFilterUtilsTest {
     public void testPageFilter() {
         PageFilter filter = new PageFilter(128);
         Assert.assertEquals("PageFilter(128)", HBaseFilterUtils.toParseableString(filter));
+        FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL);
+        filterList.addFilter(filter);
+        // system.out.println(HBaseFilterUtils.toParseableString(filter));
     }
 
     @Test

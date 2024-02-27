@@ -338,8 +338,8 @@ public abstract class HTableTestBase {
 
         // put same k, q, t
         Put put3 = new Put(Bytes.toBytes("testKey"));
-        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
-        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
+        put3.add(toBytes(family), toBytes(column1), 100L, toBytes(value1));
+        put3.add(toBytes(family), toBytes(column1), 100L, toBytes(value1));
 
         Put put4 = new Put(Bytes.toBytes("testKey"));
         put4.add(toBytes(family), toBytes(column1), System.currentTimeMillis(), toBytes(value1));
