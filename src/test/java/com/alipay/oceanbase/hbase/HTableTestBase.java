@@ -861,6 +861,7 @@ public abstract class HTableTestBase {
         Get get;
         Scan scan;
         Result r;
+        int res_count = 0;
 
         tryPut(hTable, putKey1Column1Value1);
         tryPut(hTable, putKey1Column1Value2);
@@ -917,19 +918,60 @@ public abstract class HTableTestBase {
         // verify simple scan across partition
         scan = new Scan();
         scan.addFamily("family1".getBytes());
-        scan.setStartRow("getKey1x".getBytes());
-        scan.setStopRow("getKey2x".getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey2x".getBytes());
         scan.setMaxVersions(10);
         ResultScanner scanner = hTable.getScanner(scan);
 
+        res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.println("rowKey: " + new String(keyValue.getRow()) + " columnQualifier:"
-                                   + new String(keyValue.getQualifier()) + " timestamp:"
-                                   + keyValue.getTimestamp() + " value:"
-                                   + new String(keyValue.getValue()));
+                Arrays.equals(key1.getBytes(), keyValue.getRow());
+                res_count+=1;
             }
         }
+        Assert.assertEquals(res_count, 7);
+
+        // scan with prefixFilter
+        scan = new Scan();
+        scan.addFamily("family1".getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        PrefixFilter prefixFilter = new PrefixFilter(toBytes("scanKey2"));
+        scan.setFilter(prefixFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                Arrays.equals(key2.getBytes(), keyValue.getRow());
+                res_count+=1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+
+        // scan with singleColumnValueFilter
+        // 任何一个版本满足则返回本行
+        SingleColumnValueFilter singleColumnValueFilter;
+        singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
+                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+                toBytes(value1)));
+        scan = new Scan();
+        scan.addFamily("family1".getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.setFilter(singleColumnValueFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count+=1;
+            }
+        }
+        Assert.assertEquals(res_count, 9);
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
