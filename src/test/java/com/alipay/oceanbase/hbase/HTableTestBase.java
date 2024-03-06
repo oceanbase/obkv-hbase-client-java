@@ -798,11 +798,127 @@ public abstract class HTableTestBase {
     }
 
     @Test
-    public void testScan() throws IOException {
-        Scan scan = new Scan();
-        scan.addColumn("family1".getBytes(), "column1_1".getBytes());
-        scan.setStartRow("key_1".getBytes());
-        scan.setStopRow("key_9".getBytes());
+    public void testScan() throws Exception {
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey3Column1Value2 = new Put(toBytes(key3));
+        putKey3Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey3Column2Value1 = new Put(toBytes(key3));
+        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column2Value2 = new Put(toBytes(key3));
+        putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Get get;
+        Scan scan;
+        Result r;
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey3Column1Value2);
+        tryPut(hTable, putKey3Column2Value1);
+        tryPut(hTable, putKey3Column2Value2);
+
+        // show table (time maybe different)
+        //+-----------+---------+----------------+--------+
+        //| K         | Q       | T              | V      |
+        //+-----------+---------+----------------+--------+
+        //| scanKey1x | column1 | -1709714409669 | value1 |
+        //| scanKey1x | column1 | -1709714409637 | value2 |
+        //| scanKey1x | column1 | -1709714409603 | value1 |
+        //| scanKey1x | column2 | -1709714409802 | value2 |
+        //| scanKey1x | column2 | -1709714409768 | value1 |
+        //| scanKey1x | column2 | -1709714409735 | value2 |
+        //| scanKey1x | column2 | -1709714409702 | value1 |
+        //| scanKey2x | column2 | -1709714409869 | value2 |
+        //| scanKey2x | column2 | -1709714409836 | value1 |
+        //| scanKey3x | column1 | -1709714409940 | value2 |
+        //| scanKey3x | column1 | -1709714409904 | value1 |
+        //| scanKey3x | column2 | -1709714410010 | value2 |
+        //| scanKey3x | column2 | -1709714409977 | value1 |
+        //+-----------+---------+----------------+--------+
+
+        // check insert ok
+        get = new Get(toBytes(key1));
+        get.addFamily(toBytes(family));
+        get.setMaxVersions(10);
+        r = hTable.get(get);
+        Assert.assertEquals(7, r.raw().length);
+
+        get = new Get(toBytes(key2));
+        get.addFamily(toBytes(family));
+        get.setMaxVersions(10);
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.raw().length);
+
+        get = new Get(toBytes(key3));
+        get.addFamily(toBytes(family));
+        get.setMaxVersions(10);
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.raw().length);
+
+        // verify simple scan across partition
+        scan = new Scan();
+        scan.addFamily("family1".getBytes());
+        scan.setStartRow("getKey1x".getBytes());
+        scan.setStopRow("getKey2x".getBytes());
         scan.setMaxVersions(10);
         ResultScanner scanner = hTable.getScanner(scan);
 
@@ -814,6 +930,10 @@ public abstract class HTableTestBase {
                                    + new String(keyValue.getValue()));
             }
         }
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
     }
 
     @Test
