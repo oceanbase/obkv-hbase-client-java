@@ -885,7 +885,7 @@ public class OHTable implements HTableInterface {
                         if (throwResult != null) {
                             ExceptionUtil.throwObTableException(throwResult.getExecuteHost(),
                                 throwResult.getExecutePort(), throwResult.getSequence(),
-                                throwResult.getUniqueId(), throwResult.getHeader().getErrno());
+                                throwResult.getUniqueId(), throwResult.getHeader().getErrno(), "HBase Error");
                         }
                     } catch (Exception e) {
                         logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList,
