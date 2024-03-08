@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
@@ -28,6 +29,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import java.io.IOError;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -45,6 +47,68 @@ public abstract class HTableTestBase {
     public ExpectedException  expectedException = ExpectedException.none();
 
     protected HTableInterface hTable;
+
+    @Test
+    public void testTableGroup() throws IOError, IOException {
+        /*
+        CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+        CREATE TABLE `test$family_group` (
+                      `K` varbinary(1024) NOT NULL,
+                      `Q` varbinary(256) NOT NULL,
+                      `T` bigint(20) NOT NULL,
+                      `V` varbinary(1024) DEFAULT NULL,
+                      PRIMARY KEY (`K`, `Q`, `T`)
+                ) TABLEGROUP = test;
+         */
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String value = "value333444";
+        long timestamp = System.currentTimeMillis();
+        // put data
+        Put put = new Put(toBytes(key));
+        put.add("family_group".getBytes(), column1.getBytes(), timestamp, toBytes(value + "1"));
+        hTable.put(put);
+        // test get with empty family
+        Get get = new Get(toBytes(key));
+        Result r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+        for (KeyValue keyValue : r.raw()) {
+            System.out.println("rowKey: " + new String(keyValue.getRow())
+                    + " family :" + new String(keyValue.getFamily())
+                    + " columnQualifier:"
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
+        }
+
+        get = new Get(toBytes(key));
+        get.setTimeStamp(r.raw()[0].getTimestamp());
+        get.setMaxVersions(1);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+        for (KeyValue keyValue : r.raw()) {
+            System.out.println("rowKey: " + new String(keyValue.getRow())
+                    + " family :" + new String(keyValue.getFamily())
+                    + " columnQualifier:"
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
+        }
+
+        // test scan with empty family
+        Scan scan = new Scan();
+        ResultScanner scanner = hTable.getScanner(scan);
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.println("rowKey: " + new String(keyValue.getRow())
+                                   + " family :" + new String(keyValue.getFamily())
+                                   + " columnQualifier:"
+                                   + new String(keyValue.getQualifier()) + " timestamp:"
+                                   + keyValue.getTimestamp() + " value:"
+                                   + new String(keyValue.getValue()));
+            }
+        }
+    }
 
     @Test
     public void testBasic() throws Exception {
@@ -1267,13 +1331,15 @@ public abstract class HTableTestBase {
         }
 
         Get get = new Get(key.getBytes());
-        // get.addColumn(null, null);
+        get.addColumn(Bytes.toBytes(""), null);
         Result r = null;
         try {
             r = hTable.get(get);
             fail();
         } catch (FeatureNotSupportedException e) {
             Assert.assertTrue(e.getMessage().contains("family is empty"));
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("family is blank"));
         }
 
         Scan scan = new Scan(key.getBytes());
