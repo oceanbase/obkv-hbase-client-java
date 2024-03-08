@@ -821,7 +821,6 @@ public abstract class HTableTestBase {
         hTable.delete(deleteKey2Family);
         hTable.delete(deleteKey3Family);
 
-
         Put putKey1Column1Value1 = new Put(toBytes(key1));
         putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
 
@@ -927,7 +926,7 @@ public abstract class HTableTestBase {
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
                 Arrays.equals(key1.getBytes(), keyValue.getRow());
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 7);
@@ -946,16 +945,55 @@ public abstract class HTableTestBase {
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
                 Arrays.equals(key2.getBytes(), keyValue.getRow());
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 2);
+
+        // scan with pageFilter
+        // 2 page -> 1x and 2x
+        scan = new Scan();
+        scan.addFamily("family1".getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey4x".getBytes());
+        PageFilter pageFilter = new PageFilter(2);
+        scan.setFilter(pageFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                Arrays.equals(key2.getBytes(), keyValue.getRow());
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 9);
+
+        // 0 page -> Null
+        scan = new Scan();
+        scan.addFamily("family1".getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        pageFilter = new PageFilter(0);
+        scan.setFilter(pageFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                Arrays.equals(key2.getBytes(), keyValue.getRow());
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 0);
 
         // scan with singleColumnValueFilter
         // 任何一个版本满足则返回本行
         SingleColumnValueFilter singleColumnValueFilter;
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value1)));
         scan = new Scan();
         scan.addFamily("family1".getBytes());
@@ -968,7 +1006,7 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 9);
