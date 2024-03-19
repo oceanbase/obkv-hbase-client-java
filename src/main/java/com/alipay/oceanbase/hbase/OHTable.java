@@ -19,13 +19,15 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.constants.OHConstants;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.exception.ExceptionUtil;
+import com.alipay.oceanbase.rpc.mutation.BatchOperation;
+import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -35,24 +37,11 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
-import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.Append;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Increment;
-import org.apache.hadoop.hbase.client.Mutation;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Row;
-import org.apache.hadoop.hbase.client.RowLock;
-import org.apache.hadoop.hbase.client.RowMutations;
-import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.io.TimeRange;
@@ -572,25 +561,15 @@ public class OHTable implements HTableInterface {
 
             Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet().iterator()
                 .next();
-            ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue(), false, null);
 
-            ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch,
-                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())));
-            ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient
-                .execute(request);
-            boolean hasError = false;
-            int throwErrorCode = 0;
-            for (ObTableOperationResult obTableOperationResult : result.getResults()) {
-                int errorCode = obTableOperationResult.getHeader().getErrno();
-                errorCodeList.add(errorCode);
-                if (errorCode != 0) {
-                    hasError = true;
-                    throwErrorCode = errorCode;
-                }
-            }
+            BatchOperation batch = buildBatchOperation(getTargetTableName(tableNameString,
+                    Bytes.toString(entry.getKey())), entry.getValue(), false, null);
+            BatchOperationResult results = batch.execute();
 
+            errorCodeList = results.getErrorCodeList();
+            boolean hasError = results.hasError();
             if (hasError) {
-                ExceptionUtil.throwObTableException(throwErrorCode);
+                throw results.getFirstException();
             }
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, errorCodeList, e);
@@ -859,33 +838,17 @@ public class OHTable implements HTableInterface {
                     try {
                         String targetTableName = getTargetTableName(this.tableNameString,
                             entry.getKey());
-                        ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue()
-                            .getSecond(), false, null);
-                        ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(
-                            batch, targetTableName);
 
-                        ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient
-                            .execute(request);
-                        List<ObTableOperationResult> obTableOperationResults = result.getResults();
+                        BatchOperation batch = buildBatchOperation(targetTableName, entry.getValue().getSecond(), false, null);
+                        BatchOperationResult results = batch.execute();
 
-                        ObTableOperationResult throwResult = null;
-
-                        for (ObTableOperationResult obTableOperationResult : obTableOperationResults) {
-                            int errorCode = obTableOperationResult.getHeader().getErrno();
-                            errorCodeList.add(errorCode);
-                            if (errorCode != 0) {
-                                throwResult = obTableOperationResult;
-                            }
-                        }
-
+                        errorCodeList = results.getErrorCodeList();
+                        boolean hasError = results.hasError();
                         for (Integer index : entry.getValue().getFirst()) {
-                            resultSuccess[index] = throwResult == null;
+                            resultSuccess[index] = !hasError;
                         }
-
-                        if (throwResult != null) {
-                            ExceptionUtil.throwObTableException(throwResult.getExecuteHost(),
-                                throwResult.getExecutePort(), throwResult.getSequence(),
-                                throwResult.getUniqueId(), throwResult.getHeader().getErrno(), "HBase Error");
+                        if (hasError) {
+                            throw results.getFirstException();
                         }
                     } catch (Exception e) {
                         logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList,
@@ -1207,6 +1170,47 @@ public class OHTable implements HTableInterface {
         }
         batch.setSameType(true);
         batch.setSamePropertiesNames(true);
+        return batch;
+    }
+
+    private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv, boolean putToAppend) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
+        switch (kvType) {
+            case Put:
+                ObTableOperationType operationType;
+                if (putToAppend) {
+                    operationType = APPEND;
+                } else {
+                    operationType = INSERT_OR_UPDATE;
+                }
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType, ROW_KEY_COLUMNS,
+                        new Object[]{kv.getRow(), kv.getQualifier(), kv.getTimestamp()}, V_COLUMNS,
+                        new Object[]{kv.getValue()});
+            case Delete:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[]{kv.getRow(), kv.getQualifier(), kv.getTimestamp()}, null, null);
+            case DeleteColumn:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[]{kv.getRow(), kv.getQualifier(), -kv.getTimestamp()}, null, null);
+            case DeleteFamily:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS, new Object[]{kv.getRow(), null, -kv.getTimestamp()},
+                        null, null);
+            default:
+                throw new IllegalArgumentException("illegal mutation type " + kvType);
+        }
+    }
+
+    private BatchOperation buildBatchOperation(String tableName, List<KeyValue> keyValueList,
+                                               boolean putToAppend,
+                                               List<byte[]> qualifiers) {
+        BatchOperation batch = obTableClient.batchOperation(tableName);
+        for (KeyValue kv : keyValueList) {
+            if (qualifiers != null) {
+                qualifiers.add(kv.getQualifier());
+            }
+            batch.addOperation(buildMutation(kv, putToAppend));
+        }
+        batch.setEntityType(ObTableEntityType.HKV);
         return batch;
     }
 
