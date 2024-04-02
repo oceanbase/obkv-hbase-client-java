@@ -685,6 +685,29 @@ public abstract class HTableTestBase {
         r = hTable.get(get);
         Assert.assertEquals(1, r.raw().length);
 
+        // test empty filter in FilterList
+        filterList = new FilterList();
+        FilterList emptyFilterList = new FilterList();
+        filterList.addFilter(emptyFilterList);
+        filterList.addFilter(new PageFilter(1));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(7, r.raw().length);
+
+        // test empty filter in FilterList
+        filterList = new FilterList();
+        emptyFilterList = new FilterList();
+        filterList.addFilter(emptyFilterList);
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(7, r.raw().length);
+
         // singleColumnValue Filter
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
