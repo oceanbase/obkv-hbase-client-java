@@ -133,13 +133,13 @@ public class HBaseFilterUtils {
     private static String toParseableString(FilterList filterList) {
         StringBuilder sb = new StringBuilder();
         List<Filter> filters = filterList.getFilters();
-        boolean isFirst = true;
+        boolean isEmpty = true;
         for (int i = 0; i < filters.size(); i++) {
             String filterString = toParseableString(filters.get(i));
             if (filterString.isEmpty()) continue;
-            if (isFirst) {
+            if (isEmpty) {
                 sb.append("(").append(filterString);
-                isFirst = false;
+                isEmpty = false;
             } else {
                 sb.append(" ");
                 if (filterList.getOperator().equals(FilterList.Operator.MUST_PASS_ALL)) {
@@ -152,7 +152,7 @@ public class HBaseFilterUtils {
                 sb.append(" ").append(filterString);
             }
         }
-        if (!isFirst) {
+        if (!isEmpty) {
             sb.append(")");
         }
         return sb.toString();
