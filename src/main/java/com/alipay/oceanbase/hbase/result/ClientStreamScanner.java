@@ -35,8 +35,8 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
 public class ClientStreamScanner extends AbstractClientScanner {
 
-    private static final Logger                  logger     = TableHBaseLoggerFactory
-                                                                .getLogger(ClientStreamScanner.class);
+    private static final Logger                  logger       = TableHBaseLoggerFactory
+                                                                  .getLogger(ClientStreamScanner.class);
 
     private final ObTableClientQueryStreamResult streamResult;
 
@@ -44,9 +44,9 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private byte[]                               family;
 
-    private boolean                              closed     = false;
+    private boolean                              closed       = false;
 
-    private boolean                              streamNext = true;
+    private boolean                              streamNext   = true;
 
     private boolean                              isTableGroup = false;
 
@@ -77,11 +77,11 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 return null;
             }
 
-
             byte[][] familyAndQualifier = new byte[2][];
             if (this.isTableGroup) {
                 // split family and qualifier
-                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow.get(1).getValue());
+                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow
+                    .get(1).getValue());
                 this.family = familyAndQualifier[0];
             } else {
                 familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();
@@ -100,7 +100,8 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 List<ObObj> row = streamResult.getRow();
                 if (this.isTableGroup) {
                     // split family and qualifier
-                    familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow.get(1).getValue());
+                    familyAndQualifier = OHBaseFuncUtils
+                        .extractFamilyFromQualifier((byte[]) startRow.get(1).getValue());
                     this.family = familyAndQualifier[0];
                 } else {
                     familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();

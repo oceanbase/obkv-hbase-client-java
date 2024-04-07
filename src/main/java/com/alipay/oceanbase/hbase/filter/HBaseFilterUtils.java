@@ -136,7 +136,8 @@ public class HBaseFilterUtils {
         boolean isEmpty = true;
         for (int i = 0; i < filters.size(); i++) {
             String filterString = toParseableString(filters.get(i));
-            if (filterString.isEmpty()) continue;
+            if (filterString.isEmpty())
+                continue;
             if (isEmpty) {
                 sb.append("(").append(filterString);
                 isEmpty = false;
