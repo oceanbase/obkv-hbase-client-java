@@ -18,7 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
@@ -889,6 +889,8 @@ public abstract class HTableTestBase {
         String key1 = "scanKey1x";
         String key2 = "scanKey2x";
         String key3 = "scanKey3x";
+        String zKey1 = "zScanKey1";
+        String zKey2 = "zScanKey2";
         String column1 = "column1";
         String column2 = "column2";
         String value1 = "value1";
@@ -903,10 +905,16 @@ public abstract class HTableTestBase {
         deleteKey2Family.deleteFamily(toBytes(family));
         Delete deleteKey3Family = new Delete(toBytes(key3));
         deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteZKey1Family = new Delete(toBytes(zKey1));
+        deleteZKey1Family.deleteFamily(toBytes(family));
+        Delete deleteZKey2Family = new Delete(toBytes(zKey2));
+        deleteZKey2Family.deleteFamily(toBytes(family));
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
         hTable.delete(deleteKey3Family);
+        hTable.delete(deleteZKey1Family);
+        hTable.delete(deleteZKey2Family);
 
 
         Put putKey1Column1Value1 = new Put(toBytes(key1));
@@ -945,6 +953,12 @@ public abstract class HTableTestBase {
         Put putKey3Column2Value2 = new Put(toBytes(key3));
         putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
 
+        Put putzKey1Column1Value1 = new Put(toBytes(zKey1));
+        putzKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putzKey2Column1Value1 = new Put(toBytes(zKey2));
+        putzKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
         Get get;
         Scan scan;
         Result r;
@@ -963,6 +977,8 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey3Column1Value2);
         tryPut(hTable, putKey3Column2Value1);
         tryPut(hTable, putKey3Column2Value2);
+        tryPut(hTable, putzKey1Column1Value1);
+        tryPut(hTable, putzKey2Column1Value1);
 
         // show table (time maybe different)
         //+-----------+---------+----------------+--------+
@@ -1058,11 +1074,50 @@ public abstract class HTableTestBase {
                 res_count+=1;
             }
         }
-        Assert.assertEquals(res_count, 9);
+        Assert.assertEquals(9, res_count);
+
+        // scan with HConstants.EMPTY_START_ROW / HConstants.EMPTY_END_ROW / HConstants.EMPTY_BYTE_ARRAY
+        scan = new Scan("zScanKey".getBytes(), HConstants.EMPTY_END_ROW);
+        scan.addFamily("family1".getBytes());
+        scan.setFilter(singleColumnValueFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count+=1;
+            }
+        }
+        Assert.assertEquals(2, res_count);
+
+        // try to delete all with scan
+        scan = new Scan(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY);
+        scan.addFamily("family1".getBytes());
+        scanner = hTable.getScanner(scan);
+        for (Result result : scanner) {
+            Delete delete = new Delete(result.getRow());
+            delete.deleteFamily(toBytes(family));
+            hTable.delete(delete);
+        }
+
+        // verify table is empty
+        scan = new Scan("scanKey".getBytes(), HConstants.EMPTY_BYTE_ARRAY);
+        scan.addFamily("family1".getBytes());
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count+=1;
+            }
+        }
+        Assert.assertEquals(0, res_count);
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
         hTable.delete(deleteKey3Family);
+        hTable.delete(deleteZKey1Family);
+        hTable.delete(deleteZKey2Family);
     }
 
     @Test

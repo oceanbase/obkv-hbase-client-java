@@ -498,13 +498,8 @@ public class OHTable implements HTableInterface {
                         } else {
                             filter = buildObHTableFilter(scan.getFilter(),
                                 scan.getTimeRange(), scan.getMaxVersions(), null);
-                            if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
-                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
-                                obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
-                            } else {
-                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                    scan.getStopRow(), false, scan.getBatch());
-                            }
+                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                scan.getStopRow(), false, scan.getBatch());
 
                             request = buildObTableQueryRequest(obTableQuery, tableNameString);
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
@@ -517,20 +512,16 @@ public class OHTable implements HTableInterface {
                             family = entry.getKey();
                             filter = buildObHTableFilter(scan.getFilter(),
                                 scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
-                            if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
-                                && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
-                                obTableQuery = buildObTableQuery(filter, null, scan.getBatch());
-                            } else {
-                                // not support reverse scan.
-                                // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
-                                // if (scan.getReversed()) {
-                                //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                //         scan.getStartRow(), true, scan.getBatch());
-                                // } else {
-                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                    scan.getStopRow(), false, scan.getBatch());
-                                // }
-                            }
+
+                            // not support reverse scan.
+                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
+                            // if (scan.getReversed()) {
+                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                            //         scan.getStartRow(), true, scan.getBatch());
+                            // } else {
+                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                scan.getStopRow(), false, scan.getBatch());
+                            // }
 
                             // not support reverse scan.
                             // if (scan.getReversed()) { // reverse scan 时设置为逆序
@@ -1234,13 +1225,16 @@ public class OHTable implements HTableInterface {
                                            int batchSize) {
         ObNewRange obNewRange = new ObNewRange();
 
-        if (includeStart) {
+        if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
+            obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
+                    ObObj.getMin()));
+        } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
         } else {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
         }
 
-        if (Arrays.equals(stop, HConstants.EMPTY_START_ROW)) {
+        if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
                 ObObj.getMax()));
         } else if (includeStop) {
