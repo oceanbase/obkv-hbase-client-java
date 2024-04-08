@@ -403,5 +403,5 @@
             </plugin>
         </plugins>
     </build>
-    <profiles />
+    <profiles></profiles>
 </project>
