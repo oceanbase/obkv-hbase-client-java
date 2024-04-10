@@ -100,17 +100,18 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 List<ObObj> row = streamResult.getRow();
                 if (this.isTableGroup) {
                     // split family and qualifier
-                    familyAndQualifier = OHBaseFuncUtils
-                        .extractFamilyFromQualifier((byte[]) startRow.get(1).getValue());
+                    familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row
+                        .get(1).getValue());
                     this.family = familyAndQualifier[0];
                 } else {
-                    familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();
+                    familyAndQualifier[1] = (byte[]) row.get(1).getValue();
                 }
                 byte[] k = (byte[]) row.get(0).getValue();
                 byte[] q = familyAndQualifier[1];
                 long t = (Long) row.get(2).getValue();
                 byte[] v = (byte[]) row.get(3).getValue();
-                if (Arrays.equals(sk, k)) {// when rowKey is equal to the previous rowKey ,merge the result into the same result
+                if (Arrays.equals(sk, k)) {
+                    // when rowKey is equal to the previous rowKey ,merge the result into the same result
                     keyValues.add(new KeyValue(k, family, q, t, v));
                 } else {
                     break;
