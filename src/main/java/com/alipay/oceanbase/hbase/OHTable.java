@@ -35,6 +35,8 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateRequest;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
+import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
@@ -490,8 +492,8 @@ public class OHTable implements HTableInterface {
             operationTimeout) {
             public ResultScanner call() throws IOException {
                 byte[] family = new byte[] {};
-                ObTableClientQueryStreamResult clientQueryStreamResult;
-                ObTableQueryRequest request;
+                ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
+                ObTableQueryAsyncRequest request;
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
                 try {
@@ -505,10 +507,10 @@ public class OHTable implements HTableInterface {
                             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
                                 scan.getStopRow(), false, scan.getBatch());
 
-                            request = buildObTableQueryRequest(obTableQuery, tableNameString);
-                            clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
+                            request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
+                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            return new ClientStreamScanner(clientQueryStreamResult,
+                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
                                 tableNameString, family, true);
                         }
                     } else {
@@ -536,11 +538,11 @@ public class OHTable implements HTableInterface {
                             // no support set maxResultSize.
                             // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
 
-                            request = buildObTableQueryRequest(obTableQuery,
+                            request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
-                            clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
+                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            return new ClientStreamScanner(clientQueryStreamResult,
+                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
                                 tableNameString, family, false);
                         }
                     }
@@ -1319,6 +1321,19 @@ public class OHTable implements HTableInterface {
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         return request;
+    }
+
+    private ObTableQueryAsyncRequest buildObTableQueryAsyncRequest(ObTableQuery obTableQuery,
+                                                                   String targetTableName) {
+        ObTableQueryRequest request = new ObTableQueryRequest();
+        request.setEntityType(ObTableEntityType.HKV);
+        request.setTableQuery(obTableQuery);
+        request.setTableName(targetTableName);
+        ObTableQueryAsyncRequest asyncRequest = new ObTableQueryAsyncRequest();
+        asyncRequest.setEntityType(ObTableEntityType.HKV);
+        asyncRequest.setTableName(targetTableName);
+        asyncRequest.setObTableQueryRequest(request);
+        return asyncRequest;
     }
 
     private ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,

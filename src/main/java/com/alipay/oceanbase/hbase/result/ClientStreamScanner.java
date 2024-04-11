@@ -20,6 +20,8 @@ package com.alipay.oceanbase.hbase.result;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
+import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
@@ -35,22 +37,30 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
 public class ClientStreamScanner extends AbstractClientScanner {
 
-    private static final Logger                  logger       = TableHBaseLoggerFactory
-                                                                  .getLogger(ClientStreamScanner.class);
+    private static final Logger             logger       = TableHBaseLoggerFactory
+                                                             .getLogger(ClientStreamScanner.class);
 
-    private final ObTableClientQueryStreamResult streamResult;
+    private final AbstractQueryStreamResult streamResult;
 
-    private final String                         tableName;
+    private final String                    tableName;
 
-    private byte[]                               family;
+    private byte[]                          family;
 
-    private boolean                              closed       = false;
+    private boolean                         closed       = false;
 
-    private boolean                              streamNext   = true;
+    private boolean                         streamNext   = true;
 
-    private boolean                              isTableGroup = false;
+    private boolean                         isTableGroup = false;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
+                               byte[] family, boolean isTableGroup) {
+        this.streamResult = streamResult;
+        this.tableName = tableName;
+        this.family = family;
+        this.isTableGroup = isTableGroup;
+    }
+
+    public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup) {
         this.streamResult = streamResult;
         this.tableName = tableName;
