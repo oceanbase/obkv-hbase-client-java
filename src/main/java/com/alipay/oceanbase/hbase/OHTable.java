@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase;
 
-import com.alipay.oceanbase.hbase.constants.OHConstants;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
@@ -327,7 +326,7 @@ public class OHTable implements HTableInterface {
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = this.configuration.getInt(HBASE_CLIENT_KEYVALUE_MAXSIZE,
-            OHConstants.DEFAULT_HBASE_CLIENT_KEYVALUE_MAXSIZE);
+            DEFAULT_HBASE_CLIENT_KEYVALUE_MAXSIZE);
         this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(HBASE_HTABLE_CLIENT_WRITE_BUFFER,
@@ -1387,5 +1386,29 @@ public class OHTable implements HTableInterface {
             this.obTableClient.getOrRefreshTableEntry(
                 getTestLoadTargetTableName(tableNameString, familyString), true, true);
         }
+    }
+
+    public byte[][] getStartKeys() throws IOException {
+        byte[][] startKeys = new byte[0][];
+        try {
+            startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
+        } catch (Exception e) {
+            throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+        }
+        return startKeys;
+    }
+
+    public byte[][] getEndKeys() throws IOException {
+        byte[][] endKeys = new byte[0][];
+        try {
+            endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
+        } catch (Exception e) {
+            throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+        }
+        return endKeys;
+    }
+
+    public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
+        return new Pair<>(getStartKeys(), getEndKeys());
     }
 }
