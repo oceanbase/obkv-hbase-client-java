@@ -412,22 +412,18 @@ public class OHTable implements HTableInterface {
                 try {
                     if (get.getFamilyMap().keySet() == null
                         || get.getFamilyMap().keySet().size() == 0) {
-                        if (obTableClient.isOdpMode()) {
-                            throw new ObTableException("empty family not support in odp mode");
-                        } else {
-                            filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
-                                get.getMaxVersions(), null);
+                        filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
+                            get.getMaxVersions(), null);
 
-                            obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-                                get.getRow(), true, -1);
+                        obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                            get.getRow(), true, -1);
 
-                            request = buildObTableQueryRequest(obTableQuery, tableNameString);
+                        request = buildObTableQueryRequest(obTableQuery, tableNameString);
 
-                            clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-                                .execute(request);
-                            getKeyValueFromResult(clientQueryStreamResult, keyValueList, true,
-                                family);
-                        }
+                        clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
+                            .execute(request);
+                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true,
+                            family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
@@ -499,20 +495,16 @@ public class OHTable implements HTableInterface {
                 try {
                     if (scan.getFamilyMap().keySet() == null
                         || scan.getFamilyMap().keySet().size() == 0) {
-                        if (obTableClient.isOdpMode()) {
-                            throw new ObTableException("empty family not support in odp mode");
-                        } else {
-                            filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-                                scan.getMaxVersions(), null);
-                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                scan.getStopRow(), false, scan.getBatch());
+                        filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                            scan.getMaxVersions(), null);
+                        obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                            scan.getStopRow(), false, scan.getBatch());
 
-                            request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
-                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                .execute(request);
-                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, true);
-                        }
+                        request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
+                        clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                            .execute(request);
+                        return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                            tableNameString, family, true);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
