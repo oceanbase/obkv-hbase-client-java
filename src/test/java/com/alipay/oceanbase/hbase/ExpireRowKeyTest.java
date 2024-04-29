@@ -1,15 +1,10 @@
 package com.alipay.oceanbase.hbase;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.*;
-import org.jruby.RubyProcess;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
-
-import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class ExpireRowKeyTest {
     OHTableClient hTable;
@@ -153,6 +148,7 @@ public class ExpireRowKeyTest {
                     hTable.put(put);
                 }
             }
+            // expectation: row0, row2, row4, row6, row8, row10, row12, row14
 
             // 1. scan all qualifier for row0
             // will record row0
