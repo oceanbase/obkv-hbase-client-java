@@ -40,7 +40,7 @@ import org.apache.hadoop.hbase.client.Result;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
-public class Demo {
+public class simpleTest {
     public static void main(String[] args) throws Exception {
         // 1. initial client for table test1
         Configuration conf = new Configuration();
