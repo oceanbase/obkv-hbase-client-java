@@ -76,6 +76,7 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
+import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_POOL_LOGGING_CAPABILITY;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
@@ -306,6 +307,13 @@ public class OHTable implements HTableInterface {
      */
     public static ThreadPoolExecutor createDefaultThreadPoolExecutor(int coreSize, int maxThreads,
                                                                      long keepAliveTime) {
+        // NOTE: when SOFA_THREAD_POOL_LOGGING_CAPABILITY is set to true or not set,
+        // the static instance ThreadPoolGovernor will start a non-daemon thread pool
+        // monitor thread in the function ThreadPoolMonitorWrapper.startMonitor,
+        // which will prevent the client process from normal exit
+        if (System.getProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY) == null) {
+            System.setProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY, "false");
+        }
         SofaThreadPoolExecutor executor = new SofaThreadPoolExecutor(coreSize, maxThreads,
             keepAliveTime, SECONDS, new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool",
             TABLE_HBASE_LOGGER_SPACE);
