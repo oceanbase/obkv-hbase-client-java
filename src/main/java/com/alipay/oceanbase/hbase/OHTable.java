@@ -27,7 +27,6 @@ import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ExceptionUtil;
-import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -423,15 +422,14 @@ public class OHTable implements HTableInterface {
                         filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
                             get.getMaxVersions(), null);
 
-                        obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-                            get.getRow(), true, -1);
+                        obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
+                            true, -1);
 
                         request = buildObTableQueryRequest(obTableQuery, tableNameString);
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
-                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true,
-                            family);
+                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
