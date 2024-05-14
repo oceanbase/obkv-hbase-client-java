@@ -27,7 +27,6 @@ import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ExceptionUtil;
-import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -76,6 +75,7 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
+import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_POOL_LOGGING_CAPABILITY;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
@@ -306,6 +306,13 @@ public class OHTable implements HTableInterface {
      */
     public static ThreadPoolExecutor createDefaultThreadPoolExecutor(int coreSize, int maxThreads,
                                                                      long keepAliveTime) {
+        // NOTE: when SOFA_THREAD_POOL_LOGGING_CAPABILITY is set to true or not set,
+        // the static instance ThreadPoolGovernor will start a non-daemon thread pool
+        // monitor thread in the function ThreadPoolMonitorWrapper.startMonitor,
+        // which will prevent the client process from normal exit
+        if (System.getProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY) == null) {
+            System.setProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY, "false");
+        }
         SofaThreadPoolExecutor executor = new SofaThreadPoolExecutor(coreSize, maxThreads,
             keepAliveTime, SECONDS, new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool",
             TABLE_HBASE_LOGGER_SPACE);
@@ -415,15 +422,14 @@ public class OHTable implements HTableInterface {
                         filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
                             get.getMaxVersions(), null);
 
-                        obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-                            get.getRow(), true, -1);
+                        obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
+                            true, -1);
 
                         request = buildObTableQueryRequest(obTableQuery, tableNameString);
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
-                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true,
-                            family);
+                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
