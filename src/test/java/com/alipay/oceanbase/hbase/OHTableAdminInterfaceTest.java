@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase;
 
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;
@@ -75,6 +74,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = ohTableClient.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -89,7 +89,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = ohTableClient.getStartEndKeys();
 
-
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -122,6 +122,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -136,6 +137,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -170,6 +172,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = ohTableClient.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -185,6 +188,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = ohTableClient.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -219,6 +223,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
@@ -234,6 +239,7 @@ public class OHTableAdminInterfaceTest {
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
+        // [none], [none]
         Assert.assertEquals(1, startEndKeys.getFirst().length);
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);

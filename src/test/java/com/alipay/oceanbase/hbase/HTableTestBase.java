@@ -1029,6 +1029,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 7);
+        scanner.close();
 
         // scan with prefixFilter
         scan = new Scan();
@@ -1048,6 +1049,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 2);
+        scanner.close();
 
         // scan with singleColumnValueFilter
         // 任何一个版本满足则返回本行
@@ -1070,6 +1072,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(9, res_count);
+        scanner.close();
 
         // scan with HConstants.EMPTY_START_ROW / HConstants.EMPTY_END_ROW / HConstants.EMPTY_BYTE_ARRAY
         scan = new Scan("zScanKey".getBytes(), HConstants.EMPTY_END_ROW);
@@ -1084,6 +1087,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(2, res_count);
+        scanner.close();
 
         // try to delete all with scan
         scan = new Scan(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY);
@@ -1107,6 +1111,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(0, res_count);
+        scanner.close();
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
@@ -1264,6 +1269,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 7);
+        scanner.close();
 
         // scan with prefixFilter
         scan = new Scan();
@@ -1283,6 +1289,7 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 2);
+        scanner.close();
 
         // scan with singleColumnValueFilter
         // 任何一个版本满足则返回本行
@@ -1305,43 +1312,46 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(9, res_count);
+        scanner.close();
 
-        //        // scan with HConstants.EMPTY_START_ROW / HConstants.EMPTY_END_ROW / HConstants.EMPTY_BYTE_ARRAY
-        //        scan = new Scan("zScanKey".getBytes(), HConstants.EMPTY_END_ROW);
-        //        scan.addFamily(family.getBytes());
-        //        scan.setFilter(singleColumnValueFilter);
-        //        scan.setMaxVersions(10);
-        //        scanner = hTable.getScanner(scan);
-        //        res_count = 0;
-        //        for (Result result : scanner) {
-        //            for (KeyValue keyValue : result.raw()) {
-        //                res_count += 1;
-        //            }
-        //        }
-        //        Assert.assertEquals(2, res_count);
-        //
-        //        // try to delete all with scan
-        //        scan = new Scan(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY);
-        //        scan.addFamily(family.getBytes());
-        //        scanner = hTable.getScanner(scan);
-        //        for (Result result : scanner) {
-        //            Delete delete = new Delete(result.getRow());
-        //            delete.deleteFamily(toBytes(family));
-        //            hTable.delete(delete);
-        //        }
-        //
-        //        // verify table is empty
-        //        scan = new Scan("scanKey".getBytes(), HConstants.EMPTY_BYTE_ARRAY);
-        //        scan.addFamily(family.getBytes());
-        //        scan.setMaxVersions(10);
-        //        scanner = hTable.getScanner(scan);
-        //        res_count = 0;
-        //        for (Result result : scanner) {
-        //            for (KeyValue keyValue : result.raw()) {
-        //                res_count += 1;
-        //            }
-        //        }
-        //        Assert.assertEquals(0, res_count);
+        // scan with HConstants.EMPTY_START_ROW / HConstants.EMPTY_END_ROW / HConstants.EMPTY_BYTE_ARRAY
+        scan = new Scan("zScanKey".getBytes(), HConstants.EMPTY_END_ROW);
+        scan.addFamily(family.getBytes());
+        scan.setFilter(singleColumnValueFilter);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(2, res_count);
+        scanner.close();
+
+        // try to delete all with scan
+        scan = new Scan(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY);
+        scan.addFamily(family.getBytes());
+        scanner = hTable.getScanner(scan);
+        for (Result result : scanner) {
+            Delete delete = new Delete(result.getRow());
+            delete.deleteFamily(toBytes(family));
+            hTable.delete(delete);
+        }
+
+        // verify table is empty
+        scan = new Scan("scanKey".getBytes(), HConstants.EMPTY_BYTE_ARRAY);
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(0, res_count);
+        scanner.close();
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
