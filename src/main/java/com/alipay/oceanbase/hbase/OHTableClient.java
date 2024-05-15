@@ -23,6 +23,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
 import java.util.List;
@@ -346,5 +347,17 @@ public class OHTableClient implements HTableInterface, Lifecycle {
 
     public void refreshTableEntry(String familyString, boolean hasTestLoad) throws Exception {
         this.ohTable.refreshTableEntry(familyString, hasTestLoad);
+    }
+
+    public byte[][] getStartKeys() throws IOException {
+        return this.ohTable.getStartKeys();
+    }
+
+    public byte[][] getEndKeys() throws IOException {
+        return this.ohTable.getEndKeys();
+    }
+
+    public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
+        return this.ohTable.getStartEndKeys();
     }
 }

@@ -26,6 +26,7 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PoolMap;
 
 import java.io.Closeable;
@@ -882,6 +883,18 @@ public class OHTablePool implements Closeable {
 
         public HTableInterface getTable() {
             return table;
+        }
+
+        public byte[][] getStartKeys() throws IOException {
+            return ((OHTable) this.table).getStartKeys();
+        }
+
+        public byte[][] getEndKeys() throws IOException {
+            return ((OHTable) this.table).getEndKeys();
+        }
+
+        public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
+            return ((OHTable) this.table).getStartEndKeys();
         }
     }
 }
