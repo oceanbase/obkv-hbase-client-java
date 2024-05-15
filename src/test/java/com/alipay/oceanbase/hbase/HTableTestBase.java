@@ -42,7 +42,7 @@ import static org.junit.Assert.fail;
 public abstract class HTableTestBase {
 
     @Rule
-    public ExpectedException  expectedException = ExpectedException.none();
+    public ExpectedException expectedException = ExpectedException.none();
 
     protected HTableInterface hTable;
 
@@ -68,9 +68,9 @@ public abstract class HTableTestBase {
 
         for (KeyValue keyValue : r.raw()) {
             System.out.println("rowKey: " + new String(keyValue.getRow()) + " columnQualifier:"
-                               + new String(keyValue.getQualifier()) + " timestamp:"
-                               + keyValue.getTimestamp() + " value:"
-                               + new String(keyValue.getValue()));
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
             Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
             Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
         }
@@ -94,9 +94,9 @@ public abstract class HTableTestBase {
 
         for (KeyValue keyValue : r.raw()) {
             System.out.println("rowKey: " + new String(keyValue.getRow()) + " columnQualifier:"
-                               + new String(keyValue.getQualifier()) + " timestamp:"
-                               + keyValue.getTimestamp() + " value:"
-                               + new String(keyValue.getValue()));
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
             Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
             Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
         }
@@ -122,12 +122,12 @@ public abstract class HTableTestBase {
                 boolean countAdd = true;
                 for (KeyValue keyValue : result.raw()) {
                     System.out.println("rowKey: " + new String(keyValue.getRow())
-                                       + " columnQualifier:" + new String(keyValue.getQualifier())
-                                       + " timestamp:" + keyValue.getTimestamp() + " value:"
-                                       + new String(keyValue.getValue()));
+                            + " columnQualifier:" + new String(keyValue.getQualifier())
+                            + " timestamp:" + keyValue.getTimestamp() + " value:"
+                            + new String(keyValue.getValue()));
                     Assert.assertEquals(key + "_" + i, Bytes.toString(keyValue.getRow()));
                     Assert.assertTrue(column1.equals(Bytes.toString(keyValue.getQualifier()))
-                                      || column2.equals(Bytes.toString(keyValue.getQualifier())));
+                            || column2.equals(Bytes.toString(keyValue.getQualifier())));
                     Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
                     if (countAdd) {
                         countAdd = false;
@@ -148,12 +148,12 @@ public abstract class HTableTestBase {
                 boolean countAdd = true;
                 for (KeyValue keyValue : result.raw()) {
                     System.out.println("rowKey: " + new String(keyValue.getRow())
-                                       + " columnQualifier:" + new String(keyValue.getQualifier())
-                                       + " timestamp:" + keyValue.getTimestamp() + " value:"
-                                       + new String(keyValue.getValue()));
+                            + " columnQualifier:" + new String(keyValue.getQualifier())
+                            + " timestamp:" + keyValue.getTimestamp() + " value:"
+                            + new String(keyValue.getValue()));
                     Assert.assertEquals(key + "_" + i, Bytes.toString(keyValue.getRow()));
                     Assert.assertTrue(column1.equals(Bytes.toString(keyValue.getQualifier()))
-                                      || column2.equals(Bytes.toString(keyValue.getQualifier())));
+                            || column2.equals(Bytes.toString(keyValue.getQualifier())));
                     Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
                     if (countAdd) {
                         countAdd = false;
@@ -266,6 +266,99 @@ public abstract class HTableTestBase {
         puts.add(put3);
         puts.add(put4);
         hTable.put(puts);
+    }
+
+    @Test
+    public void testMultiPartitionPut() throws IOException {
+        String[] keys = new String[]{"putKey1", "putKey2", "putKey3", "putKey4", "putKey5", "putKey6", "putKey7",
+                "putKey8", "putKey9", "putKey10"};
+
+        String column1 = "column1";
+        String column2 = "column2";
+        String column3 = "column3";
+        String value = "value";
+        String family = "familyPartition";
+        // put
+        {
+            List<Put> puts = new ArrayList<Put>();
+            for (String key : keys) {
+                Put put = new Put(Bytes.toBytes(key));
+                put.add(toBytes(family), toBytes(column1), toBytes(value));
+                put.add(toBytes(family), toBytes(column2), System.currentTimeMillis(), toBytes(value));
+                puts.add(put);
+            }
+
+            for (String key : keys) {
+                // put same k, q, t
+                Put put = new Put(Bytes.toBytes(key));
+                put.add(toBytes(family), toBytes(column3), 100L, toBytes(value));
+                put.add(toBytes(family), toBytes(column3), 100L, toBytes(value));
+                puts.add(put);
+            }
+            hTable.put(puts);
+        }
+        // get
+        {
+            List<Get> gets = new ArrayList<Get>();
+            for (String key : keys) {
+                Get get = new Get(Bytes.toBytes(key));
+                get.addColumn(toBytes(family), toBytes(column1));
+                get.addColumn(toBytes(family), toBytes(column2));
+                get.addColumn(toBytes(family), toBytes(column3));
+                gets.add(get);
+            }
+            Result[] res = hTable.get(gets);
+            assertEquals(res.length, 10);
+            assertEquals(res[0].raw().length, 3);
+        }
+    }
+
+    @Test
+    public void testMultiPartitionDel() throws IOException {
+        String[] keys = new String[]{"putKey1", "putKey2", "putKey3", "putKey4", "putKey5", "putKey6", "putKey7",
+                "putKey8", "putKey9", "putKey10"};
+
+        String column1 = "column1";
+        String column2 = "column2";
+        String column3 = "column3";
+        String value = "value";
+        String family = "familyPartition";
+        // delete
+        {
+            List<Delete> deletes = new ArrayList<Delete>();
+            for (String key : keys) {
+                Delete del = new Delete(Bytes.toBytes(key));
+                del.deleteColumns(toBytes(family), toBytes(column1));
+                del.deleteColumns(toBytes(family), toBytes(column2), System.currentTimeMillis());
+                deletes.add(del);
+            }
+
+            for (String key : keys) {
+                // del same k, q, t
+                Delete del = new Delete(Bytes.toBytes(key));
+                del.deleteColumn(toBytes(family), toBytes(column3), 100L);
+                del.deleteColumn(toBytes(family), toBytes(column3), 100L);
+                deletes.add(del);
+            }
+            hTable.delete(deletes);
+        }
+        // get
+        {
+            List<Get> gets = new ArrayList<Get>();
+            for (String key : keys) {
+                Get get = new Get(Bytes.toBytes(key));
+                get.addColumn(toBytes(family), toBytes(column1));
+                get.addColumn(toBytes(family), toBytes(column2));
+                get.addColumn(toBytes(family), toBytes(column3));
+                gets.add(get);
+            }
+            Result[] res = hTable.get(gets);
+            assertEquals(res.length, 10);
+            int i = 0;
+            for (i = 0; i < res.length; ++i) {
+                assertEquals(res[i].raw().length, 0);
+            }
+        }
     }
 
     public void tryPut(HTableInterface hTable, Put put) throws Exception {
@@ -413,7 +506,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-            new BinaryComparator(toBytes(value2)));
+                new BinaryComparator(toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
@@ -422,7 +515,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(value1)));
+                toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
@@ -434,7 +527,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
@@ -443,7 +536,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.raw().length);
@@ -452,7 +545,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
-            toBytes(value1)));
+                toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
@@ -461,7 +554,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-            new BinaryComparator(toBytes(value1)));
+                new BinaryComparator(toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.raw().length);
@@ -470,7 +563,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
-            toBytes(value3)));
+                toBytes(value3)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
@@ -492,7 +585,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         QualifierFilter qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-            new BinaryComparator(toBytes(column1)));
+                new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(3, r.raw().length);
@@ -501,7 +594,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(column2)));
+                toBytes(column2)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.raw().length);
@@ -510,7 +603,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
-            new BinaryComparator(toBytes(column1)));
+                new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.raw().length);
@@ -519,7 +612,7 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-            new BinaryComparator(toBytes(column1)));
+                new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(7, r.raw().length);
@@ -548,7 +641,7 @@ public abstract class HTableTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new SingleColumnValueFilter(Bytes.toBytes(family), Bytes
-            .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
+                .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -559,7 +652,7 @@ public abstract class HTableTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(1));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.GREATER,
-            new BinaryComparator(toBytes(column2))));
+                new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -570,7 +663,7 @@ public abstract class HTableTestBase {
         filterList = new FilterList(MUST_PASS_ONE);
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-            new BinaryComparator(toBytes(column2))));
+                new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -581,7 +674,7 @@ public abstract class HTableTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-            new BinaryComparator(toBytes(column2))));
+                new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -601,7 +694,7 @@ public abstract class HTableTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-            new BinaryComparator(toBytes(column2))));
+                new BinaryComparator(toBytes(column2))));
         filterList.addFilter(new ColumnCountGetFilter(2));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -613,7 +706,7 @@ public abstract class HTableTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(value2))));
+                toBytes(value2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -637,7 +730,7 @@ public abstract class HTableTestBase {
         // 任何一个版本满足则返回本行
         SingleColumnValueFilter singleColumnValueFilter;
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -647,7 +740,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(7, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value2)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -657,7 +750,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(0, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -668,7 +761,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(7, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
+                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
                 toBytes(value1)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -679,7 +772,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(0, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
+                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -690,7 +783,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(7, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
+                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -701,7 +794,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(7, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER_OR_EQUAL, new BinaryComparator(
+                Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER_OR_EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -712,7 +805,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(7, r.raw().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER, new BinaryComparator(
+                Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -729,7 +822,7 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey1Column2Value2);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         SkipFilter skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -739,7 +832,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(2, r.raw().length);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -752,7 +845,7 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey1Column2Value1);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -762,7 +855,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals(0, r.raw().length);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -787,7 +880,7 @@ public abstract class HTableTestBase {
         WhileMatchFilter whileMatchFilter;
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-            toBytes(value2)));
+                toBytes(value2)));
         whileMatchFilter = new WhileMatchFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -927,7 +1020,7 @@ public abstract class HTableTestBase {
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
                 Arrays.equals(key1.getBytes(), keyValue.getRow());
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 7);
@@ -946,7 +1039,7 @@ public abstract class HTableTestBase {
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
                 Arrays.equals(key2.getBytes(), keyValue.getRow());
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 2);
@@ -968,7 +1061,7 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                res_count+=1;
+                res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 9);
@@ -984,7 +1077,7 @@ public abstract class HTableTestBase {
             Delete delete = new Delete("key_5".getBytes());
             delete.deleteFamily("family2".getBytes());
             delete.deleteColumns("family1".getBytes(), "column1_1".getBytes(),
-                System.currentTimeMillis());
+                    System.currentTimeMillis());
             hTable.delete(delete);
             fail();
         } catch (Exception e) {
@@ -1000,22 +1093,22 @@ public abstract class HTableTestBase {
             Put put = new Put("key_7".getBytes());
             put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
             boolean ret = hTable.checkAndPut("key_8".getBytes(), "family1".getBytes(),
-                "column1_1".getBytes(), "value1".getBytes(), put);
+                    "column1_1".getBytes(), "value1".getBytes(), put);
             fail();
         } catch (IOException e) {
             Assert.assertTrue(e.getCause().getMessage()
-                .contains("mutation row is not equal check row"));
+                    .contains("mutation row is not equal check row"));
         }
 
         try {
             Put put = new Put("key_8".getBytes());
             put.add("family2".getBytes(), "column1_1".getBytes(), "value2".getBytes());
             boolean ret = hTable.checkAndPut("key_8".getBytes(), "family1".getBytes(),
-                "column1_1".getBytes(), "value1".getBytes(), put);
+                    "column1_1".getBytes(), "value1".getBytes(), put);
             fail();
         } catch (IOException e) {
             Assert.assertTrue(e.getCause().getMessage()
-                .contains("mutation family is not equal check family"));
+                    .contains("mutation family is not equal check family"));
         }
     }
 
@@ -1045,7 +1138,7 @@ public abstract class HTableTestBase {
         put = new Put(key.getBytes());
         put.add(family.getBytes(), column.getBytes(), "value1".getBytes());
         boolean ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            value.getBytes(), put);
+                value.getBytes(), put);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
@@ -1074,7 +1167,7 @@ public abstract class HTableTestBase {
         delete = new Delete(key.getBytes());
         delete.deleteColumn(family.getBytes(), column.getBytes());
         boolean ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
-            value.getBytes(), delete);
+                value.getBytes(), delete);
         Assert.assertTrue(ret);
         Get get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
@@ -1096,7 +1189,7 @@ public abstract class HTableTestBase {
         delete = new Delete(key.getBytes());
         delete.deleteColumns(family.getBytes(), column.getBytes());
         ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
-            value.getBytes(), delete);
+                value.getBytes(), delete);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
@@ -1120,7 +1213,7 @@ public abstract class HTableTestBase {
         delete = new Delete(key.getBytes());
         delete.deleteFamily(family.getBytes());
         ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
-            value.getBytes(), delete);
+                value.getBytes(), delete);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
@@ -1200,10 +1293,10 @@ public abstract class HTableTestBase {
         //        }
 
         long ret = hTable.incrementColumnValue(key.getBytes(), "family1".getBytes(),
-            column.getBytes(), 1);
+                column.getBytes(), 1);
         Assert.assertEquals(3, ret);
         ret = hTable.incrementColumnValue(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            1, true);
+                1, true);
         Assert.assertEquals(4, ret);
     }
 
@@ -1347,15 +1440,15 @@ public abstract class HTableTestBase {
         put.add(family.getBytes(), null, value1.getBytes());
 
         hTable.checkAndPut(Bytes.toBytes(key), Bytes.toBytes(family), null, Bytes.toBytes(value),
-            put);
+                put);
 
         get = new Get(key.getBytes());
         get.addColumn(Bytes.toBytes(family), null);
         r = hTable.get(get);
         for (KeyValue kv : r.raw()) {
             System.out.println("K = [" + Bytes.toString(kv.getRow()) + "] Q =["
-                               + Bytes.toString(kv.getQualifier()) + "] T = [" + kv.getTimestamp()
-                               + "] V = [" + Bytes.toString(kv.getValue()) + "]");
+                    + Bytes.toString(kv.getQualifier()) + "] T = [" + kv.getTimestamp()
+                    + "] V = [" + Bytes.toString(kv.getValue()) + "]");
         }
         Assert.assertEquals(1, r.raw().length);
         Assert.assertEquals(key, Bytes.toString(r.raw()[0].getRow()));
@@ -1492,7 +1585,7 @@ public abstract class HTableTestBase {
         put.add(family.getBytes(), Bytes.toBytes(column), value1.getBytes());
 
         hTable.checkAndPut(Bytes.toBytes(key), Bytes.toBytes(family), Bytes.toBytes(column),
-            Bytes.toBytes(value), put);
+                Bytes.toBytes(value), put);
 
         get = new Get(key.getBytes());
         get.addColumn(Bytes.toBytes(family), Bytes.toBytes(column));
@@ -1558,7 +1651,7 @@ public abstract class HTableTestBase {
         /** family 不存在时提示不友好，*/
         Put put4 = new Put(("key_c_f").getBytes());
         put4.add("family_not_exists".getBytes(), "column2".getBytes(),
-            System.currentTimeMillis() - 1000 * 60 * 60L, "now - 1h".getBytes());
+                System.currentTimeMillis() - 1000 * 60 * 60L, "now - 1h".getBytes());
         expectedException.expect(IOException.class);
         hTable.put(put4);
     }
@@ -1613,7 +1706,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals("", 1, result.raw().length);
         Assert.assertEquals("", 0, result.raw()[0].getQualifierLength());
         Assert
-            .assertArrayEquals("", "value1_qualifier_null".getBytes(), result.raw()[0].getValue());
+                .assertArrayEquals("", "value1_qualifier_null".getBytes(), result.raw()[0].getValue());
 
         put = new Put(("key_c_q_empty").getBytes());
         put.add("family1".getBytes(), "".getBytes(), "value1_qualifier_empty".getBytes());
@@ -1624,7 +1717,7 @@ public abstract class HTableTestBase {
         Assert.assertEquals("", 1, result.raw().length);
         Assert.assertEquals("", 0, result.raw()[0].getQualifierLength());
         Assert.assertArrayEquals("", "value1_qualifier_empty".getBytes(),
-            result.raw()[0].getValue());
+                result.raw()[0].getValue());
 
         put = new Put(("key_c_q_space").getBytes());
         put.add("family1".getBytes(), "  ".getBytes(), "value1_qualifier_space".getBytes());
@@ -1634,7 +1727,7 @@ public abstract class HTableTestBase {
         result = hTable.get(get);
         Assert.assertEquals("", 1, result.raw().length);
         Assert.assertArrayEquals("", "value1_qualifier_space".getBytes(),
-            result.raw()[0].getValue());
+                result.raw()[0].getValue());
         //空格可以做qualifier
         Assert.assertEquals("", 2, result.raw()[0].getQualifierLength());
 
@@ -1656,9 +1749,9 @@ public abstract class HTableTestBase {
     public void testTTLColumnLevel() throws Exception {
         Put put = new Put(("key_ttl_column").getBytes());
         put.add("family_ttl".getBytes(), ("column1").getBytes(),
-            "column1_value1_ttl_column".getBytes());
+                "column1_value1_ttl_column".getBytes());
         put.add("family_ttl".getBytes(), ("column2").getBytes(),
-            "column2_value1_ttl_column".getBytes());
+                "column2_value1_ttl_column".getBytes());
         hTable.put(put);
         Get get = new Get("key_ttl_column".getBytes());
         get.addColumn("family_ttl".getBytes(), "column1".getBytes());
@@ -1667,13 +1760,13 @@ public abstract class HTableTestBase {
         Result result = hTable.get(get);
         Assert.assertEquals("", 2, result.raw().length);
         Assert.assertEquals("", 1, result
-            .getColumn("family_ttl".getBytes(), ("column1").getBytes()).size());
+                .getColumn("family_ttl".getBytes(), ("column1").getBytes()).size());
         Assert.assertEquals("", 1, result
-            .getColumn("family_ttl".getBytes(), ("column2").getBytes()).size());
+                .getColumn("family_ttl".getBytes(), ("column2").getBytes()).size());
         Assert.assertArrayEquals("", "column1_value1_ttl_column".getBytes(),
-            result.getColumn("family_ttl".getBytes(), ("column1").getBytes()).get(0).getValue());
+                result.getColumn("family_ttl".getBytes(), ("column1").getBytes()).get(0).getValue());
         Assert.assertArrayEquals("", "column2_value1_ttl_column".getBytes(),
-            result.getColumn("family_ttl".getBytes(), ("column2").getBytes()).get(0).getValue());
+                result.getColumn("family_ttl".getBytes(), ("column2").getBytes()).get(0).getValue());
 
         //过期之后不能再查出数据
         Thread.sleep(4 * 1000L);
@@ -1685,9 +1778,9 @@ public abstract class HTableTestBase {
     public void testTTLFamilyLevel() throws Exception {
         Put put = new Put(("key_ttl_family").getBytes());
         put.add("family_ttl".getBytes(), ("column1").getBytes(),
-            "column1_value_ttl_family".getBytes());
+                "column1_value_ttl_family".getBytes());
         put.add("family_ttl".getBytes(), ("column2").getBytes(),
-            "column2_value_ttl_family".getBytes());
+                "column2_value_ttl_family".getBytes());
         hTable.put(put);
         Get get = new Get("key_ttl_family".getBytes());
         get.addFamily("family_ttl".getBytes());
@@ -1695,13 +1788,13 @@ public abstract class HTableTestBase {
         Result result = hTable.get(get);
         Assert.assertEquals("", 2, result.raw().length);
         Assert.assertEquals("", 1, result
-            .getColumn("family_ttl".getBytes(), ("column1").getBytes()).size());
+                .getColumn("family_ttl".getBytes(), ("column1").getBytes()).size());
         Assert.assertEquals("", 1, result
-            .getColumn("family_ttl".getBytes(), ("column2").getBytes()).size());
+                .getColumn("family_ttl".getBytes(), ("column2").getBytes()).size());
         Assert.assertArrayEquals("", "column1_value_ttl_family".getBytes(),
-            result.getColumn("family_ttl".getBytes(), ("column1").getBytes()).get(0).getValue());
+                result.getColumn("family_ttl".getBytes(), ("column1").getBytes()).get(0).getValue());
         Assert.assertArrayEquals("", "column2_value_ttl_family".getBytes(),
-            result.getColumn("family_ttl".getBytes(), ("column2").getBytes()).get(0).getValue());
+                result.getColumn("family_ttl".getBytes(), ("column2").getBytes()).get(0).getValue());
 
         //过期之后不能再查出数据
         Thread.sleep(4 * 1000L);
@@ -1711,7 +1804,7 @@ public abstract class HTableTestBase {
 
     public class IncrementHelper implements Runnable {
         private HTableInterface hTable;
-        private Increment       increment;
+        private Increment increment;
 
         public IncrementHelper(HTableInterface hTable, Increment increment) {
             this.hTable = hTable;
@@ -1730,7 +1823,7 @@ public abstract class HTableTestBase {
 
     public class PutHelper implements Runnable {
         private HTableInterface hTable;
-        private Put             put;
+        private Put put;
 
         public PutHelper(HTableInterface hTable, Put put) {
             this.hTable = hTable;
