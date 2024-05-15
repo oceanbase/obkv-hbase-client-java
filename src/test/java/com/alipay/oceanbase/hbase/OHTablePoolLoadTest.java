@@ -93,7 +93,7 @@ public class OHTablePoolLoadTest extends HTableTestBase {
                 t = t.getCause();
             }
             if (ObHTableTestUtil.ODP_MODE) {
-                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+                Assert.assertTrue(t.getMessage().contains("OB_TABLE_NOT_EXIST"));
             } else {
                 Assert.assertTrue(t instanceof ObTableNotExistException);
                 Assert.assertTrue(t.getMessage().contains("test_t$testload"));
@@ -109,7 +109,7 @@ public class OHTablePoolLoadTest extends HTableTestBase {
                 t = t.getCause();
             }
             if (ObHTableTestUtil.ODP_MODE) {
-                Assert.assertTrue(t instanceof ObTableUnexpectedException);
+                Assert.assertTrue(t.getMessage().contains("OB_TABLE_NOT_EXIST"));
             } else {
                 Assert.assertTrue(t instanceof ObTableNotExistException);
                 Assert.assertTrue(t.getMessage().contains("test_a$testload"));
