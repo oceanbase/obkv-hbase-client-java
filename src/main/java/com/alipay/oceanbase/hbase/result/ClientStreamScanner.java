@@ -17,8 +17,11 @@
 
 package com.alipay.oceanbase.hbase.result;
 
+import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
+import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
@@ -34,24 +37,35 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
 public class ClientStreamScanner extends AbstractClientScanner {
 
-    private static final Logger                  logger     = TableHBaseLoggerFactory
-                                                                .getLogger(ClientStreamScanner.class);
+    private static final Logger             logger       = TableHBaseLoggerFactory
+                                                             .getLogger(ClientStreamScanner.class);
 
-    private final ObTableClientQueryStreamResult streamResult;
+    private final AbstractQueryStreamResult streamResult;
 
-    private final String                         tableName;
+    private final String                    tableName;
 
-    private final byte[]                         family;
+    private byte[]                          family;
 
-    private boolean                              closed     = false;
+    private boolean                         closed       = false;
 
-    private boolean                              streamNext = true;
+    private boolean                         streamNext   = true;
+
+    private boolean                         isTableGroup = false;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
-                               byte[] family) {
+                               byte[] family, boolean isTableGroup) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.family = family;
+        this.isTableGroup = isTableGroup;
+    }
+
+    public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
+                               byte[] family, boolean isTableGroup) {
+        this.streamResult = streamResult;
+        this.tableName = tableName;
+        this.family = family;
+        this.isTableGroup = isTableGroup;
     }
 
     @Override
@@ -73,8 +87,18 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 return null;
             }
 
+            byte[][] familyAndQualifier = new byte[2][];
+            if (this.isTableGroup) {
+                // split family and qualifier
+                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow
+                    .get(1).getValue());
+                this.family = familyAndQualifier[0];
+            } else {
+                familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();
+            }
+
             byte[] sk = (byte[]) startRow.get(0).getValue();
-            byte[] sq = (byte[]) startRow.get(1).getValue();
+            byte[] sq = familyAndQualifier[1];
             long st = (Long) startRow.get(2).getValue();
             byte[] sv = (byte[]) startRow.get(3).getValue();
 
@@ -84,11 +108,20 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
             while (streamNext = streamResult.next()) {
                 List<ObObj> row = streamResult.getRow();
+                if (this.isTableGroup) {
+                    // split family and qualifier
+                    familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row
+                        .get(1).getValue());
+                    this.family = familyAndQualifier[0];
+                } else {
+                    familyAndQualifier[1] = (byte[]) row.get(1).getValue();
+                }
                 byte[] k = (byte[]) row.get(0).getValue();
-                byte[] q = (byte[]) row.get(1).getValue();
+                byte[] q = familyAndQualifier[1];
                 long t = (Long) row.get(2).getValue();
                 byte[] v = (byte[]) row.get(3).getValue();
-                if (Arrays.equals(sk, k)) {// when rowKey is equal to the previous rowKey ,merge the result into the same result
+                if (Arrays.equals(sk, k)) {
+                    // when rowKey is equal to the previous rowKey ,merge the result into the same result
                     keyValues.add(new KeyValue(k, family, q, t, v));
                 } else {
                     break;

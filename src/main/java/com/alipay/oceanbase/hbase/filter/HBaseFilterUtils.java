@@ -133,9 +133,15 @@ public class HBaseFilterUtils {
     private static String toParseableString(FilterList filterList) {
         StringBuilder sb = new StringBuilder();
         List<Filter> filters = filterList.getFilters();
-        if (!filters.isEmpty()) {
-            sb.append("(").append(toParseableString(filters.get(0)));
-            for (int i = 1; i < filters.size(); i++) {
+        boolean isEmpty = true;
+        for (int i = 0; i < filters.size(); i++) {
+            String filterString = toParseableString(filters.get(i));
+            if (filterString.isEmpty())
+                continue;
+            if (isEmpty) {
+                sb.append("(").append(filterString);
+                isEmpty = false;
+            } else {
                 sb.append(" ");
                 if (filterList.getOperator().equals(FilterList.Operator.MUST_PASS_ALL)) {
                     sb.append(Bytes.toString(ParseConstants.AND));
@@ -144,8 +150,10 @@ public class HBaseFilterUtils {
                 } else {
                     throw new IllegalArgumentException("Invalid FilterList: " + filterList);
                 }
-                sb.append(" ").append(toParseableString(filters.get(i)));
+                sb.append(" ").append(filterString);
             }
+        }
+        if (!isEmpty) {
             sb.append(")");
         }
         return sb.toString();
