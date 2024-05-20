@@ -109,21 +109,24 @@ public abstract class HTableTestBase {
 
     @Test
     public void testBasic() throws Exception {
+        testBasic("family1");
+    }
+
+    private void testBasic(String family) throws Exception {
         String key = "putKey";
         String column1 = "putColumn1";
         String column2 = "putColumn2";
         String value = "value";
-        String family = "family1";
         long timestamp = System.currentTimeMillis();
         Delete delete = new Delete(key.getBytes());
         delete.deleteFamily(family.getBytes());
         hTable.delete(delete);
 
         Put put = new Put(toBytes(key));
-        put.add("family1".getBytes(), column1.getBytes(), timestamp, toBytes(value));
+        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(value));
         hTable.put(put);
         Get get = new Get(toBytes(key));
-        get.addColumn("family1".getBytes(), toBytes(column1));
+        get.addColumn(family.getBytes(), toBytes(column1));
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.raw().length);
 
@@ -137,10 +140,10 @@ public abstract class HTableTestBase {
         }
 
         put = new Put(toBytes(key));
-        put.add("family1".getBytes(), column1.getBytes(), timestamp + 1, toBytes(value));
+        put.add(family.getBytes(), column1.getBytes(), timestamp + 1, toBytes(value));
         hTable.put(put);
         get = new Get(toBytes(key));
-        get.addColumn("family1".getBytes(), toBytes(column1));
+        get.addColumn(family.getBytes(), toBytes(column1));
         get.setMaxVersions(2);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
@@ -165,14 +168,14 @@ public abstract class HTableTestBase {
         try {
             for (int j = 0; j < 10; j++) {
                 put = new Put((key + "_" + j).getBytes());
-                put.add("family1".getBytes(), column1.getBytes(), toBytes(value));
-                put.add("family1".getBytes(), column2.getBytes(), toBytes(value));
+                put.add(family.getBytes(), column1.getBytes(), toBytes(value));
+                put.add(family.getBytes(), column2.getBytes(), toBytes(value));
                 hTable.put(put);
             }
 
             Scan scan = new Scan();
-            scan.addColumn("family1".getBytes(), column1.getBytes());
-            scan.addColumn("family1".getBytes(), column2.getBytes());
+            scan.addColumn(family.getBytes(), column1.getBytes());
+            scan.addColumn(family.getBytes(), column2.getBytes());
             scan.setStartRow(toBytes(key + "_" + 0));
             scan.setStopRow(toBytes(key + "_" + 9));
             scan.setMaxVersions(9);
@@ -2170,5 +2173,11 @@ public abstract class HTableTestBase {
         get.setMaxVersions(200);
         result = hTable.get(get);
         assertEquals(101, result.raw().length);
+    }
+
+    // Test operation in hbase table with local index
+    @Test
+    public void testHtableWithIndex() throws Exception {
+        testBasic("family_with_local_index");
     }
 }
