@@ -125,6 +125,12 @@ public class HBaseFilterUtilsTest {
     }
 
     @Test
+    public void testColumnPaginationFilter() {
+        ColumnPaginationFilter filter = new ColumnPaginationFilter(2,2);
+        Assert.assertEquals("ColumnPaginationFilter(2,2)", HBaseFilterUtils.toParseableString(filter));
+    }
+
+    @Test
     public void testColumnCountGetFilter() {
         ColumnCountGetFilter filter = new ColumnCountGetFilter(513);
         Assert
@@ -162,24 +168,27 @@ public class HBaseFilterUtilsTest {
         QualifierFilter qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
             new BinaryPrefixComparator("whileMatchFilter".getBytes()));
         SkipFilter skipFilter = new SkipFilter(new PageFilter(128));
+        ColumnPaginationFilter columnPaginationFilter = new ColumnPaginationFilter(2,2);
 
         FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL);
         filterList.addFilter(rowFilter);
         filterList.addFilter(qualifierFilter);
         filterList.addFilter(skipFilter);
+        filterList.addFilter(columnPaginationFilter);
 
         Assert
             .assertEquals(
                 "(RowFilter(=,'binary:testSkipFilter') "
-                        + "AND QualifierFilter(>,'binaryprefix:whileMatchFilter') AND (SKIP PageFilter(128)))",
+                        + "AND QualifierFilter(>,'binaryprefix:whileMatchFilter') AND (SKIP PageFilter(128)) AND ColumnPaginationFilter(2,2))",
                 HBaseFilterUtils.toParseableString(filterList));
 
         filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
         filterList.addFilter(rowFilter);
         filterList.addFilter(qualifierFilter);
+        filterList.addFilter(columnPaginationFilter);
 
         Assert.assertEquals("(RowFilter(=,'binary:testSkipFilter') "
-                            + "OR QualifierFilter(>,'binaryprefix:whileMatchFilter'))",
+                            + "OR QualifierFilter(>,'binaryprefix:whileMatchFilter') OR ColumnPaginationFilter(2,2))",
             HBaseFilterUtils.toParseableString(filterList));
     }
 }

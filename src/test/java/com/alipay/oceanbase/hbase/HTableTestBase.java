@@ -601,6 +601,22 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey2Column2Value1);
         tryPut(hTable, putKey2Column2Value2);
 
+
+        // show table (time maybe different)
+        //+---------+---------+----------------+--------+
+        //| K         | Q       | T              | V      |
+        //+---------+---------+----------------+--------+
+        //| getKey1 | column1 | -1709714109660 | value1 |
+        //| getKey1 | column1 | -1709714109661 | value2 |
+        //| getKey1 | column1 | -1709714109662 | value1 |
+        //| getKey1 | column2 | -1709714109663 | value1 |
+        //| getKey1 | column2 | -1709714109664 | value2 |
+        //| getKey1 | column2 | -1709714109665 | value1 |
+        //| getKey1 | column2 | -1709714109666 | value2 |
+        //| getKey2 | column2 | -1709714109667 | value1 |
+        //| getKey2 | column2 | -1709714109668 | value2 |
+        //+---------+---------+----------------+--------+
+
         FilterList filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(1));
         get = new Get(toBytes(key1));
@@ -696,6 +712,18 @@ public abstract class HTableTestBase {
         get.setFilter(filterList);
         r = hTable.get(get);
         Assert.assertEquals(7, r.raw().length);
+
+        // test empty filter in FilterList
+        filterList = new FilterList();
+        emptyFilterList = new FilterList();
+        filterList.addFilter(emptyFilterList);
+        filterList.addFilter(new ColumnPaginationFilter(3,1));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
 
         // test empty filter in FilterList
         filterList = new FilterList();
