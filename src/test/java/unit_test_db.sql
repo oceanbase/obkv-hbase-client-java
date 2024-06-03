@@ -80,6 +80,22 @@ CREATE TABLE `test$familyThrottle` (
     PRIMARY KEY (`K`, `Q`, `T`)
 );
 
+CREATE TABLE `test$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 10;
+
+CREATE TABLE `test_t$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 10;
+
 CREATE TABLEGROUP testAdminKey SHARDING = 'ADAPTIVE';
 CREATE TABLE `testAdminKey$familyRange` (
     `K` varbinary(1024) NOT NULL,
