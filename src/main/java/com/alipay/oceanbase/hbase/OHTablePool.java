@@ -657,7 +657,7 @@ public class OHTablePool implements Closeable {
      * A proxy class that implements HTableInterface.close method to return the
      * wrapped table back to the table pool
      */
-    class PooledOHTable implements HTableInterface {
+    public class PooledOHTable implements HTableInterface {
 
         private HTableInterface table; // actual table implementation
 
