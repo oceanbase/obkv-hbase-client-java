@@ -18,13 +18,22 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.constants.OHConstants;
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.KeyDefiner;
 import com.alipay.oceanbase.hbase.util.OHTableFactory;
+import com.google.protobuf.Descriptors.MethodDescriptor;
+import com.google.protobuf.Message;
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.client.coprocessor.Batch.Call;
+import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PoolMap;
@@ -795,48 +804,6 @@ public class OHTablePool implements Closeable {
             returnTable(table);
         }
 
-        /**
-         * @deprecated {@link RowLock} and associated operations are deprecated
-         */
-        @Override
-        public RowLock lockRow(byte[] row) throws IOException {
-            return table.lockRow(row);
-        }
-
-        /**
-         * @deprecated {@link RowLock} and associated operations are deprecated
-         */
-        @Override
-        public void unlockRow(RowLock rl) throws IOException {
-            table.unlockRow(rl);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
-            return table.coprocessorProxy(protocol, row);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
-                                                                                 byte[] startKey,
-                                                                                 byte[] endKey,
-                                                                                 Batch.Call<T, R> callable)
-                                                                                                           throws IOException,
-                                                                                                           Throwable {
-            return table.coprocessorExec(protocol, startKey, endKey, callable);
-        }
-
-        @Override
-        public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
-                                                                       byte[] startKey,
-                                                                       byte[] endKey,
-                                                                       Batch.Call<T, R> callable,
-                                                                       Batch.Callback<R> callback)
-                                                                                                  throws IOException,
-                                                                                                  Throwable {
-            table.coprocessorExec(protocol, startKey, endKey, callable, callback);
-        }
-
         @Override
         public String toString() {
             return "PooledOHTable{" + ", table=" + table + '}';
@@ -895,6 +862,89 @@ public class OHTablePool implements Closeable {
 
         public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
             return ((OHTable) this.table).getStartEndKeys();
+        }
+
+        @Override
+        public <R> Object[] batchCallback(List<? extends Row> arg0, Callback<R> arg1)
+                                                                                     throws IOException,
+                                                                                     InterruptedException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <R> void batchCallback(List<? extends Row> arg0, Object[] arg1, Callback<R> arg2)
+                                                                                                throws IOException,
+                                                                                                InterruptedException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <R extends Message> Map<byte[], R> batchCoprocessorService(MethodDescriptor arg0,
+                                                                          Message arg1,
+                                                                          byte[] arg2, byte[] arg3,
+                                                                          R arg4)
+                                                                                 throws ServiceException,
+                                                                                 Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <R extends Message> void batchCoprocessorService(MethodDescriptor arg0,
+                                                                Message arg1, byte[] arg2,
+                                                                byte[] arg3, R arg4,
+                                                                Callback<R> arg5)
+                                                                                 throws ServiceException,
+                                                                                 Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public boolean checkAndMutate(byte[] arg0, byte[] arg1, byte[] arg2, CompareOp arg3,
+                                      byte[] arg4, RowMutations arg5) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public CoprocessorRpcChannel coprocessorService(byte[] arg0) {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> arg0, byte[] arg1,
+                                                                        byte[] arg2, Call<T, R> arg3)
+                                                                                                     throws ServiceException,
+                                                                                                     Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <T extends Service, R> void coprocessorService(Class<T> arg0, byte[] arg1,
+                                                              byte[] arg2, Call<T, R> arg3,
+                                                              Callback<R> arg4)
+                                                                               throws ServiceException,
+                                                                               Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public Boolean[] exists(List<Get> arg0) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public TableName getName() {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public long incrementColumnValue(byte[] arg0, byte[] arg1, byte[] arg2, long arg3,
+                                         Durability arg4) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public void setAutoFlushTo(boolean arg0) {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
     }
 }

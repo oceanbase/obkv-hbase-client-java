@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase.result;
 
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
@@ -164,5 +165,10 @@ public class ClientStreamScanner extends AbstractClientScanner {
         } catch (Exception e) {
             logger.error(LCD.convert("01-00001"), streamResult.getTableName(), e);
         }
+    }
+
+    @Override
+    public boolean renewLease() {
+        throw new FeatureNotSupportedException("not supported yet'");
     }
 }

@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase;
 
-import org.apache.hadoop.hbase.client.RowLock;
 import org.junit.*;
 
 import java.io.IOException;
@@ -25,7 +24,6 @@ import java.io.IOException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class OHTableClientTest extends HTableTestBase {
     @Before
@@ -50,20 +48,6 @@ public class OHTableClientTest extends HTableTestBase {
         OHTableClient hTable2 = ObHTableTestUtil.newOHTableClient("test");
         hTable2.init();
         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
-
-        try {
-            hTable2.lockRow("key".getBytes());
-            fail();
-        } catch (Exception e) {
-            assertTrue(true);
-        }
-
-        try {
-            hTable2.unlockRow(new RowLock(1));
-            fail();
-        } catch (Exception e) {
-            assertTrue(true);
-        }
 
         assertTrue(hTable2.isAutoFlush());
         hTable2.setAutoFlush(false);
