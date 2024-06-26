@@ -23,15 +23,15 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String  PARAM_URL      = "http://ocp-cfg.alibaba.net:8080/services?User_ID=alibaba&UID=test&Action=ObRootServiceInfo&ObCluster=ob12.wuhuang.wh.11.158.77.154&database=test";
-    public static String  FULL_USER_NAME = "root@mysql#ob11.wuhuang.wh.11.158.77.154";
-    public static String  PASSWORD       = "";
-    public static String  SYS_USER_NAME  = "proxyro";
-    public static String  SYS_PASSWORD   = "3u^0kCdpE";
-    public static String  ODP_ADDR       = "";
-    public static int     ODP_PORT       = 0;
-    public static boolean ODP_MODE       = false;
-    public static String  DATABASE       = "";
+    public static String PARAM_URL = "";
+    public static String FULL_USER_NAME = "";
+    public static String PASSWORD = "";
+    public static String SYS_USER_NAME = "";
+    public static String SYS_PASSWORD = "";
+    public static String ODP_ADDR = "";
+    public static int ODP_PORT = 0;
+    public static boolean ODP_MODE = false;
+    public static String DATABASE = "";
 
     public static Configuration newConfiguration() {
         Configuration conf = new Configuration();

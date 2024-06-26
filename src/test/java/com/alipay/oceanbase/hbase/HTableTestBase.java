@@ -1124,58 +1124,24 @@ public abstract class HTableTestBase {
         Assert.assertEquals(2, res_count);
         scanner.close();
 
-        scan = new Scan();
-        scan.addFamily(family.getBytes());
-        scan.setStartRow("scanKey1x".getBytes());
-        scan.setMaxVersions(10);
-        scanner = hTable.getScanner(scan);
-        for (Result result : scanner) {
-            // 处理结果
-            for (Cell cell : result.listCells()) {
-                // 获取列族、列限定符、值和时间戳
-                String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
-                String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
-                String value = Bytes.toString(CellUtil.cloneValue(cell));
-                long timestamp = cell.getTimestamp();
-
-                System.out.print("RowKey: " + Bytes.toString(result.getRow()) + "||||");
-                System.out.print("Column Family: " + family2 + "||||");
-                System.out.print("Column Qualifier: " + qualifier + "||||");
-                System.out.print("Value: " + value + "||||");
-                System.out.println("Timestampsss: " + timestamp);
-            }
-        }
-        scanner.close();
-
         System.out.println("******************************");
 
         // reverse scan
         scan = new Scan();
         scan.addFamily(family.getBytes());
-        scan.setStartRow("scanKey1x".getBytes());
-        scan.setStopRow("scanKey3x".getBytes());
-        // ColumnPaginationFilter filter = new ColumnPaginationFilter(2, 0);
-        // scan.setFilter(filter);
+        scan.setStartRow("scanKey3x".getBytes());
+        scan.setStopRow("scanKey1x".getBytes());
         scan.setReversed(true);
-        scan.setMaxVersions(10);
+        scan.setMaxVersions(1);
         scanner = hTable.getScanner(scan);
 
+        res_count = 0;
         for (Result result : scanner) {
-            // 处理结果
-            for (Cell cell : result.listCells()) {
-                // 获取列族、列限定符、值和时间戳
-                String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
-                String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
-                String value = Bytes.toString(CellUtil.cloneValue(cell));
-                long timestamp = cell.getTimestamp();
-
-                System.out.print("RowKey: " + Bytes.toString(result.getRow()) + "||||");
-                System.out.print("Column Family: " + family2 + "||||");
-                System.out.print("Column Qualifier: " + qualifier + "||||");
-                System.out.print("Value: " + value + "||||");
-                System.out.println("Timestampsss: " + timestamp);
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
             }
         }
+        Assert.assertEquals(6, res_count);
         scanner.close();
 
         // try to delete all with scan

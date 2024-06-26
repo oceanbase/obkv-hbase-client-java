@@ -59,6 +59,7 @@ public class LoggerTest {
 
     /**
      * mock 掉 OHTable 里的 obTableClient，使其链接 ob 失败
+     * 
      * @throws Exception
      */
     @Test
@@ -95,7 +96,7 @@ public class LoggerTest {
 
         try {
             hTableMock.incrementColumnValue("key".getBytes(), "family1".getBytes(),
-                "c1".getBytes(), 1);
+                    "c1".getBytes(), 1);
             fail();
         } catch (Exception e) {
             assertTrue(true);
