@@ -73,7 +73,7 @@ public class HBaseFilterUtils {
         }
     }
 
-    private static String toParseableString(WritableByteArrayComparable comparator) {
+    private static String toParseableString(ByteArrayComparable comparator) {
         if (comparator == null) {
             throw new IllegalArgumentException("Comparator is null");
         }

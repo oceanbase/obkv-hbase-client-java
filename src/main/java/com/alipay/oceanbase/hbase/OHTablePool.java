@@ -18,13 +18,20 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.constants.OHConstants;
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.KeyDefiner;
 import com.alipay.oceanbase.hbase.util.OHTableFactory;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PoolMap;
@@ -657,7 +664,7 @@ public class OHTablePool implements Closeable {
      * A proxy class that implements HTableInterface.close method to return the
      * wrapped table back to the table pool
      */
-    class PooledOHTable implements HTableInterface {
+    public class PooledOHTable implements HTableInterface {
 
         private HTableInterface table; // actual table implementation
 
@@ -668,6 +675,11 @@ public class OHTablePool implements Closeable {
         @Override
         public byte[] getTableName() {
             return table.getTableName();
+        }
+
+        @Override
+        public TableName getName() {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
         @Override
@@ -686,6 +698,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public Boolean[] exists(List<Get> gets) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
         public void batch(List<? extends Row> actions, Object[] results) throws IOException,
                                                                         InterruptedException {
             table.batch(actions, results);
@@ -694,6 +711,16 @@ public class OHTablePool implements Closeable {
         @Override
         public Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
             return table.batch(actions);
+        }
+
+        @Override
+        public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
         @Override
@@ -771,6 +798,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
         public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
                                          boolean writeToWAL) throws IOException {
             return table.incrementColumnValue(row, family, qualifier, amount, writeToWAL);
@@ -795,47 +827,21 @@ public class OHTablePool implements Closeable {
             returnTable(table);
         }
 
-        /**
-         * @deprecated {@link RowLock} and associated operations are deprecated
-         */
         @Override
-        public RowLock lockRow(byte[] row) throws IOException {
-            return table.lockRow(row);
-        }
-
-        /**
-         * @deprecated {@link RowLock} and associated operations are deprecated
-         */
-        @Override
-        public void unlockRow(RowLock rl) throws IOException {
-            table.unlockRow(rl);
+        public CoprocessorRpcChannel coprocessorService(byte[] row) {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
         @Override
-        public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
-            return table.coprocessorProxy(protocol, row);
+        public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
         @Override
-        public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
-                                                                                 byte[] startKey,
-                                                                                 byte[] endKey,
-                                                                                 Batch.Call<T, R> callable)
-                                                                                                           throws IOException,
-                                                                                                           Throwable {
-            return table.coprocessorExec(protocol, startKey, endKey, callable);
+        public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
-        @Override
-        public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
-                                                                       byte[] startKey,
-                                                                       byte[] endKey,
-                                                                       Batch.Call<T, R> callable,
-                                                                       Batch.Callback<R> callback)
-                                                                                                  throws IOException,
-                                                                                                  Throwable {
-            table.coprocessorExec(protocol, startKey, endKey, callable, callback);
-        }
 
         @Override
         public String toString() {
@@ -872,6 +878,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public void setAutoFlushTo(boolean autoFlush) {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
         public long getWriteBufferSize() {
             return table.getWriteBufferSize();
         }
@@ -879,6 +890,21 @@ public class OHTablePool implements Closeable {
         @Override
         public void setWriteBufferSize(long writeBufferSize) throws IOException {
             table.setWriteBufferSize(writeBufferSize);
+        }
+
+        @Override
+        public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
+            throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
+            throw new FeatureNotSupportedException("not supported yet'");
         }
 
         public HTableInterface getTable() {

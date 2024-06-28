@@ -17,7 +17,7 @@
 
 package com.alipay.oceanbase.hbase;
 
-import org.apache.hadoop.hbase.client.RowLock;
+import org.apache.hadoop.hbase.client.*;
 import org.junit.*;
 
 import java.io.IOException;
@@ -52,14 +52,12 @@ public class OHTableClientTest extends HTableTestBase {
         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
 
         try {
-            hTable2.lockRow("key".getBytes());
             fail();
         } catch (Exception e) {
             assertTrue(true);
         }
 
         try {
-            hTable2.unlockRow(new RowLock(1));
             fail();
         } catch (Exception e) {
             assertTrue(true);

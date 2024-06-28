@@ -18,6 +18,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
@@ -1078,6 +1080,33 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 7);
+        scanner.close();
+
+        // reverse scan
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey3x".getBytes());
+        scan.setStopRow("scanKey1x".getBytes());
+        scan.setReversed(true);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        for (Result result : scanner) {
+            // 处理结果
+            for (Cell cell : result.listCells()) {
+                // 获取列族、列限定符、值和时间戳
+                String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
+                String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+                String value = Bytes.toString(CellUtil.cloneValue(cell));
+                long timestamp = cell.getTimestamp();
+
+                System.out.print("RowKey: " + Bytes.toString(result.getRow()) + "||||");
+                System.out.print("Column Family: " + family2 + "||||");
+                System.out.print("Column Qualifier: " + qualifier + "||||");
+                System.out.print("Value: " + value + "||||");
+                System.out.println("Timestampsss: " + timestamp);
+            }
+        }
         scanner.close();
 
         // scan with prefixFilter
