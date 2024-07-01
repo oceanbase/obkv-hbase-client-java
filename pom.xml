@@ -46,7 +46,7 @@
 
     <properties>
         <hadoop.version>1.2.1</hadoop.version>
-        <hbase.version>0.94.27</hbase.version>
+        <hbase.version>0.98.24-hadoop1</hbase.version>
         <java.source.version>1.8</java.source.version>
         <java.target.version>1.8</java.target.version>
         <junit.version>4.13.1</junit.version>
@@ -60,7 +60,7 @@
     <dependencies>
         <dependency>
             <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase</artifactId>
+            <artifactId>hbase-client</artifactId>
             <version>${hbase.version}</version>
             <exclusions>
                 <exclusion>
