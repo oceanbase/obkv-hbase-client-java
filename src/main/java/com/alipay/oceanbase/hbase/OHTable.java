@@ -382,7 +382,8 @@ public class OHTable implements HTableInterface {
             KeyValue kv = new KeyValue((byte[]) row.get(0).getValue(),//K
                 familyAndQualifier[0], // family
                 familyAndQualifier[1], // qualifier
-                (byte[]) row.get(3).getValue()//T
+                (Long) row.get(2).getValue(), // T
+                (byte[]) row.get(3).getValue()//  V
             );
             keyValueList.add(kv);
         }

@@ -40,6 +40,8 @@ public class HBaseFilterUtils {
             return toParseableString((PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
             return toParseableString((FilterList) filter);
+        } else if (filter instanceof ColumnPaginationFilter) {
+            return toParseableString((ColumnPaginationFilter) filter);
         } else if (filter instanceof SkipFilter) {
             return toParseableString((SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
@@ -110,6 +112,10 @@ public class HBaseFilterUtils {
 
     private static String toParseableString(PageFilter filter) {
         return filter.getClass().getSimpleName() + '(' + filter.getPageSize() + ')';
+    }
+
+    private static String toParseableString(ColumnPaginationFilter filter) {
+        return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ',' + filter.getOffset() + ')';
     }
 
     private static String toParseableString(ColumnCountGetFilter filter) {
