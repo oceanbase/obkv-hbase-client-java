@@ -78,7 +78,7 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
 public class OHTable implements HTableInterface {
 
     private static final Logger   logger                 = TableHBaseLoggerFactory
-            .getLogger(OHTable.class);
+                                                             .getLogger(OHTable.class);
     /**
      * the table client for oceanbase
      */
@@ -200,9 +200,9 @@ public class OHTable implements HTableInterface {
         this.tableName = tableName.getBytes();
         this.tableNameString = tableName;
         this.maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
+            DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
         this.keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+            DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(configuration);
 
@@ -244,16 +244,16 @@ public class OHTable implements HTableInterface {
         checkArgument(configuration != null, "configuration is null.");
         checkArgument(tableName != null, "tableNameString is blank.");
         checkArgument(executePool != null && !executePool.isShutdown(),
-                "executePool is null or executePool is shutdown");
+            "executePool is null or executePool is shutdown");
         this.configuration = configuration;
         this.executePool = executePool;
         this.tableName = tableName;
         this.tableNameString = Bytes.toString(tableName);
         this.cleanupPoolOnClose = false;
         this.maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
+            DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
         this.keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+            DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(configuration);
 
         finishSetUp();
@@ -275,7 +275,7 @@ public class OHTable implements HTableInterface {
                    final ExecutorService executePool) {
         checkArgument(tableName != null, "tableNameString is blank.");
         checkArgument(executePool != null && !executePool.isShutdown(),
-                "executePool is null or executePool is shutdown");
+            "executePool is null or executePool is shutdown");
         this.tableName = tableName;
         this.tableNameString = Bytes.toString(tableName);
         this.cleanupPoolOnClose = false;
@@ -309,8 +309,8 @@ public class OHTable implements HTableInterface {
             System.setProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY, "false");
         }
         SofaThreadPoolExecutor executor = new SofaThreadPoolExecutor(coreSize, maxThreads,
-                keepAliveTime, SECONDS, new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool",
-                TABLE_HBASE_LOGGER_SPACE);
+            keepAliveTime, SECONDS, new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool",
+            TABLE_HBASE_LOGGER_SPACE);
         executor.allowCoreThreadTimeOut(true);
         return executor;
     }
@@ -323,17 +323,17 @@ public class OHTable implements HTableInterface {
         checkArgument(tableName != null, "tableNameString is null.");
         checkArgument(tableNameString != null, "tableNameString is null.");
         this.operationTimeout = this.configuration.getInt(
-                HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
-                HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+            HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
         this.operationExecuteInPool = this.configuration.getBoolean(
-                HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
-                (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
+            HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
+            (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = this.configuration.getInt(HBASE_CLIENT_KEYVALUE_MAXSIZE,
-                DEFAULT_HBASE_CLIENT_KEYVALUE_MAXSIZE);
+            DEFAULT_HBASE_CLIENT_KEYVALUE_MAXSIZE);
         this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-                DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
+            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(HBASE_HTABLE_CLIENT_WRITE_BUFFER,
-                DEFAULT_HBASE_HTABLE_CLIENT_WRITE_BUFFER);
+            DEFAULT_HBASE_HTABLE_CLIENT_WRITE_BUFFER);
     }
 
     public byte[] getTableName() {
@@ -380,11 +380,15 @@ public class OHTable implements HTableInterface {
         throw new FeatureNotSupportedException("not supported yet.");
     }
 
-    public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> void batchCallback(List<? extends Row> actions, Object[] results,
+                                  Batch.Callback<R> callback) throws IOException,
+                                                             InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
+                                                                                              throws IOException,
+                                                                                              InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -397,16 +401,16 @@ public class OHTable implements HTableInterface {
             if (isTableGroup) {
                 // split family and qualifier
                 familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row.get(1)
-                        .getValue());
+                    .getValue());
             } else {
                 familyAndQualifier[0] = family;
                 familyAndQualifier[1] = (byte[]) row.get(1).getValue();
             }
             KeyValue kv = new KeyValue((byte[]) row.get(0).getValue(),//K
-                    familyAndQualifier[0], // family
-                    familyAndQualifier[1], // qualifier
-                    (Long) row.get(2).getValue(), // T
-                    (byte[]) row.get(3).getValue()//  V
+                familyAndQualifier[0], // family
+                familyAndQualifier[1], // qualifier
+                (Long) row.get(2).getValue(), // T
+                (byte[]) row.get(3).getValue()//  V
             );
             keyValueList.add(kv);
         }
@@ -420,7 +424,7 @@ public class OHTable implements HTableInterface {
         }
 
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
-                obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
+            obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
             public Result call() throws IOException {
                 List<KeyValue> keyValueList = new ArrayList<KeyValue>();
                 byte[] family = new byte[] {};
@@ -430,43 +434,43 @@ public class OHTable implements HTableInterface {
                 ObHTableFilter filter;
                 try {
                     if (get.getFamilyMap().keySet() == null
-                            || get.getFamilyMap().keySet().size() == 0) {
+                        || get.getFamilyMap().keySet().size() == 0) {
                         filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
-                                get.getMaxVersions(), null);
+                            get.getMaxVersions(), null);
 
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
-                                true, -1);
+                            true, -1);
 
                         request = buildObTableQueryRequest(obTableQuery, tableNameString);
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-                                .execute(request);
+                            .execute(request);
                         getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
-                                .entrySet()) {
+                            .entrySet()) {
 
                             family = entry.getKey();
 
                             filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
-                                    get.getMaxVersions(), entry.getValue());
+                                get.getMaxVersions(), entry.getValue());
 
                             obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-                                    get.getRow(), true, -1);
+                                get.getRow(), true, -1);
 
                             request = buildObTableQueryRequest(obTableQuery,
-                                    getTargetTableName(tableNameString, Bytes.toString(family)));
+                                getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-                                    .execute(request);
+                                .execute(request);
                             getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
-                                    family);
+                                family);
                         }
                     }
                 } catch (Exception e) {
                     logger.error(LCD.convert("01-00002"), tableNameString, Bytes.toString(family),
-                            e);
+                        e);
                     throw new IOException("query table:" + tableNameString + " family "
-                            + Bytes.toString(family) + " error.", e);
+                                          + Bytes.toString(family) + " error.", e);
                 }
                 return new Result(keyValueList);
             }
@@ -502,8 +506,8 @@ public class OHTable implements HTableInterface {
 
         //be careful about the packet size ,may the packet exceed the max result size ,leading to error
         ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
-                configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
-                operationTimeout) {
+            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+            operationTimeout) {
             public ResultScanner call() throws IOException {
                 byte[] family = new byte[] {};
                 ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
@@ -512,83 +516,57 @@ public class OHTable implements HTableInterface {
                 ObHTableFilter filter;
                 try {
                     if (scan.getFamilyMap().keySet() == null
-                            || scan.getFamilyMap().keySet().size() == 0) {
+                        || scan.getFamilyMap().keySet().size() == 0) {
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-<<<<<<< HEAD
                             scan.getMaxVersions(), null);
                         if (scan.isReversed()) {
                             obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                    scan.getStartRow(), true, scan.getBatch());
+                                scan.getStartRow(), true, scan.getBatch());
                         } else {
                             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                    scan.getStopRow(), false, scan.getBatch());
+                                scan.getStopRow(), false, scan.getBatch());
                         }
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
                         }
-=======
-                                scan.getMaxVersions(), null);
-                        obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                scan.getStopRow(), false, scan.getBatch());
-
->>>>>>> b1cd4d4 ([Fix] conflict resolution error)
                         request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                .execute(request);
+                            .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, true);
+                            tableNameString, family, true);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
-                                .entrySet()) {
+                            .entrySet()) {
                             family = entry.getKey();
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-<<<<<<< HEAD
                                 scan.getMaxVersions(), entry.getValue());
                             if (scan.isReversed()) {
-                                 obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                     scan.getStartRow(), true, scan.getBatch());
+                                obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                                    scan.getStartRow(), true, scan.getBatch());
                             } else {
-                                 obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                 scan.getStopRow(), false, scan.getBatch());
-                            }
-                             if (scan.isReversed()) { // reverse scan 时设置为逆序
-                                 obTableQuery.setScanOrder(ObScanOrder.Reverse);
-                             }
-=======
-                                    scan.getMaxVersions(), entry.getValue());
-
-                            // not support reverse scan.
-                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
-                            // if (scan.getReversed()) {
-                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                            //         scan.getStartRow(), true, scan.getBatch());
-                            // } else {
-                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
                                     scan.getStopRow(), false, scan.getBatch());
-                            // }
+                            }
+                            if (scan.isReversed()) { // reverse scan 时设置为逆序
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            }
 
-                            // not support reverse scan.
-                            // if (scan.getReversed()) { // reverse scan 时设置为逆序
-                            //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
-                            // }
-
->>>>>>> b1cd4d4 ([Fix] conflict resolution error)
                             // no support set maxResultSize.
                             // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
 
                             request = buildObTableQueryAsyncRequest(obTableQuery,
-                                    getTargetTableName(tableNameString, Bytes.toString(family)));
+                                getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                    .execute(request);
+                                .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                    tableNameString, family, false);
+                                tableNameString, family, false);
                         }
                     }
                 } catch (Exception e) {
                     logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                            e);
+                        e);
                     throw new IOException("scan table:" + tableNameString + " family "
-                            + Bytes.toString(family) + " error.", e);
+                                          + Bytes.toString(family) + " error.", e);
                 }
 
                 throw new IOException("scan table:" + tableNameString + "has no family");
@@ -670,7 +648,7 @@ public class OHTable implements HTableInterface {
      * @throws IOException if failed
      */
     public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, byte[] value, Put put)
-            throws IOException {
+                                                                                                  throws IOException {
         return checkAndMutation(row, family, qualifier, value, put);
     }
 
@@ -682,10 +660,11 @@ public class OHTable implements HTableInterface {
             checkFamilyViolation(delete.getFamilyMap().keySet());
 
             Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet().iterator()
-                    .next();
+                .next();
 
-            BatchOperation batch = buildBatchOperation(getTargetTableName(tableNameString,
-                    Bytes.toString(entry.getKey())), entry.getValue(), false, null);
+            BatchOperation batch = buildBatchOperation(
+                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                entry.getValue(), false, null);
             BatchOperationResult results = batch.execute();
 
             errorCodeList = results.getErrorCodeList();
@@ -696,7 +675,7 @@ public class OHTable implements HTableInterface {
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, errorCodeList, e);
             throw new IOException("delete  table " + tableNameString + " error codes "
-                    + errorCodeList, e);
+                                  + errorCodeList, e);
         }
     }
 
@@ -732,7 +711,7 @@ public class OHTable implements HTableInterface {
             checkArgument(row != null, "row is null");
             checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
             checkArgument(Bytes.equals(row, mutation.getRow()),
-                    "mutation row is not equal check row");
+                "mutation row is not equal check row");
 
             checkArgument(!mutation.isEmpty(), "mutation is empty");
 
@@ -743,25 +722,25 @@ public class OHTable implements HTableInterface {
             checkFamilyViolation(mutation.getFamilyMap().keySet());
             // only one family operation is allowed
             Map.Entry<byte[], List<KeyValue>> entry = mutation.getFamilyMap().entrySet().iterator()
-                    .next();
+                .next();
 
             checkArgument(Arrays.equals(family, entry.getKey()),
-                    "mutation family is not equal check family");
+                "mutation family is not equal check family");
 
             ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, -1);
 
             ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue(), false, null);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                    batch, getTargetTableName(tableNameString, Bytes.toString(entry.getKey())));
+                batch, getTargetTableName(tableNameString, Bytes.toString(entry.getKey())));
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                    .execute(request);
+                .execute(request);
             return result.getAffectedRows() > 0;
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), mutation.getClass().getSimpleName(),
-                    tableNameString, e);
+                tableNameString, e);
             throw new IOException("checkAndMutation type " + mutation.getClass().getSimpleName()
-                    + " table " + tableNameString + " error.", e);
+                                  + " table " + tableNameString + " error.", e);
         }
     }
 
@@ -783,11 +762,11 @@ public class OHTable implements HTableInterface {
         try {
             byte[] r = append.getRow();
             Map.Entry<byte[], List<KeyValue>> entry = append.getFamilyMap().entrySet().iterator()
-                    .next();
+                .next();
             byte[] f = entry.getKey();
             List<byte[]> qualifiers = new ArrayList<byte[]>();
             ObTableBatchOperation batchOperation = buildObTableBatchOperation(entry.getValue(),
-                    true, qualifiers);
+                true, qualifiers);
             // the later hbase has supported timeRange
             ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
             ObTableQuery obTableQuery = buildObTableQuery(filter, r, true, r, true, -1);
@@ -795,10 +774,10 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
             queryAndMutate.setMutations(batchOperation);
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                    batchOperation, getTargetTableName(tableNameString, Bytes.toString(f)));
+                batchOperation, getTargetTableName(tableNameString, Bytes.toString(f)));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                    .execute(request);
+                .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -832,12 +811,8 @@ public class OHTable implements HTableInterface {
             List<byte[]> qualifiers = new ArrayList<byte[]>();
 
             byte[] rowKey = increment.getRow();
-<<<<<<< HEAD
             Map.Entry<byte[], List<Cell>> entry = increment.getFamilyCellMap()
-=======
-            Map.Entry<byte[], NavigableMap<byte[], Long>> entry = increment.getFamilyMap()
->>>>>>> b1cd4d4 ([Fix] conflict resolution error)
-                    .entrySet().iterator().next();
+                .entrySet().iterator().next();
 
             byte[] f = entry.getKey();
 
@@ -846,17 +821,11 @@ public class OHTable implements HTableInterface {
                 byte[] qualifier = cell.getQualifier();
                 qualifiers.add(qualifier);
                 batch.addTableOperation(getInstance(INCREMENT, new Object[] { rowKey, qualifier,
-<<<<<<< HEAD
                         Long.MAX_VALUE }, V_COLUMNS, new Object[] { cell.getValue() }));
             });
-=======
-                                Long.MAX_VALUE }, V_COLUMNS,
-                        new Object[] { Bytes.toBytes(qualifiersIncrements.getValue()) }));
-            }
->>>>>>> b1cd4d4 ([Fix] conflict resolution error)
-
+            
             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
-                    qualifiers);
+                qualifiers);
 
             ObTableQuery obTableQuery = buildObTableQuery(filter, rowKey, true, rowKey, true, -1);
             ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
@@ -864,10 +833,10 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                    batch, getTargetTableName(tableNameString, Bytes.toString(f)));
+                batch, getTargetTableName(tableNameString, Bytes.toString(f)));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                    .execute(request);
+                .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -896,7 +865,7 @@ public class OHTable implements HTableInterface {
      * @throws IOException if failed
      */
     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount)
-            throws IOException {
+                                                                                              throws IOException {
         try {
             List<byte[]> qualifiers = new ArrayList<byte[]>();
             qualifiers.add(qualifier);
@@ -913,14 +882,14 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                    batch, getTargetTableName(tableNameString, Bytes.toString(family)));
+                batch, getTargetTableName(tableNameString, Bytes.toString(family)));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                    .execute(request);
+                .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
             if (queryResult.getPropertiesRows().size() != 1) {
                 throw new IllegalStateException("the increment result size illegal "
-                        + queryResult.getPropertiesRows().size());
+                                                + queryResult.getPropertiesRows().size());
             }
             return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3).getValue());
         } catch (Exception e) {
@@ -929,7 +898,8 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
+    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                     Durability durability) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -956,10 +926,10 @@ public class OHTable implements HTableInterface {
                     for (Map.Entry<byte[], List<KeyValue>> entry : innerFamilyMap.entrySet()) {
                         String family = Bytes.toString(entry.getKey());
                         Pair<List<Integer>, List<KeyValue>> keyValueWithIndex = familyMap
-                                .get(family);
+                            .get(family);
                         if (keyValueWithIndex == null) {
                             keyValueWithIndex = new Pair<List<Integer>, List<KeyValue>>(
-                                    new ArrayList<Integer>(), new ArrayList<KeyValue>());
+                                new ArrayList<Integer>(), new ArrayList<KeyValue>());
                             familyMap.put(family, keyValueWithIndex);
                         }
                         keyValueWithIndex.getFirst().add(i);
@@ -967,14 +937,15 @@ public class OHTable implements HTableInterface {
                     }
                 }
                 for (Map.Entry<String, Pair<List<Integer>, List<KeyValue>>> entry : familyMap
-                        .entrySet()) {
+                    .entrySet()) {
                     List<Integer> errorCodeList = new ArrayList<Integer>(entry.getValue()
-                            .getSecond().size());
+                        .getSecond().size());
                     try {
                         String targetTableName = getTargetTableName(this.tableNameString,
-                                entry.getKey());
+                            entry.getKey());
 
-                        BatchOperation batch = buildBatchOperation(targetTableName, entry.getValue().getSecond(), false, null);
+                        BatchOperation batch = buildBatchOperation(targetTableName, entry
+                            .getValue().getSecond(), false, null);
                         BatchOperationResult results = batch.execute();
 
                         errorCodeList = results.getErrorCodeList();
@@ -987,10 +958,10 @@ public class OHTable implements HTableInterface {
                         }
                     } catch (Exception e) {
                         logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList,
-                                autoFlush, writeBuffer.size(), e);
+                            autoFlush, writeBuffer.size(), e);
                         throw new IOException("put table " + tableNameString + " error codes "
-                                + errorCodeList + "auto flush " + autoFlush
-                                + " current buffer size " + writeBuffer.size(), e);
+                                              + errorCodeList + "auto flush " + autoFlush
+                                              + " current buffer size " + writeBuffer.size(), e);
                     }
 
                 }
@@ -1031,14 +1002,21 @@ public class OHTable implements HTableInterface {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
+    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service,
+                                                                    byte[] startKey, byte[] endKey,
+                                                                    Batch.Call<T, R> callable)
+                                                                                              throws ServiceException,
+                                                                                              Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey,
+                                                          byte[] endKey, Batch.Call<T, R> callable,
+                                                          Batch.Callback<R> callback)
+                                                                                     throws ServiceException,
+                                                                                     Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
-
 
     /**
      * See {@link #setAutoFlush(boolean, boolean)}
@@ -1111,23 +1089,36 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
+    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                                      Message request,
+                                                                      byte[] startKey,
+                                                                      byte[] endKey,
+                                                                      R responsePrototype)
+                                                                                          throws ServiceException,
+                                                                                          Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                            Message request, byte[] startKey,
+                                                            byte[] endKey, R responsePrototype,
+                                                            Batch.Callback<R> callback)
+                                                                                       throws ServiceException,
+                                                                                       Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
+    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
+                                  CompareFilter.CompareOp compareOp, byte[] value,
+                                  RowMutations mutation) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
         this.operationExecuteInPool = this.configuration.getBoolean(
-                HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
-                (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
+            HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
+            (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
@@ -1164,11 +1155,11 @@ public class OHTable implements HTableInterface {
             String hostPort = "unknown";
             String regionEncodedName = "unknown";
             throw new OperationTimeoutException("Failed executing operation for table '"
-                    + Bytes.toString(this.tableName) + "' on server "
-                    + hostPort + ",region=" + regionEncodedName
-                    + ",operationTimeout=" + this.operationTimeout
-                    + ",waitTime="
-                    + (System.currentTimeMillis() - startTime));
+                                                + Bytes.toString(this.tableName) + "' on server "
+                                                + hostPort + ",region=" + regionEncodedName
+                                                + ",operationTimeout=" + this.operationTimeout
+                                                + ",waitTime="
+                                                + (System.currentTimeMillis() - startTime));
         }
     }
 
@@ -1187,7 +1178,7 @@ public class OHTable implements HTableInterface {
 
     private String getTestLoadTargetTableName(String tableNameString, String familyString) {
         String suffix = configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
-                DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+            DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
         return tableNameString + suffix + "$" + familyString;
     }
 
@@ -1263,7 +1254,7 @@ public class OHTable implements HTableInterface {
 
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
-                    ObObj.getMin()));
+                ObObj.getMin()));
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
         } else {
@@ -1272,7 +1263,7 @@ public class OHTable implements HTableInterface {
 
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
-                    ObObj.getMax()));
+                ObObj.getMax()));
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
         } else {
@@ -1314,7 +1305,8 @@ public class OHTable implements HTableInterface {
         return batch;
     }
 
-    private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv, boolean putToAppend) {
+    private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
+                                                                     boolean putToAppend) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
         switch (kvType) {
             case Put:
@@ -1324,26 +1316,28 @@ public class OHTable implements HTableInterface {
                 } else {
                     operationType = INSERT_OR_UPDATE;
                 }
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType, ROW_KEY_COLUMNS,
-                        new Object[]{kv.getRow(), kv.getQualifier(), kv.getTimestamp()}, V_COLUMNS,
-                        new Object[]{kv.getValue()});
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { kv.getValue() });
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
-                        new Object[]{kv.getRow(), kv.getQualifier(), kv.getTimestamp()}, null, null);
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
             case DeleteColumn:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
-                        new Object[]{kv.getRow(), kv.getQualifier(), -kv.getTimestamp()}, null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation
+                    .getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null,
+                        null);
             case DeleteFamily:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS, new Object[]{kv.getRow(), null, -kv.getTimestamp()},
-                        null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
     }
 
     private BatchOperation buildBatchOperation(String tableName, List<KeyValue> keyValueList,
-                                               boolean putToAppend,
-                                               List<byte[]> qualifiers) {
+                                               boolean putToAppend, List<byte[]> qualifiers) {
         BatchOperation batch = obTableClient.batchOperation(tableName);
         for (KeyValue kv : keyValueList) {
             if (qualifiers != null) {
@@ -1366,17 +1360,17 @@ public class OHTable implements HTableInterface {
                     operationType = INSERT_OR_UPDATE;
                 }
                 return getInstance(operationType,
-                        new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
-                        new Object[] { kv.getValue() });
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { kv.getValue() });
             case Delete:
                 return getInstance(DEL,
-                        new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
             case DeleteColumn:
                 return getInstance(DEL,
-                        new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null, null);
+                    new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null, null);
             case DeleteFamily:
                 return getInstance(DEL, new Object[] { kv.getRow(), null, -kv.getTimestamp() },
-                        null, null);
+                    null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
@@ -1450,10 +1444,10 @@ public class OHTable implements HTableInterface {
             return;
         }
         this.obTableClient.getOrRefreshTableEntry(
-                getNormalTargetTableName(tableNameString, familyString), true, true);
+            getNormalTargetTableName(tableNameString, familyString), true, true);
         if (hasTestLoad) {
             this.obTableClient.getOrRefreshTableEntry(
-                    getTestLoadTargetTableName(tableNameString, familyString), true, true);
+                getTestLoadTargetTableName(tableNameString, familyString), true, true);
         }
     }
 

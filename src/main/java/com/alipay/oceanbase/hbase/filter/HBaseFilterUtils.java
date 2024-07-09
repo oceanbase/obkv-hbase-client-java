@@ -115,7 +115,8 @@ public class HBaseFilterUtils {
     }
 
     private static String toParseableString(ColumnPaginationFilter filter) {
-        return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ',' + filter.getOffset() + ')';
+        return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ','
+               + filter.getOffset() + ')';
     }
 
     private static String toParseableString(ColumnCountGetFilter filter) {

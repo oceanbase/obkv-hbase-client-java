@@ -33,7 +33,6 @@ public class ObHTableTestUtil {
     public static boolean ODP_MODE       = false;
     public static String  DATABASE       = "";
 
-
     public static Configuration newConfiguration() {
         Configuration conf = new Configuration();
         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
