@@ -115,12 +115,20 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
+    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service,
+                                                                    byte[] startKey, byte[] endKey,
+                                                                    Batch.Call<T, R> callable)
+                                                                                              throws ServiceException,
+                                                                                              Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
     @Override
-    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey,
+                                                          byte[] endKey, Batch.Call<T, R> callable,
+                                                          Batch.Callback<R> callback)
+                                                                                     throws ServiceException,
+                                                                                     Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -129,7 +137,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
             throw new IllegalStateException("tableName " + tableNameString + " is not initialized");
         }
     }
-
 
     @Override
     public void setAutoFlush(boolean autoFlush) {
@@ -161,17 +168,30 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
+    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                                      Message request,
+                                                                      byte[] startKey,
+                                                                      byte[] endKey,
+                                                                      R responsePrototype)
+                                                                                          throws ServiceException,
+                                                                                          Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
     @Override
-    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                            Message request, byte[] startKey,
+                                                            byte[] endKey, R responsePrototype,
+                                                            Batch.Callback<R> callback)
+                                                                                       throws ServiceException,
+                                                                                       Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
     @Override
-    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
+    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
+                                  CompareFilter.CompareOp compareOp, byte[] value,
+                                  RowMutations mutation) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -225,12 +245,16 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> void batchCallback(List<? extends Row> actions, Object[] results,
+                                  Batch.Callback<R> callback) throws IOException,
+                                                             InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
     @Override
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
+                                                                                              throws IOException,
+                                                                                              InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -336,7 +360,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
+    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                     Durability durability) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 

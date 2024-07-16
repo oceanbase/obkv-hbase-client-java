@@ -83,6 +83,13 @@ public final class OHConstants {
             "Q", "T", "V"                                                   };
 
     /**
+     * ocenbase hbase model rowkey column is consist of following column
+     * K, Q, T hbase value
+     */
+    public static final String[] ROW_KEY_COLUMNS                             = new String[] { "K",
+            "Q", "T"                                                        };
+
+    /**
      * ocenbase hbase model value column is consist of following column
      * V hbase value
      */

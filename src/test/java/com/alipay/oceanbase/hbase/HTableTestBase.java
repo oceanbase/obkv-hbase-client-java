@@ -353,6 +353,100 @@ public abstract class HTableTestBase {
         hTable.put(puts);
     }
 
+    @Test
+    public void testMultiPartitionPut() throws IOException {
+        String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
+                "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
+
+        String column1 = "column1";
+        String column2 = "column2";
+        String column3 = "column3";
+        String value = "value";
+        String family = "familyPartition";
+        // put
+        {
+            List<Put> puts = new ArrayList<Put>();
+            for (String key : keys) {
+                Put put = new Put(Bytes.toBytes(key));
+                put.add(toBytes(family), toBytes(column1), toBytes(value));
+                put.add(toBytes(family), toBytes(column2), System.currentTimeMillis(),
+                    toBytes(value));
+                puts.add(put);
+            }
+
+            for (String key : keys) {
+                // put same k, q, t
+                Put put = new Put(Bytes.toBytes(key));
+                put.add(toBytes(family), toBytes(column3), 100L, toBytes(value));
+                put.add(toBytes(family), toBytes(column3), 100L, toBytes(value));
+                puts.add(put);
+            }
+            hTable.put(puts);
+        }
+        // get
+        {
+            List<Get> gets = new ArrayList<Get>();
+            for (String key : keys) {
+                Get get = new Get(Bytes.toBytes(key));
+                get.addColumn(toBytes(family), toBytes(column1));
+                get.addColumn(toBytes(family), toBytes(column2));
+                get.addColumn(toBytes(family), toBytes(column3));
+                gets.add(get);
+            }
+            Result[] res = hTable.get(gets);
+            assertEquals(res.length, 10);
+            assertEquals(res[0].raw().length, 3);
+        }
+    }
+
+    @Test
+    public void testMultiPartitionDel() throws IOException {
+        String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
+                "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
+
+        String column1 = "column1";
+        String column2 = "column2";
+        String column3 = "column3";
+        String value = "value";
+        String family = "familyPartition";
+        // delete
+        {
+            List<Delete> deletes = new ArrayList<Delete>();
+            for (String key : keys) {
+                Delete del = new Delete(Bytes.toBytes(key));
+                del.deleteColumns(toBytes(family), toBytes(column1));
+                del.deleteColumns(toBytes(family), toBytes(column2), System.currentTimeMillis());
+                deletes.add(del);
+            }
+
+            for (String key : keys) {
+                // del same k, q, t
+                Delete del = new Delete(Bytes.toBytes(key));
+                del.deleteColumn(toBytes(family), toBytes(column3), 100L);
+                del.deleteColumn(toBytes(family), toBytes(column3), 100L);
+                deletes.add(del);
+            }
+            hTable.delete(deletes);
+        }
+        // get
+        {
+            List<Get> gets = new ArrayList<Get>();
+            for (String key : keys) {
+                Get get = new Get(Bytes.toBytes(key));
+                get.addColumn(toBytes(family), toBytes(column1));
+                get.addColumn(toBytes(family), toBytes(column2));
+                get.addColumn(toBytes(family), toBytes(column3));
+                gets.add(get);
+            }
+            Result[] res = hTable.get(gets);
+            assertEquals(res.length, 10);
+            int i = 0;
+            for (i = 0; i < res.length; ++i) {
+                assertEquals(res[i].raw().length, 0);
+            }
+        }
+    }
+
     public void tryPut(HTableInterface hTable, Put put) throws Exception {
         hTable.put(put);
         Thread.sleep(1);
@@ -622,7 +716,6 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey2Column2Value1);
         tryPut(hTable, putKey2Column2Value2);
 
-
         // show table (time maybe different)
         //+---------+---------+----------------+--------+
         //| K         | Q       | T              | V      |
@@ -738,7 +831,7 @@ public abstract class HTableTestBase {
         filterList = new FilterList();
         emptyFilterList = new FilterList();
         filterList.addFilter(emptyFilterList);
-        filterList.addFilter(new ColumnPaginationFilter(3,1));
+        filterList.addFilter(new ColumnPaginationFilter(3, 1));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -1171,7 +1264,6 @@ public abstract class HTableTestBase {
         hTable.delete(deleteZKey1Family);
         hTable.delete(deleteZKey2Family);
     }
-
 
     @Test
     public void testReversedScan() throws Exception {

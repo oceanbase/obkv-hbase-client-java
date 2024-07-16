@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
@@ -25,7 +26,8 @@ import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.exception.ExceptionUtil;
+import com.alipay.oceanbase.rpc.mutation.BatchOperation;
+import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -45,6 +47,9 @@ import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.HConstants;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.CompareFilter;
@@ -375,11 +380,15 @@ public class OHTable implements HTableInterface {
         throw new FeatureNotSupportedException("not supported yet.");
     }
 
-    public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> void batchCallback(List<? extends Row> actions, Object[] results,
+                                  Batch.Callback<R> callback) throws IOException,
+                                                             InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
+                                                                                              throws IOException,
+                                                                                              InterruptedException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -512,10 +521,10 @@ public class OHTable implements HTableInterface {
                             scan.getMaxVersions(), null);
                         if (scan.isReversed()) {
                             obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                    scan.getStartRow(), true, scan.getBatch());
+                                scan.getStartRow(), true, scan.getBatch());
                         } else {
                             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                    scan.getStopRow(), false, scan.getBatch());
+                                scan.getStopRow(), false, scan.getBatch());
                         }
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
@@ -532,15 +541,16 @@ public class OHTable implements HTableInterface {
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), entry.getValue());
                             if (scan.isReversed()) {
-                                 obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                     scan.getStartRow(), true, scan.getBatch());
+                                obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                                    scan.getStartRow(), true, scan.getBatch());
                             } else {
-                                 obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                 scan.getStopRow(), false, scan.getBatch());
+                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                    scan.getStopRow(), false, scan.getBatch());
                             }
-                             if (scan.isReversed()) { // reverse scan 时设置为逆序
-                                 obTableQuery.setScanOrder(ObScanOrder.Reverse);
-                             }
+                            if (scan.isReversed()) { // reverse scan 时设置为逆序
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            }
+
                             // no support set maxResultSize.
                             // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
 
@@ -651,25 +661,16 @@ public class OHTable implements HTableInterface {
 
             Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet().iterator()
                 .next();
-            ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue(), false, null);
 
-            ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch,
-                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())));
-            ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient
-                .execute(request);
-            boolean hasError = false;
-            int throwErrorCode = 0;
-            for (ObTableOperationResult obTableOperationResult : result.getResults()) {
-                int errorCode = obTableOperationResult.getHeader().getErrno();
-                errorCodeList.add(errorCode);
-                if (errorCode != 0) {
-                    hasError = true;
-                    throwErrorCode = errorCode;
-                }
-            }
+            BatchOperation batch = buildBatchOperation(
+                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                entry.getValue(), false, null);
+            BatchOperationResult results = batch.execute();
 
+            errorCodeList = results.getErrorCodeList();
+            boolean hasError = results.hasError();
             if (hasError) {
-                ExceptionUtil.throwObTableException(throwErrorCode);
+                throw results.getFirstException();
             }
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, errorCodeList, e);
@@ -811,7 +812,7 @@ public class OHTable implements HTableInterface {
 
             byte[] rowKey = increment.getRow();
             Map.Entry<byte[], List<Cell>> entry = increment.getFamilyCellMap()
-                    .entrySet().iterator().next();
+                .entrySet().iterator().next();
 
             byte[] f = entry.getKey();
 
@@ -822,7 +823,7 @@ public class OHTable implements HTableInterface {
                 batch.addTableOperation(getInstance(INCREMENT, new Object[] { rowKey, qualifier,
                         Long.MAX_VALUE }, V_COLUMNS, new Object[] { cell.getValue() }));
             });
-
+            
             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
                 qualifiers);
 
@@ -897,7 +898,8 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
+    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                     Durability durability) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -941,34 +943,18 @@ public class OHTable implements HTableInterface {
                     try {
                         String targetTableName = getTargetTableName(this.tableNameString,
                             entry.getKey());
-                        ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue()
-                            .getSecond(), false, null);
-                        ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(
-                            batch, targetTableName);
 
-                        ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient
-                            .execute(request);
-                        List<ObTableOperationResult> obTableOperationResults = result.getResults();
+                        BatchOperation batch = buildBatchOperation(targetTableName, entry
+                            .getValue().getSecond(), false, null);
+                        BatchOperationResult results = batch.execute();
 
-                        ObTableOperationResult throwResult = null;
-
-                        for (ObTableOperationResult obTableOperationResult : obTableOperationResults) {
-                            int errorCode = obTableOperationResult.getHeader().getErrno();
-                            errorCodeList.add(errorCode);
-                            if (errorCode != 0) {
-                                throwResult = obTableOperationResult;
-                            }
-                        }
-
+                        errorCodeList = results.getErrorCodeList();
+                        boolean hasError = results.hasError();
                         for (Integer index : entry.getValue().getFirst()) {
-                            resultSuccess[index] = throwResult == null;
+                            resultSuccess[index] = !hasError;
                         }
-
-                        if (throwResult != null) {
-                            ExceptionUtil.throwObTableException(throwResult.getExecuteHost(),
-                                throwResult.getExecutePort(), throwResult.getSequence(),
-                                throwResult.getUniqueId(), throwResult.getHeader().getErrno(),
-                                "HBase Error");
+                        if (hasError) {
+                            throw results.getFirstException();
                         }
                     } catch (Exception e) {
                         logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList,
@@ -1016,14 +1002,21 @@ public class OHTable implements HTableInterface {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
+    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service,
+                                                                    byte[] startKey, byte[] endKey,
+                                                                    Batch.Call<T, R> callable)
+                                                                                              throws ServiceException,
+                                                                                              Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey,
+                                                          byte[] endKey, Batch.Call<T, R> callable,
+                                                          Batch.Callback<R> callback)
+                                                                                     throws ServiceException,
+                                                                                     Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
-
 
     /**
      * See {@link #setAutoFlush(boolean, boolean)}
@@ -1096,15 +1089,28 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
+    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                                      Message request,
+                                                                      byte[] startKey,
+                                                                      byte[] endKey,
+                                                                      R responsePrototype)
+                                                                                          throws ServiceException,
+                                                                                          Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
+    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
+                                                            Message request, byte[] startKey,
+                                                            byte[] endKey, R responsePrototype,
+                                                            Batch.Callback<R> callback)
+                                                                                       throws ServiceException,
+                                                                                       Throwable {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
+    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
+                                  CompareFilter.CompareOp compareOp, byte[] value,
+                                  RowMutations mutation) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
@@ -1296,6 +1302,50 @@ public class OHTable implements HTableInterface {
         }
         batch.setSameType(true);
         batch.setSamePropertiesNames(true);
+        return batch;
+    }
+
+    private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
+                                                                     boolean putToAppend) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
+        switch (kvType) {
+            case Put:
+                ObTableOperationType operationType;
+                if (putToAppend) {
+                    operationType = APPEND;
+                } else {
+                    operationType = INSERT_OR_UPDATE;
+                }
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { kv.getValue() });
+            case Delete:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
+            case DeleteColumn:
+                return com.alipay.oceanbase.rpc.mutation.Mutation
+                    .getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null,
+                        null);
+            case DeleteFamily:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
+            default:
+                throw new IllegalArgumentException("illegal mutation type " + kvType);
+        }
+    }
+
+    private BatchOperation buildBatchOperation(String tableName, List<KeyValue> keyValueList,
+                                               boolean putToAppend, List<byte[]> qualifiers) {
+        BatchOperation batch = obTableClient.batchOperation(tableName);
+        for (KeyValue kv : keyValueList) {
+            if (qualifiers != null) {
+                qualifiers.add(kv.getQualifier());
+            }
+            batch.addOperation(buildMutation(kv, putToAppend));
+        }
+        batch.setEntityType(ObTableEntityType.HKV);
         return batch;
     }
 
