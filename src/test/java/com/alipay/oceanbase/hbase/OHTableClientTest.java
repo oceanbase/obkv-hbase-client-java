@@ -50,18 +50,6 @@ public class OHTableClientTest extends HTableTestBase {
         hTable2.init();
         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
 
-        try {
-            fail();
-        } catch (Exception e) {
-            assertTrue(true);
-        }
-
-        try {
-            fail();
-        } catch (Exception e) {
-            assertTrue(true);
-        }
-
         assertTrue(hTable2.isAutoFlush());
         hTable2.setAutoFlush(false);
         assertFalse(hTable2.isAutoFlush());

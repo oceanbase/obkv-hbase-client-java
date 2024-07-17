@@ -416,6 +416,14 @@ public class OHTable implements HTableInterface {
         }
     }
 
+    public String getTargetTableName(String tableNameString) {
+        if (configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
+            return tableNameString + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
+                    DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+        }
+        return tableNameString;
+    }
+
     public Result get(final Get get) throws IOException {
         if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().size() == 0) {
             // check nothing, use table group;
@@ -437,11 +445,9 @@ public class OHTable implements HTableInterface {
                         || get.getFamilyMap().keySet().size() == 0) {
                         filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
                             get.getMaxVersions(), null);
-
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
                             true, -1);
-
-                        request = buildObTableQueryRequest(obTableQuery, tableNameString);
+                        request = buildObTableQueryRequest(obTableQuery, getTargetTableName(tableNameString));
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
@@ -529,7 +535,7 @@ public class OHTable implements HTableInterface {
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
                         }
-                        request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
+                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
