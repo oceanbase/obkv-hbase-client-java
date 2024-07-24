@@ -1,0 +1,951 @@
+From fbcdea4218a0118f8bb252ba466557b116c40bf3 Mon Sep 17 00:00:00 2001
+From: stuBirdFly <1065492934@qq.com>
+Date: Fri, 28 Jun 2024 23:09:21 +0800
+Subject: [PATCH] support reverse scan
+
+---
+ pom.xml                                       |   4 +-
+ .../com/alipay/oceanbase/hbase/OHTable.java   | 138 ++++++-----
+ .../alipay/oceanbase/hbase/OHTableClient.java | 103 +++++---
+ .../alipay/oceanbase/hbase/OHTablePool.java   |  92 ++++---
+ .../hbase/filter/HBaseFilterUtils.java        |   2 +-
+ .../hbase/result/ClientStreamScanner.java     |   6 +
+ .../oceanbase/hbase/HTableTestBase.java       | 230 +++++++++++++++++-
+ .../oceanbase/hbase/OHTableClientTest.java    |   3 -
+ .../oceanbase/hbase/ObHTableTestUtil.java     |   1 +
+ 9 files changed, 436 insertions(+), 143 deletions(-)
+
+diff --git a/pom.xml b/pom.xml
+index cdfb38c..2bdeefd 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -46,7 +46,7 @@
+ 
+     <properties>
+         <hadoop.version>1.2.1</hadoop.version>
+-        <hbase.version>0.94.27</hbase.version>
++        <hbase.version>0.98.24-hadoop1</hbase.version>
+         <java.source.version>1.8</java.source.version>
+         <java.target.version>1.8</java.target.version>
+         <junit.version>4.13.1</junit.version>
+@@ -60,7 +60,7 @@
+     <dependencies>
+         <dependency>
+             <groupId>org.apache.hbase</groupId>
+-            <artifactId>hbase</artifactId>
++            <artifactId>hbase-client</artifactId>
+             <version>${hbase.version}</version>
+             <exclusions>
+                 <exclusion>
+diff --git a/src/main/java/com/alipay/oceanbase/hbase/OHTable.java b/src/main/java/com/alipay/oceanbase/hbase/OHTable.java
+index 3314c3e..c7b3aed 100644
+--- a/src/main/java/com/alipay/oceanbase/hbase/OHTable.java
++++ b/src/main/java/com/alipay/oceanbase/hbase/OHTable.java
+@@ -39,27 +39,18 @@ import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
+ import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
+ import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
+ 
++import com.google.protobuf.Descriptors;
++import com.google.protobuf.Message;
++import com.google.protobuf.Service;
++import com.google.protobuf.ServiceException;
+ import org.apache.hadoop.conf.Configuration;
+-import org.apache.hadoop.hbase.HConstants;
+-import org.apache.hadoop.hbase.HTableDescriptor;
+-import org.apache.hadoop.hbase.KeyValue;
+-import org.apache.hadoop.hbase.client.Append;
+-import org.apache.hadoop.hbase.client.Delete;
+-import org.apache.hadoop.hbase.client.Get;
+-import org.apache.hadoop.hbase.client.HTableInterface;
+-import org.apache.hadoop.hbase.client.Increment;
+-import org.apache.hadoop.hbase.client.Mutation;
+-import org.apache.hadoop.hbase.client.Put;
+-import org.apache.hadoop.hbase.client.Result;
+-import org.apache.hadoop.hbase.client.ResultScanner;
+-import org.apache.hadoop.hbase.client.Row;
+-import org.apache.hadoop.hbase.client.RowLock;
+-import org.apache.hadoop.hbase.client.RowMutations;
+-import org.apache.hadoop.hbase.client.Scan;
++import org.apache.hadoop.hbase.*;
++import org.apache.hadoop.hbase.client.*;
+ import org.apache.hadoop.hbase.client.coprocessor.Batch;
++import org.apache.hadoop.hbase.filter.CompareFilter;
+ import org.apache.hadoop.hbase.filter.Filter;
+ import org.apache.hadoop.hbase.io.TimeRange;
+-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
++import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+ import org.apache.hadoop.hbase.util.Bytes;
+ import org.apache.hadoop.hbase.util.Pair;
+ import org.slf4j.Logger;
+@@ -344,6 +335,10 @@ public class OHTable implements HTableInterface {
+         return tableName;
+     }
+ 
++    public TableName getName() {
++        return null;
++    }
++
+     public Configuration getConfiguration() {
+         return configuration;
+     }
+@@ -368,6 +363,10 @@ public class OHTable implements HTableInterface {
+         return !r.isEmpty();
+     }
+ 
++    public Boolean[] exists(List<Get> gets) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     public void batch(List<? extends Row> actions, Object[] results) {
+         throw new FeatureNotSupportedException("not supported yet.");
+     }
+@@ -376,6 +375,14 @@ public class OHTable implements HTableInterface {
+         throw new FeatureNotSupportedException("not supported yet.");
+     }
+ 
++    public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     public void getKeyValueFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                       List<KeyValue> keyValueList, boolean isTableGroup,
+                                       byte[] family) throws Exception {
+@@ -503,9 +510,16 @@ public class OHTable implements HTableInterface {
+                         || scan.getFamilyMap().keySet().size() == 0) {
+                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                             scan.getMaxVersions(), null);
+-                        obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+-                            scan.getStopRow(), false, scan.getBatch());
+-
++                        if (scan.isReversed()) {
++                            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
++                                    scan.getStartRow(), true, scan.getBatch());
++                        } else {
++                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
++                                    scan.getStopRow(), false, scan.getBatch());
++                        }
++                        if (scan.isReversed()) { // reverse scan 时设置为逆序
++                            obTableQuery.setScanOrder(ObScanOrder.Reverse);
++                        }
+                         request = buildObTableQueryAsyncRequest(obTableQuery, tableNameString);
+                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                             .execute(request);
+@@ -517,22 +531,16 @@ public class OHTable implements HTableInterface {
+                             family = entry.getKey();
+                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                 scan.getMaxVersions(), entry.getValue());
+-
+-                            // not support reverse scan.
+-                            // 由于 HBase 接口与 OB 接口表达范围的差异，reverse scan 需要交换 startRow 和 stopRow
+-                            // if (scan.getReversed()) {
+-                            //     obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+-                            //         scan.getStartRow(), true, scan.getBatch());
+-                            // } else {
+-                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+-                                scan.getStopRow(), false, scan.getBatch());
+-                            // }
+-
+-                            // not support reverse scan.
+-                            // if (scan.getReversed()) { // reverse scan 时设置为逆序
+-                            //     obTableQuery.setScanOrder(ObScanOrder.Reverse);
+-                            // }
+-
++                            if (scan.isReversed()) {
++                                 obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
++                                     scan.getStartRow(), true, scan.getBatch());
++                            } else {
++                                 obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
++                                 scan.getStopRow(), false, scan.getBatch());
++                            }
++                             if (scan.isReversed()) { // reverse scan 时设置为逆序
++                                 obTableQuery.setScanOrder(ObScanOrder.Reverse);
++                             }
+                             // no support set maxResultSize.
+                             // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
+ 
+@@ -802,19 +810,18 @@ public class OHTable implements HTableInterface {
+             List<byte[]> qualifiers = new ArrayList<byte[]>();
+ 
+             byte[] rowKey = increment.getRow();
+-            Map.Entry<byte[], NavigableMap<byte[], Long>> entry = increment.getFamilyMap()
+-                .entrySet().iterator().next();
++            Map.Entry<byte[], List<Cell>> entry = increment.getFamilyCellMap()
++                    .entrySet().iterator().next();
+ 
+             byte[] f = entry.getKey();
+ 
+             ObTableBatchOperation batch = new ObTableBatchOperation();
+-            for (Map.Entry<byte[], Long> qualifiersIncrements : entry.getValue().entrySet()) {
+-                byte[] qualifier = qualifiersIncrements.getKey();
++            entry.getValue().forEach(cell -> {
++                byte[] qualifier = cell.getQualifier();
+                 qualifiers.add(qualifier);
+                 batch.addTableOperation(getInstance(INCREMENT, new Object[] { rowKey, qualifier,
+-                        Long.MAX_VALUE }, V_COLUMNS,
+-                    new Object[] { Bytes.toBytes(qualifiersIncrements.getValue()) }));
+-            }
++                        Long.MAX_VALUE }, V_COLUMNS, new Object[] { cell.getValue() }));
++            });
+ 
+             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
+                 qualifiers);
+@@ -890,6 +897,10 @@ public class OHTable implements HTableInterface {
+         }
+     }
+ 
++    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                      boolean writeToWAL) throws IOException {
+         // WAL ignored
+@@ -1001,31 +1012,18 @@ public class OHTable implements HTableInterface {
+         }
+     }
+ 
+-    public RowLock lockRow(byte[] row) {
+-        throw new FeatureNotSupportedException("not supported yet.");
++    public CoprocessorRpcChannel coprocessorService(byte[] row) {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    public void unlockRow(RowLock rl) {
+-        throw new FeatureNotSupportedException("not supported yet.");
++    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
+-        throw new FeatureNotSupportedException("not supported yet.");
++    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
+-                                                                             byte[] startKey,
+-                                                                             byte[] endKey,
+-                                                                             Batch.Call<T, R> callable) {
+-        throw new FeatureNotSupportedException("not supported yet.");
+-    }
+-
+-    public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
+-                                                                   byte[] startKey, byte[] endKey,
+-                                                                   Batch.Call<T, R> callable,
+-                                                                   Batch.Callback<R> callback) {
+-        throw new FeatureNotSupportedException("not supported yet.");
+-    }
+ 
+     /**
+      * See {@link #setAutoFlush(boolean, boolean)}
+@@ -1066,6 +1064,10 @@ public class OHTable implements HTableInterface {
+         this.clearBufferOnFail = autoFlush || clearBufferOnFail;
+     }
+ 
++    public void setAutoFlushTo(boolean autoFlush) {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     /**
+      * Returns the maximum size in bytes of the write buffer for this HTable.
+      * <p>
+@@ -1094,6 +1096,18 @@ public class OHTable implements HTableInterface {
+         }
+     }
+ 
++    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     public void setOperationTimeout(int operationTimeout) {
+         this.operationTimeout = operationTimeout;
+         this.operationExecuteInPool = this.configuration.getBoolean(
+diff --git a/src/main/java/com/alipay/oceanbase/hbase/OHTableClient.java b/src/main/java/com/alipay/oceanbase/hbase/OHTableClient.java
+index 10276f5..4b76b31 100644
+--- a/src/main/java/com/alipay/oceanbase/hbase/OHTableClient.java
++++ b/src/main/java/com/alipay/oceanbase/hbase/OHTableClient.java
+@@ -18,11 +18,18 @@
+ package com.alipay.oceanbase.hbase;
+ 
+ import com.alipay.oceanbase.hbase.core.Lifecycle;
++import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
++import com.google.protobuf.Descriptors;
++import com.google.protobuf.Message;
++import com.google.protobuf.Service;
++import com.google.protobuf.ServiceException;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.hbase.HTableDescriptor;
++import org.apache.hadoop.hbase.TableName;
+ import org.apache.hadoop.hbase.client.*;
+ import org.apache.hadoop.hbase.client.coprocessor.Batch;
+-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
++import org.apache.hadoop.hbase.filter.CompareFilter;
++import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+ import org.apache.hadoop.hbase.util.Pair;
+ 
+ import java.io.IOException;
+@@ -102,56 +109,27 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         }
+     }
+ 
+-    private void checkStatus() throws IllegalStateException {
+-        if (!initialized) {
+-            throw new IllegalStateException("tableName " + tableNameString + " is not initialized");
+-        }
+-    }
+-
+-    // Not support.
+     @Override
+-    public RowLock lockRow(byte[] row) throws IOException {
+-        checkStatus();
+-        return ohTable.lockRow(row);
++    public CoprocessorRpcChannel coprocessorService(byte[] row) {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    // Not support.
+     @Override
+-    public void unlockRow(RowLock rl) throws IOException {
+-        checkStatus();
+-        ohTable.unlockRow(rl);
++    public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    // Not support.
+     @Override
+-    public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
+-        checkStatus();
+-        return ohTable.coprocessorProxy(protocol, row);
++    public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
+     }
+ 
+-    // Not support.
+-    @Override
+-    public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
+-                                                                             byte[] startKey,
+-                                                                             byte[] endKey,
+-                                                                             Batch.Call<T, R> callable)
+-                                                                                                       throws IOException,
+-                                                                                                       Throwable {
+-        checkStatus();
+-        return ohTable.coprocessorExec(protocol, startKey, endKey, callable);
++    private void checkStatus() throws IllegalStateException {
++        if (!initialized) {
++            throw new IllegalStateException("tableName " + tableNameString + " is not initialized");
++        }
+     }
+ 
+-    // Not support.
+-    @Override
+-    public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
+-                                                                   byte[] startKey, byte[] endKey,
+-                                                                   Batch.Call<T, R> callable,
+-                                                                   Batch.Callback<R> callback)
+-                                                                                              throws IOException,
+-                                                                                              Throwable {
+-        checkStatus();
+-        ohTable.coprocessorExec(protocol, startKey, endKey, callable, callback);
+-    }
+ 
+     @Override
+     public void setAutoFlush(boolean autoFlush) {
+@@ -165,6 +143,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         ohTable.setAutoFlush(autoFlush, clearBufferOnFail);
+     }
+ 
++    @Override
++    public void setAutoFlushTo(boolean autoFlush) {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     @Override
+     public long getWriteBufferSize() {
+         checkStatus();
+@@ -177,11 +160,31 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         ohTable.setWriteBufferSize(writeBufferSize);
+     }
+ 
++    @Override
++    public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    @Override
++    public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    @Override
++    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     @Override
+     public byte[] getTableName() {
+         return tableName;
+     }
+ 
++    @Override
++    public TableName getName() {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     @Override
+     public Configuration getConfiguration() {
+         checkStatus();
+@@ -201,6 +204,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         return ohTable.exists(get);
+     }
+ 
++    @Override
++    public Boolean[] exists(List<Get> gets) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     // Not support.
+     @Override
+     public void batch(List<? extends Row> actions, Object[] results) throws IOException,
+@@ -216,6 +224,16 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         return ohTable.batch(actions);
+     }
+ 
++    @Override
++    public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
++    @Override
++    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     @Override
+     public Result get(Get get) throws IOException {
+         checkStatus();
+@@ -317,6 +335,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
+         return ohTable.incrementColumnValue(row, family, qualifier, amount);
+     }
+ 
++    @Override
++    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     @Override
+     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                      boolean writeToWAL) throws IOException {
+diff --git a/src/main/java/com/alipay/oceanbase/hbase/OHTablePool.java b/src/main/java/com/alipay/oceanbase/hbase/OHTablePool.java
+index 9d804d6..22d5c2f 100644
+--- a/src/main/java/com/alipay/oceanbase/hbase/OHTablePool.java
++++ b/src/main/java/com/alipay/oceanbase/hbase/OHTablePool.java
+@@ -18,13 +18,20 @@
+ package com.alipay.oceanbase.hbase;
+ 
+ import com.alipay.oceanbase.hbase.constants.OHConstants;
++import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+ import com.alipay.oceanbase.hbase.util.KeyDefiner;
+ import com.alipay.oceanbase.hbase.util.OHTableFactory;
++import com.google.protobuf.Descriptors;
++import com.google.protobuf.Message;
++import com.google.protobuf.Service;
++import com.google.protobuf.ServiceException;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.hbase.HTableDescriptor;
++import org.apache.hadoop.hbase.TableName;
+ import org.apache.hadoop.hbase.client.*;
+ import org.apache.hadoop.hbase.client.coprocessor.Batch;
+-import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
++import org.apache.hadoop.hbase.filter.CompareFilter;
++import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+ import org.apache.hadoop.hbase.util.Bytes;
+ import org.apache.hadoop.hbase.util.Pair;
+ import org.apache.hadoop.hbase.util.PoolMap;
+@@ -670,6 +677,11 @@ public class OHTablePool implements Closeable {
+             return table.getTableName();
+         }
+ 
++        @Override
++        public TableName getName() {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         @Override
+         public Configuration getConfiguration() {
+             return table.getConfiguration();
+@@ -685,6 +697,11 @@ public class OHTablePool implements Closeable {
+             return table.exists(get);
+         }
+ 
++        @Override
++        public Boolean[] exists(List<Get> gets) throws IOException {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         @Override
+         public void batch(List<? extends Row> actions, Object[] results) throws IOException,
+                                                                         InterruptedException {
+@@ -696,6 +713,16 @@ public class OHTablePool implements Closeable {
+             return table.batch(actions);
+         }
+ 
++        @Override
++        public <R> void batchCallback(List<? extends Row> actions, Object[] results, Batch.Callback<R> callback) throws IOException, InterruptedException {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
++        @Override
++        public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback) throws IOException, InterruptedException {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         @Override
+         public Result get(Get get) throws IOException {
+             return table.get(get);
+@@ -770,6 +797,11 @@ public class OHTablePool implements Closeable {
+             return table.incrementColumnValue(row, family, qualifier, amount);
+         }
+ 
++        @Override
++        public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount, Durability durability) throws IOException {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         @Override
+         public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
+                                          boolean writeToWAL) throws IOException {
+@@ -795,47 +827,21 @@ public class OHTablePool implements Closeable {
+             returnTable(table);
+         }
+ 
+-        /**
+-         * @deprecated {@link RowLock} and associated operations are deprecated
+-         */
+-        @Override
+-        public RowLock lockRow(byte[] row) throws IOException {
+-            return table.lockRow(row);
+-        }
+-
+-        /**
+-         * @deprecated {@link RowLock} and associated operations are deprecated
+-         */
+         @Override
+-        public void unlockRow(RowLock rl) throws IOException {
+-            table.unlockRow(rl);
++        public CoprocessorRpcChannel coprocessorService(byte[] row) {
++            throw new FeatureNotSupportedException("not supported yet'");
+         }
+ 
+         @Override
+-        public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol, byte[] row) {
+-            return table.coprocessorProxy(protocol, row);
++        public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable) throws ServiceException, Throwable {
++            throw new FeatureNotSupportedException("not supported yet'");
+         }
+ 
+         @Override
+-        public <T extends CoprocessorProtocol, R> Map<byte[], R> coprocessorExec(Class<T> protocol,
+-                                                                                 byte[] startKey,
+-                                                                                 byte[] endKey,
+-                                                                                 Batch.Call<T, R> callable)
+-                                                                                                           throws IOException,
+-                                                                                                           Throwable {
+-            return table.coprocessorExec(protocol, startKey, endKey, callable);
++        public <T extends Service, R> void coprocessorService(Class<T> service, byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback) throws ServiceException, Throwable {
++            throw new FeatureNotSupportedException("not supported yet'");
+         }
+ 
+-        @Override
+-        public <T extends CoprocessorProtocol, R> void coprocessorExec(Class<T> protocol,
+-                                                                       byte[] startKey,
+-                                                                       byte[] endKey,
+-                                                                       Batch.Call<T, R> callable,
+-                                                                       Batch.Callback<R> callback)
+-                                                                                                  throws IOException,
+-                                                                                                  Throwable {
+-            table.coprocessorExec(protocol, startKey, endKey, callable, callback);
+-        }
+ 
+         @Override
+         public String toString() {
+@@ -871,6 +877,11 @@ public class OHTablePool implements Closeable {
+             table.setAutoFlush(autoFlush, clearBufferOnFail);
+         }
+ 
++        @Override
++        public void setAutoFlushTo(boolean autoFlush) {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         @Override
+         public long getWriteBufferSize() {
+             return table.getWriteBufferSize();
+@@ -881,6 +892,21 @@ public class OHTablePool implements Closeable {
+             table.setWriteBufferSize(writeBufferSize);
+         }
+ 
++        @Override
++        public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype) throws ServiceException, Throwable {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
++        @Override
++        public <R extends Message> void batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor, Message request, byte[] startKey, byte[] endKey, R responsePrototype, Batch.Callback<R> callback) throws ServiceException, Throwable {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
++        @Override
++        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value, RowMutations mutation) throws IOException {
++            throw new FeatureNotSupportedException("not supported yet'");
++        }
++
+         public HTableInterface getTable() {
+             return table;
+         }
+diff --git a/src/main/java/com/alipay/oceanbase/hbase/filter/HBaseFilterUtils.java b/src/main/java/com/alipay/oceanbase/hbase/filter/HBaseFilterUtils.java
+index df1fbed..370baaf 100644
+--- a/src/main/java/com/alipay/oceanbase/hbase/filter/HBaseFilterUtils.java
++++ b/src/main/java/com/alipay/oceanbase/hbase/filter/HBaseFilterUtils.java
+@@ -73,7 +73,7 @@ public class HBaseFilterUtils {
+         }
+     }
+ 
+-    private static String toParseableString(WritableByteArrayComparable comparator) {
++    private static String toParseableString(ByteArrayComparable comparator) {
+         if (comparator == null) {
+             throw new IllegalArgumentException("Comparator is null");
+         }
+diff --git a/src/main/java/com/alipay/oceanbase/hbase/result/ClientStreamScanner.java b/src/main/java/com/alipay/oceanbase/hbase/result/ClientStreamScanner.java
+index 5da57c2..ed58582 100644
+--- a/src/main/java/com/alipay/oceanbase/hbase/result/ClientStreamScanner.java
++++ b/src/main/java/com/alipay/oceanbase/hbase/result/ClientStreamScanner.java
+@@ -17,6 +17,7 @@
+ 
+ package com.alipay.oceanbase.hbase.result;
+ 
++import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+ import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
+ import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
+ import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
+@@ -149,6 +150,11 @@ public class ClientStreamScanner extends AbstractClientScanner {
+         return resultSets.toArray(new Result[resultSets.size()]);
+     }
+ 
++    @Override
++    public boolean renewLease() {
++        throw new FeatureNotSupportedException("not supported yet'");
++    }
++
+     private void checkStatus() throws IllegalStateException {
+         if (closed) {
+             throw new IllegalStateException("table " + tableName + " family "
+diff --git a/src/test/java/com/alipay/oceanbase/hbase/HTableTestBase.java b/src/test/java/com/alipay/oceanbase/hbase/HTableTestBase.java
+index fa2608e..35546c0 100644
+--- a/src/test/java/com/alipay/oceanbase/hbase/HTableTestBase.java
++++ b/src/test/java/com/alipay/oceanbase/hbase/HTableTestBase.java
+@@ -18,6 +18,9 @@
+ package com.alipay.oceanbase.hbase;
+ 
+ import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
++
++import org.apache.hadoop.hbase.Cell;
++import org.apache.hadoop.hbase.CellUtil;
+ import org.apache.hadoop.hbase.HConstants;
+ import org.apache.hadoop.hbase.KeyValue;
+ import org.apache.hadoop.hbase.client.*;
+@@ -338,8 +341,8 @@ public abstract class HTableTestBase {
+ 
+         // put same k, q, t
+         Put put3 = new Put(Bytes.toBytes("testKey"));
+-        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
+-        put3.add(toBytes(family), toBytes(column1), -100L, toBytes(value1));
++        put3.add(toBytes(family), toBytes(column1), 0L, toBytes(value1));
++        put3.add(toBytes(family), toBytes(column1), 0L, toBytes(value1));
+ 
+         Put put4 = new Put(Bytes.toBytes("testKey"));
+         put4.add(toBytes(family), toBytes(column1), System.currentTimeMillis(), toBytes(value1));
+@@ -1169,6 +1172,229 @@ public abstract class HTableTestBase {
+         hTable.delete(deleteZKey2Family);
+     }
+ 
++
++    @Test
++    public void testReversedScan() throws Exception {
++        String key1 = "scanKey1x";
++        String key2 = "scanKey2x";
++        String key3 = "scanKey3x";
++        String zKey1 = "zScanKey1";
++        String zKey2 = "zScanKey2";
++        String column1 = "column1";
++        String column2 = "column2";
++        String value1 = "value1";
++        String value2 = "value2";
++        String value3 = "value3";
++        String family = "family1";
++
++        // delete previous data
++        Delete deleteKey1Family = new Delete(toBytes(key1));
++        deleteKey1Family.deleteFamily(toBytes(family));
++        Delete deleteKey2Family = new Delete(toBytes(key2));
++        deleteKey2Family.deleteFamily(toBytes(family));
++        Delete deleteKey3Family = new Delete(toBytes(key3));
++        deleteKey3Family.deleteFamily(toBytes(family));
++        Delete deleteZKey1Family = new Delete(toBytes(zKey1));
++        deleteZKey1Family.deleteFamily(toBytes(family));
++        Delete deleteZKey2Family = new Delete(toBytes(zKey2));
++        deleteZKey2Family.deleteFamily(toBytes(family));
++
++        hTable.delete(deleteKey1Family);
++        hTable.delete(deleteKey2Family);
++        hTable.delete(deleteKey3Family);
++        hTable.delete(deleteZKey1Family);
++        hTable.delete(deleteZKey2Family);
++
++        Put putKey1Column1Value1 = new Put(toBytes(key1));
++        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
++
++        Put putKey1Column1Value2 = new Put(toBytes(key1));
++        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
++
++        Put putKey1Column2Value2 = new Put(toBytes(key1));
++        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
++
++        Put putKey1Column2Value1 = new Put(toBytes(key1));
++        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
++
++        Put putKey2Column1Value1 = new Put(toBytes(key2));
++        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
++
++        Put putKey2Column1Value2 = new Put(toBytes(key2));
++        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
++
++        Put putKey2Column2Value2 = new Put(toBytes(key2));
++        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
++
++        Put putKey2Column2Value1 = new Put(toBytes(key2));
++        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
++
++        Put putKey3Column1Value1 = new Put(toBytes(key3));
++        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
++
++        Put putKey3Column1Value2 = new Put(toBytes(key3));
++        putKey3Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
++
++        Put putKey3Column2Value1 = new Put(toBytes(key3));
++        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
++
++        Put putKey3Column2Value2 = new Put(toBytes(key3));
++        putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
++
++        Get get;
++        Scan scan;
++        Result r;
++        int res_count = 0;
++
++        tryPut(hTable, putKey1Column1Value1);
++        tryPut(hTable, putKey1Column1Value2);
++        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
++        tryPut(hTable, putKey1Column2Value1);
++        tryPut(hTable, putKey1Column2Value2);
++        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
++        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
++        tryPut(hTable, putKey2Column2Value1);
++        tryPut(hTable, putKey2Column2Value2);
++        tryPut(hTable, putKey3Column1Value1);
++        tryPut(hTable, putKey3Column1Value2);
++        tryPut(hTable, putKey3Column2Value1);
++        tryPut(hTable, putKey3Column2Value2);
++
++        // show table (time maybe different)
++        // +-----------+---------+----------------+--------+
++        // | K | Q | T | V |
++        // +-----------+---------+----------------+--------+
++        // | scanKey1x | column1 | -1709714409669 | value1 |
++        // | scanKey1x | column1 | -1709714409637 | value2 |
++        // | scanKey1x | column1 | -1709714409603 | value1 |
++        // | scanKey1x | column2 | -1709714409802 | value2 |
++        // | scanKey1x | column2 | -1709714409768 | value1 |
++        // | scanKey1x | column2 | -1709714409735 | value2 |
++        // | scanKey1x | column2 | -1709714409702 | value1 |
++        // | scanKey2x | column2 | -1709714409869 | value2 |
++        // | scanKey2x | column2 | -1709714409836 | value1 |
++        // | scanKey3x | column1 | -1709714409940 | value2 |
++        // | scanKey3x | column1 | -1709714409904 | value1 |
++        // | scanKey3x | column2 | -1709714410010 | value2 |
++        // | scanKey3x | column2 | -1709714409977 | value1 |
++        // +-----------+---------+----------------+--------+
++
++        // reverse scan
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey3x".getBytes());
++        scan.setStopRow("scanKey1x".getBytes());
++        scan.setReversed(true);
++        scan.setMaxVersions(10);
++        ResultScanner scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 6);
++        scanner.close();
++
++        // reverse scan with MaxVersion
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey3x".getBytes());
++        scan.setStopRow("scanKey1x".getBytes());
++        scan.setReversed(true);
++        scan.setMaxVersions(1);
++        scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 3);
++        scanner.close();
++
++        // reverse scan with pageFilter
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey3x".getBytes());
++        scan.setStopRow("scanKey1x".getBytes());
++        PageFilter pageFilter = new PageFilter(2);
++        scan.setFilter(pageFilter);
++        scan.setReversed(true);
++        scan.setMaxVersions(10);
++        scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 6);
++        scanner.close();
++
++        // reverse scan with not_exist_start_row
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey4x".getBytes());
++        scan.setStopRow("scanKey1x".getBytes());
++        scan.setReversed(true);
++        scan.setMaxVersions(10);
++        scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 6);
++        scanner.close();
++
++        // reverse scan with abnormal range
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey1x".getBytes());
++        scan.setStopRow("scanKey3x".getBytes());
++        scan.setReversed(true);
++        scan.setMaxVersions(10);
++        scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 0);
++        scanner.close();
++
++        // reverse scan with abnormal range
++        scan = new Scan();
++        scan.addFamily(family.getBytes());
++        scan.setStartRow("scanKey3x".getBytes());
++        scan.setStopRow("scanKey0x".getBytes());
++        scan.setReversed(true);
++        scan.setMaxVersions(10);
++        scanner = hTable.getScanner(scan);
++        res_count = 0;
++        for (Result result : scanner) {
++            for (KeyValue keyValue : result.raw()) {
++                Arrays.equals(key1.getBytes(), keyValue.getRow());
++                res_count += 1;
++            }
++        }
++        Assert.assertEquals(res_count, 13);
++        scanner.close();
++
++        hTable.delete(deleteKey1Family);
++        hTable.delete(deleteKey2Family);
++        hTable.delete(deleteKey3Family);
++
++    }
++
+     @Test
+     public void testPartitionScan() throws Exception {
+         String key1 = "scanKey1x";
+diff --git a/src/test/java/com/alipay/oceanbase/hbase/OHTableClientTest.java b/src/test/java/com/alipay/oceanbase/hbase/OHTableClientTest.java
+index 41c736a..71968d0 100644
+--- a/src/test/java/com/alipay/oceanbase/hbase/OHTableClientTest.java
++++ b/src/test/java/com/alipay/oceanbase/hbase/OHTableClientTest.java
+@@ -17,7 +17,6 @@
+ 
+ package com.alipay.oceanbase.hbase;
+ 
+-import org.apache.hadoop.hbase.client.RowLock;
+ import org.junit.*;
+ 
+ import java.io.IOException;
+@@ -52,14 +51,12 @@ public class OHTableClientTest extends HTableTestBase {
+         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
+ 
+         try {
+-            hTable2.lockRow("key".getBytes());
+             fail();
+         } catch (Exception e) {
+             assertTrue(true);
+         }
+ 
+         try {
+-            hTable2.unlockRow(new RowLock(1));
+             fail();
+         } catch (Exception e) {
+             assertTrue(true);
+diff --git a/src/test/java/com/alipay/oceanbase/hbase/ObHTableTestUtil.java b/src/test/java/com/alipay/oceanbase/hbase/ObHTableTestUtil.java
+index 3a8a796..ab0a826 100644
+--- a/src/test/java/com/alipay/oceanbase/hbase/ObHTableTestUtil.java
++++ b/src/test/java/com/alipay/oceanbase/hbase/ObHTableTestUtil.java
+@@ -33,6 +33,7 @@ public class ObHTableTestUtil {
+     public static boolean ODP_MODE       = false;
+     public static String  DATABASE       = "";
+ 
++
+     public static Configuration newConfiguration() {
+         Configuration conf = new Configuration();
+         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
+-- 
+2.39.3 (Apple Git-146)
+
