@@ -14,6 +14,14 @@ CREATE TABLE `test_t$family1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 );
 
+create table `test$rowkeyTTL` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) kv_attributes ='{"Hbase": {"TimeToLive": 3600, "MaxVersions": 2}}'
+
 CREATE TABLE `test$family1` (
     `K` varbinary(1024) NOT NULL,
     `Q` varbinary(256) NOT NULL,

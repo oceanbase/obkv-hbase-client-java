@@ -19,10 +19,8 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.KeyValue;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableBatchOperationRequest;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -35,6 +33,8 @@ import org.junit.rules.ExpectedException;
 import java.io.IOError;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -1027,7 +1027,369 @@ public abstract class HTableTestBase {
     }
 
     @Test
+    public void testRowkeyTTL() throws Exception {
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String key4 = "scanKey4x";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "rowkeyTTL";
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+        putKey1Column1Value1.setTTL(5L);
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+        putKey1Column1Value2.setTTL(5L);
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+        putKey1Column2Value2.setTTL(5L);
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+        putKey1Column2Value1.setTTL(6000L);
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+        putKey2Column1Value1.setTTL(5L);
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+        putKey2Column1Value2.setTTL(5L);
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+        putKey2Column2Value2.setTTL(5L);
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+        putKey2Column2Value1.setTTL(5L);
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+        putKey3Column1Value1.setTTL(5L);
+
+        Put putKey3Column1Value2 = new Put(toBytes(key3));
+        putKey3Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+        putKey3Column1Value2.setTTL(5L);
+
+        Put putKey3Column2Value1 = new Put(toBytes(key3));
+        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+        putKey3Column2Value1.setTTL(60L);
+
+        Put putKey3Column2Value2 = new Put(toBytes(key3));
+        putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+        putKey3Column2Value2.setTTL(6000L);
+
+        Get get;
+        Scan scan;
+        Result r;
+        int res_count = 0;
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey3Column1Value2);
+        tryPut(hTable, putKey3Column2Value1);
+        tryPut(hTable, putKey3Column2Value2);
+
+        // show table (time maybe different)
+        //+-----------+---------+----------------+--------+
+        //| K         | Q       | T              | V      |
+        //+-----------+---------+----------------+--------+
+        //| scanKey1x | column1 | -1709714409669 | value1 |
+        //| scanKey1x | column1 | -1709714409637 | value2 |
+        //| scanKey1x | column1 | -1709714409603 | value1 |
+        //| scanKey1x | column2 | -1709714409802 | value2 |
+        //| scanKey1x | column2 | -1709714409768 | value1 |
+        //| scanKey1x | column2 | -1709714409735 | value2 |
+        //| scanKey1x | column2 | -1709714409702 | value1 |
+        //| scanKey2x | column2 | -1709714409869 | value2 |
+        //| scanKey2x | column2 | -1709714409836 | value1 |
+        //| scanKey3x | column1 | -1709714409940 | value2 |
+        //| scanKey3x | column1 | -1709714409904 | value1 |
+        //| scanKey3x | column2 | -1709714410010 | value2 |
+        //| scanKey3x | column2 | -1709714409977 | value1 |
+        //+-----------+---------+----------------+--------+
+
+        // check insert ok
+        Boolean flag = false;
+        for (int i = 0; i < 6; i++) {
+            get = new Get(toBytes(key1));
+            get.addFamily(toBytes(family));
+            get.setMaxVersions(2);
+            r = hTable.get(get);
+            for (Cell cell : r.listCells()) {
+                // 获取列族、列限定符、值和时间戳
+                String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
+                String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+                String value = Bytes.toString(CellUtil.cloneValue(cell));
+                long timestamp = cell.getTimestamp();
+
+                System.out.print("RowKey: " + Bytes.toString(r.getRow()) + "||||");
+                System.out.print("Column Family: " + family2 + "||||");
+                System.out.print("Column Qualifier: " + qualifier + "||||");
+                System.out.print("Value: " + value + "||||");
+                System.out.println("Timestampsss: " + timestamp);
+            }
+            if (r.raw().length==2){
+                flag = true;
+                break;
+            }
+            Thread.sleep(10 * 1000L);
+        }
+        Assert.assertEquals(Boolean.TRUE, flag);
+
+        flag = false;
+        for (int i = 0; i < 10; i++) {
+            scan = new Scan();
+            scan.addFamily(toBytes(family));
+            scan.setMaxVersions(2);
+            ResultScanner results = hTable.getScanner(scan);
+            int num = 0;
+            for (Result result : results) {
+                // 处理结果
+                for (Cell cell : result.listCells()) {
+                    // 获取列族、列限定符、值和时间戳
+                    String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
+                    String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+                    String value = Bytes.toString(CellUtil.cloneValue(cell));
+                    long timestamp = cell.getTimestamp();
+
+                    System.out.print("RowKey: " + Bytes.toString(result.getRow()) + "||||");
+                    System.out.print("Column Family: " + family2 + "||||");
+                    System.out.print("Column Qualifier: " + qualifier + "||||");
+                    System.out.print("Value: " + value + "||||");
+                    System.out.println("Timestampsss: " + timestamp);
+                    num++;
+                }
+            }
+            results.close();
+            if (num==3){
+                flag = true;
+                break;
+            }
+            Thread.sleep(10 * 1000L);
+        }
+        Assert.assertEquals(Boolean.TRUE, flag);
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+    }
+
+
+    // test max version for TTL
+    @Test
+    public void testMaxVersionForTTL() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        // 创建Statement对象
+
+        Statement stmt = conn.createStatement();
+        String sql = "create table if not exists `test$rowkeyTTL` (`K` varbinary(1024) NOT NULL, `Q` varbinary(256) NOT NULL, `T` bigint(20) NOT NULL, `V` varbinary(1024) DEFAULT NULL, PRIMARY KEY (`K`, `Q`, `T`)) kv_attributes ='{\"Hbase\": {\"TimeToLive\": 3600, \"MaxVersions\": 2}}'";
+        // 执行查询
+        boolean succ = stmt.execute(sql);
+
+        stmt.close();
+        conn.close();
+
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "rowkeyTTL";
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey3Column1Value2 = new Put(toBytes(key3));
+        putKey3Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey3Column2Value1 = new Put(toBytes(key3));
+        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column2Value2 = new Put(toBytes(key3));
+        putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Get get;
+        Scan scan;
+        Result r;
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey3Column1Value2);
+        tryPut(hTable, putKey3Column2Value1);
+        tryPut(hTable, putKey3Column2Value2);
+        tryPut(hTable, putKey3Column2Value2);
+
+        // show table (time maybe different)
+        //+-----------+---------+----------------+--------+
+        //| K         | Q       | T              | V      |
+        //+-----------+---------+----------------+--------+
+        //| scanKey1x | column1 | -1709714409669 | value1 |
+        //| scanKey1x | column1 | -1709714409637 | value2 |
+        //| scanKey1x | column1 | -1709714409603 | value1 |
+        //| scanKey1x | column2 | -1709714409802 | value2 |
+        //| scanKey1x | column2 | -1709714409768 | value1 |
+        //| scanKey1x | column2 | -1709714409735 | value2 |
+        //| scanKey1x | column2 | -1709714409702 | value1 |
+        //| scanKey2x | column2 | -1709714409869 | value2 |
+        //| scanKey2x | column2 | -1709714409836 | value1 |
+        //| scanKey3x | column1 | -1709714409940 | value2 |
+        //| scanKey3x | column1 | -1709714409904 | value1 |
+        //| scanKey3x | column2 | -1709714410010 | value2 |
+        //| scanKey3x | column2 | -1709714409977 | value1 |
+        //| scanKey3x | column2 | -1709714409979 | value2 |
+        //+-----------+---------+----------------+--------+
+
+        Boolean flag = false;
+        for (int i = 0; i < 6; i++) {
+            get = new Get(toBytes(key1));
+            get.addFamily(toBytes(family));
+            get.setMaxVersions(10);
+            r = hTable.get(get);
+            for (Cell cell : r.listCells()) {
+                // 获取列族、列限定符、值和时间戳
+                String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
+                String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+                String value = Bytes.toString(CellUtil.cloneValue(cell));
+                long timestamp = cell.getTimestamp();
+
+                System.out.print("RowKey: " + Bytes.toString(r.getRow()) + "||||");
+                System.out.print("Column Family: " + family2 + "||||");
+                System.out.print("Column Qualifier: " + qualifier + "||||");
+                System.out.print("Value: " + value + "||||");
+                System.out.println("Timestampsss: " + timestamp);
+            }
+            if (r.raw().length==4){
+                flag = true;
+                break;
+            }
+            Thread.sleep(10 * 1000L);
+        }
+        Assert.assertEquals(Boolean.TRUE, flag);
+
+        flag = false;
+        for (int i = 0; i < 6; i++) {
+            scan = new Scan();
+            scan.addFamily(toBytes(family));
+            scan.setMaxVersions(10);
+            ResultScanner results = hTable.getScanner(scan);
+            int num = 0;
+            for (Result result : results) {
+                // 处理结果
+                for (Cell cell : result.listCells()) {
+                    // 获取列族、列限定符、值和时间戳
+                    String family2 = Bytes.toString(CellUtil.cloneFamily(cell));
+                    String qualifier = Bytes.toString(CellUtil.cloneQualifier(cell));
+                    String value = Bytes.toString(CellUtil.cloneValue(cell));
+                    long timestamp = cell.getTimestamp();
+
+                    System.out.print("RowKey: " + Bytes.toString(result.getRow()) + "||||");
+                    System.out.print("Column Family: " + family2 + "||||");
+                    System.out.print("Column Qualifier: " + qualifier + "||||");
+                    System.out.print("Value: " + value + "||||");
+                    System.out.println("Timestampsss: " + timestamp);
+                    num++;
+                }
+            }
+            results.close();
+            if (num==10){
+                flag = true;
+                break;
+            }
+            Thread.sleep(10 * 1000L);
+        }
+        Assert.assertEquals(Boolean.TRUE, flag);
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+    }
+
+    @Test
     public void testScan() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        // 创建Statement对象
+
+        Statement stmt = conn.createStatement();
+        String sql = "create table if not exists `test$rowkeyTTL` (`K` varbinary(1024) NOT NULL, `Q` varbinary(256) NOT NULL, `T` bigint(20) NOT NULL, `V` varbinary(1024) DEFAULT NULL, PRIMARY KEY (`K`, `Q`, `T`)) kv_attributes ='{\"Hbase\": {\"TimeToLive\": 3600, \"MaxVersions\": 2}}'";
+        // 执行查询
+        boolean succ = stmt.execute(sql);
+
+        stmt.close();
+        conn.close();
         String key1 = "scanKey1x";
         String key2 = "scanKey2x";
         String key3 = "scanKey3x";
