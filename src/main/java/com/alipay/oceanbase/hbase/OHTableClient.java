@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.core.Lifecycle;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.property.Property;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
@@ -226,6 +227,28 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     public int getRpcTimeout() {
         checkStatus();
         return ohTable.getRpcTimeout();
+    }
+
+    @Override
+    public void setOperationTimeout(int operationTimeout) {
+        checkStatus();
+        ohTable.setOperationTimeout(operationTimeout);
+    }
+
+    @Override
+    public int getOperationTimeout() {
+        checkStatus();
+        return ohTable.getOperationTimeout();
+    }
+
+    @Override
+    public void setRpcTimeout(int rpcTimeout) {
+        conf.set(Property.RPC_EXECUTE_TIMEOUT.getKey(), String.valueOf(rpcTimeout));
+    }
+
+    @Override
+    public int getRpcTimeout() {
+        return Integer.parseInt(conf.get(Property.RPC_EXECUTE_TIMEOUT.getKey()));
     }
 
     @Override

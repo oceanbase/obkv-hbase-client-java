@@ -2222,11 +2222,23 @@ public abstract class HTableTestBase {
         boolean ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
             value.getBytes(), put);
         Assert.assertTrue(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.GREATER, "value1".getBytes(), put);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.GREATER_OR_EQUAL, "value1".getBytes(), put);
+        Assert.assertTrue(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.LESS, "".getBytes(), put);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.LESS_OR_EQUAL, "".getBytes(), put);
+        Assert.assertFalse(ret);
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
         get.addColumn(family.getBytes(), column.getBytes());
         r = hTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
+        Assert.assertEquals(3, r.raw().length);
         Assert.assertEquals("value1", Bytes.toString(r.raw()[0].getValue()));
     }
 
@@ -2250,6 +2262,24 @@ public abstract class HTableTestBase {
         delete.deleteColumn(family.getBytes(), column.getBytes());
         boolean ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
             value.getBytes(), delete);
+        Assert.assertTrue(ret);
+        put.add(family.getBytes(), column.getBytes(), "value6".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.GREATER, "value5".getBytes(), delete);
+        Assert.assertTrue(ret);
+        put.add(family.getBytes(), column.getBytes(), "value5".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.GREATER_OR_EQUAL, "value5".getBytes(), delete);
+        Assert.assertTrue(ret);
+        put.add(family.getBytes(), column.getBytes(), "value1".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.LESS, "value1".getBytes(), delete);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+                CompareFilter.CompareOp.LESS_OR_EQUAL, "value1".getBytes(), delete);
         Assert.assertTrue(ret);
         Get get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
