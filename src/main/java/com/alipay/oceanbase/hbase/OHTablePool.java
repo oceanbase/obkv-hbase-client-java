@@ -477,8 +477,8 @@ public class OHTablePool implements Closeable {
      */
     public long getWriteBufferSize(String tableName) {
         byte[] attr = getTableAttribute(tableName, HBASE_HTABLE_POOL_WRITE_BUFFER_SIZE);
-        return attr == null ? this.config.getLong(HBASE_HTABLE_CLIENT_WRITE_BUFFER, 2097152)
-            : Bytes.toLong(attr);
+        return attr == null ? this.config.getLong(WRITE_BUFFER_SIZE_KEY, 2097152) : Bytes
+            .toLong(attr);
     }
 
     /**
@@ -698,8 +698,13 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean[] existsAll(List<Get> list) throws IOException {
+            return table.existsAll(list);
+        }
+
+        @Override
         public Boolean[] exists(List<Get> gets) throws IOException {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.exists(gets);
         }
 
         @Override
@@ -775,6 +780,13 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier,
+                                   CompareFilter.CompareOp compareOp, byte[] value, Put put)
+                                                                                            throws IOException {
+            return table.checkAndPut(row, family, qualifier, compareOp, value, put);
+        }
+
+        @Override
         public void delete(Delete delete) throws IOException {
             table.delete(delete);
         }
@@ -791,6 +803,13 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier,
+                                      CompareFilter.CompareOp compareOp, byte[] value, Delete delete)
+                                                                                                     throws IOException {
+            return table.checkAndDelete(row, family, qualifier, compareOp, value, delete);
+        }
+
+        @Override
         public Result increment(Increment increment) throws IOException {
             return table.increment(increment);
         }
@@ -804,7 +823,7 @@ public class OHTablePool implements Closeable {
         @Override
         public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
                                          Durability durability) throws IOException {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.incrementColumnValue(row, family, qualifier, amount, durability);
         }
 
         @Override
@@ -834,7 +853,7 @@ public class OHTablePool implements Closeable {
 
         @Override
         public CoprocessorRpcChannel coprocessorService(byte[] row) {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.coprocessorService(row);
         }
 
         @Override
@@ -844,7 +863,7 @@ public class OHTablePool implements Closeable {
                                                                         Batch.Call<T, R> callable)
                                                                                                   throws ServiceException,
                                                                                                   Throwable {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.coprocessorService(service, startKey, endKey, callable);
         }
 
         @Override
@@ -854,7 +873,7 @@ public class OHTablePool implements Closeable {
                                                               Batch.Callback<R> callback)
                                                                                          throws ServiceException,
                                                                                          Throwable {
-            throw new FeatureNotSupportedException("not supported yet'");
+            table.coprocessorService(service, startKey, endKey, callable, callback);
         }
 
         @Override
@@ -893,7 +912,7 @@ public class OHTablePool implements Closeable {
 
         @Override
         public void setAutoFlushTo(boolean autoFlush) {
-            throw new FeatureNotSupportedException("not supported yet'");
+            table.setAutoFlushTo(autoFlush);
         }
 
         @Override
@@ -914,7 +933,8 @@ public class OHTablePool implements Closeable {
                                                                           R responsePrototype)
                                                                                               throws ServiceException,
                                                                                               Throwable {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.batchCoprocessorService(methodDescriptor, request, startKey, endKey,
+                responsePrototype);
         }
 
         @Override
@@ -924,14 +944,35 @@ public class OHTablePool implements Closeable {
                                                                 Batch.Callback<R> callback)
                                                                                            throws ServiceException,
                                                                                            Throwable {
-            throw new FeatureNotSupportedException("not supported yet'");
+            table.batchCoprocessorService(methodDescriptor, request, startKey, endKey,
+                responsePrototype, callback);
         }
 
         @Override
         public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
                                       CompareFilter.CompareOp compareOp, byte[] value,
-                                      RowMutations mutation) throws IOException {
-            throw new FeatureNotSupportedException("not supported yet'");
+                                      RowMutations mutations) throws IOException {
+            return table.checkAndMutate(row, family, qualifier, compareOp, value, mutations);
+        }
+
+        @Override
+        public void setOperationTimeout(int i) {
+            table.setOperationTimeout(i);
+        }
+
+        @Override
+        public int getOperationTimeout() {
+            return table.getOperationTimeout();
+        }
+
+        @Override
+        public void setRpcTimeout(int i) {
+            table.setRpcTimeout(i);
+        }
+
+        @Override
+        public int getRpcTimeout() {
+            return table.getRpcTimeout();
         }
 
         public HTableInterface getTable() {

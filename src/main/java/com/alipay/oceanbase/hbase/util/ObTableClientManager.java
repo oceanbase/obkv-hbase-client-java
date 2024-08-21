@@ -21,7 +21,9 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.alipay.oceanbase.rpc.property.Property;
 import com.google.common.base.Objects;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.ConnectionConfiguration;
 
 import java.io.IOException;
 import java.util.Map;
@@ -33,54 +35,52 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 
+@InterfaceAudience.Private
 public class ObTableClientManager {
 
     public static final ConcurrentHashMap<ObTableClientKey, ReentrantLock> OB_TABLE_CLIENT_LOCK     = new ConcurrentHashMap<ObTableClientKey, ReentrantLock>();
     public static final Map<ObTableClientKey, ObTableClient>               OB_TABLE_CLIENT_INSTANCE = new ConcurrentHashMap<ObTableClientKey, ObTableClient>();
 
-    public static ObTableClient getOrCreateObTableClient(Configuration conf)
-                                                                            throws IllegalArgumentException,
-                                                                            IOException {
+    public static ObTableClient getOrCreateObTableClient(OHConnectionConfiguration connectionConfig)
+                                                                                                    throws IllegalArgumentException,
+                                                                                                    IOException {
         ObTableClientKey obTableClientKey = null;
-        if (conf.getBoolean(HBASE_OCEANBASE_ODP_MODE, false)) {
-            checkArgument(isNotBlank(conf.get(HBASE_OCEANBASE_ODP_ADDR)), HBASE_OCEANBASE_ODP_ADDR
-                                                                          + " is blank");
-            checkArgument(conf.getInt(HBASE_OCEANBASE_ODP_PORT, -1) >= 0, HBASE_OCEANBASE_ODP_PORT
-                                                                          + " is invalid");
-            checkArgument(isNotBlank(conf.get(HBASE_OCEANBASE_DATABASE)), HBASE_OCEANBASE_DATABASE
-                                                                          + " is blank");
+        if (connectionConfig.isOdpMode()) {
+            checkArgument(isNotBlank(connectionConfig.getOdpAddr()), HBASE_OCEANBASE_ODP_ADDR
+                                                                     + " is blank");
+            checkArgument(connectionConfig.getOdpPort() >= 0, HBASE_OCEANBASE_ODP_PORT
+                                                              + " is invalid");
+            checkArgument(isNotBlank(connectionConfig.getDatabase()), HBASE_OCEANBASE_DATABASE
+                                                                      + " is blank");
             obTableClientKey = new ObTableClientKey();
-            obTableClientKey.setOdpAddr(conf.get(HBASE_OCEANBASE_ODP_ADDR));
-            obTableClientKey.setOdpPort(conf.getInt(HBASE_OCEANBASE_ODP_PORT, -1));
+            obTableClientKey.setOdpAddr(connectionConfig.getOdpAddr());
+            obTableClientKey.setOdpPort(connectionConfig.getOdpPort());
             obTableClientKey.setOdpMode(true);
-            obTableClientKey.setDatabase(conf.get(HBASE_OCEANBASE_DATABASE));
+            obTableClientKey.setDatabase(connectionConfig.getDatabase());
         } else {
-            checkArgument(isNotBlank(conf.get(HBASE_OCEANBASE_PARAM_URL)),
-                HBASE_OCEANBASE_PARAM_URL + " is blank");
+            checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
+                                                                      + " is blank");
             obTableClientKey = new ObTableClientKey();
-            obTableClientKey.setParamUrl(conf.get(HBASE_OCEANBASE_PARAM_URL));
-            obTableClientKey.setSysUserName(conf.get(HBASE_OCEANBASE_SYS_USER_NAME));
-            if (conf.get(HBASE_OCEANBASE_SYS_PASSWORD) == null) {
+            obTableClientKey.setParamUrl(connectionConfig.getParamUrl());
+            obTableClientKey.setSysUserName(connectionConfig.getSysUsername());
+            if (connectionConfig.getSysPassword() == null) {
                 obTableClientKey.setSysPassword(Constants.EMPTY_STRING);
             } else {
-                obTableClientKey.setSysPassword(conf.get(HBASE_OCEANBASE_SYS_PASSWORD));
+                obTableClientKey.setSysPassword(connectionConfig.getSysPassword());
             }
         }
-        checkArgument(isNotBlank(conf.get(HBASE_OCEANBASE_FULL_USER_NAME)),
+        checkArgument(isNotBlank(connectionConfig.getFullUsername()),
             HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
-        obTableClientKey.setFullUserName(conf.get(HBASE_OCEANBASE_FULL_USER_NAME));
+        obTableClientKey.setFullUserName(connectionConfig.getFullUsername());
 
-        if (conf.get(HBASE_OCEANBASE_PASSWORD) == null) {
+        if (connectionConfig.getPassword() == null) {
             obTableClientKey.setPassword(Constants.EMPTY_STRING);
         } else {
-            obTableClientKey.setPassword(conf.get(HBASE_OCEANBASE_PASSWORD));
+            obTableClientKey.setPassword(connectionConfig.getPassword());
         }
 
-        for (Property property : Property.values()) {
-            String value = conf.get(property.getKey());
-            if (value != null) {
-                obTableClientKey.getProperties().put(property.getKey(), value);
-            }
+        for (Map.Entry<Object, Object> property : connectionConfig.getProperties().entrySet()) {
+            obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
 
         return getOrCreateObTableClient(obTableClientKey);

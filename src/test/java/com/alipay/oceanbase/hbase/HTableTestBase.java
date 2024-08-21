@@ -47,9 +47,9 @@ import static org.junit.Assert.fail;
 public abstract class HTableTestBase {
 
     @Rule
-    public ExpectedException  expectedException = ExpectedException.none();
+    public ExpectedException expectedException = ExpectedException.none();
 
-    protected HTableInterface hTable;
+    protected Table          hTable;
 
     @Test
     public void testTableGroup() throws IOError, IOException {
@@ -447,7 +447,7 @@ public abstract class HTableTestBase {
         }
     }
 
-    public void tryPut(HTableInterface hTable, Put put) throws Exception {
+    public void tryPut(Table hTable, Put put) throws Exception {
         hTable.put(put);
         Thread.sleep(1);
     }
@@ -1752,8 +1752,21 @@ public abstract class HTableTestBase {
                 "column1_1".getBytes(), "value1".getBytes(), put);
             fail();
         } catch (IOException e) {
-            Assert.assertTrue(e.getCause().getMessage()
-                .contains("mutation row is not equal check row"));
+            Assert.assertTrue(e.getMessage().contains("doesn't match the original one"));
+        }
+
+        // check and mute 只支持一行操作
+        try {
+            RowMutations mutations = new RowMutations("key_7".getBytes());
+            Put put = new Put("key_7".getBytes());
+            put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
+            mutations.add(put);
+            boolean ret = hTable.checkAndMutate("key_8".getBytes(), "family1".getBytes(),
+                "column1_1".getBytes(), CompareFilter.CompareOp.EQUAL, "value1".getBytes(),
+                mutations);
+            fail();
+        } catch (IOException e) {
+            Assert.assertTrue(e.getMessage().contains("mutation row is not equal check row error"));
         }
 
         try {
@@ -1763,8 +1776,7 @@ public abstract class HTableTestBase {
                 "column1_1".getBytes(), "value1".getBytes(), put);
             fail();
         } catch (IOException e) {
-            Assert.assertTrue(e.getCause().getMessage()
-                .contains("mutation family is not equal check family"));
+            Assert.assertTrue(e.getMessage().contains("mutation family is not equal check family"));
         }
     }
 
@@ -1880,6 +1892,152 @@ public abstract class HTableTestBase {
     }
 
     @Test
+    public void testCheckAndMutate() throws IOException {
+        // Mutate 只支持操作一行数据
+        String key = "checkAndMutateKey";
+        String column1 = "checkAndMutateColumn";
+        String column2 = "checkAndMutateColumn2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String family = "family1";
+        Delete delete = new Delete(key.getBytes());
+        delete.deleteFamily(family.getBytes());
+        hTable.delete(delete);
+
+        long t = System.currentTimeMillis();
+        // put
+        Put put1 = new Put(key.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        Put put2 = new Put(key.getBytes());
+        put2.add(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.add(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        Put put3 = new Put(key.getBytes());
+        put3.add(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.add(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+
+        RowMutations rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+
+        //put data
+        boolean ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.EQUAL, null, rowMutations);
+
+        Assert.assertTrue(ret);
+        Get get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        Result r = hTable.get(get);
+        Assert.assertEquals(6, r.raw().length);
+
+        t = System.currentTimeMillis() + 7;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key.getBytes());
+        put2.add(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.add(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key.getBytes());
+        put3.add(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.add(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // test greater op
+        ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.LESS, value1.getBytes(), rowMutations);
+        Assert.assertFalse(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(6, r.raw().length);
+
+        // test less op
+        ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.LESS, value2.getBytes(), rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(12, r.raw().length);
+
+        t = System.currentTimeMillis() + 14;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key.getBytes());
+        put2.add(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.add(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key.getBytes());
+        put3.add(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.add(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // test NO_OP
+        try {
+            hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+                CompareFilter.CompareOp.NO_OP, value1.getBytes(), rowMutations);
+            fail();
+        } catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("checkAndMutate"));
+        }
+
+        // test equal op
+        ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.EQUAL, value1.getBytes(), rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(18, r.raw().length);
+
+        t = System.currentTimeMillis() + 21;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        // delete
+        Delete delete1 = new Delete(key.getBytes());
+        delete1.deleteColumns(family.getBytes(), column1.getBytes());
+
+        // check delete and put
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(delete1);
+        rowMutations.add(put1);
+        ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.EQUAL, value1.getBytes(), rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addColumn(family.getBytes(), column1.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+
+        get = new Get(key.getBytes());
+        get.addColumn(family.getBytes(), column2.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(10, r.raw().length);
+    }
+
+    @Test
     public void testAppend() throws IOException {
         String column = "appendColumn";
         String key = "appendKey";
@@ -1952,7 +2110,7 @@ public abstract class HTableTestBase {
             column.getBytes(), 1);
         Assert.assertEquals(3, ret);
         ret = hTable.incrementColumnValue(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            1, true);
+            1L, null);
         Assert.assertEquals(4, ret);
     }
 
@@ -2154,14 +2312,14 @@ public abstract class HTableTestBase {
     }
 
     @Test
-    public void testFamilyNull() throws Exception {
+    public void testFamilyBlank() throws Exception {
         // delete 只支持删一行
         String key = "qualifyNullKey";
         String value = "value";
         String value1 = "value1";
-        String family = null;
+        String family = "   ";
         Delete delete = new Delete(key.getBytes());
-        delete.deleteFamily("   ".getBytes());
+        delete.deleteFamily(family.getBytes());
         try {
             hTable.delete(delete);
             fail();
@@ -2174,7 +2332,7 @@ public abstract class HTableTestBase {
             hTable.put(put);
             fail();
         } catch (IllegalArgumentException e) {
-            Assert.assertTrue(e.getMessage().contains("family is blank"));
+            Assert.assertTrue(e.getMessage().contains("family is empty"));
         }
 
         Get get = new Get(key.getBytes());
@@ -2183,10 +2341,8 @@ public abstract class HTableTestBase {
         try {
             r = hTable.get(get);
             fail();
-        } catch (FeatureNotSupportedException e) {
-            Assert.assertTrue(e.getMessage().contains("family is empty"));
         } catch (IllegalArgumentException e) {
-            Assert.assertTrue(e.getMessage().contains("family is blank"));
+            Assert.assertTrue(e.getMessage().contains("family is empty"));
         }
 
         Scan scan = new Scan(key.getBytes());
@@ -2195,7 +2351,7 @@ public abstract class HTableTestBase {
             hTable.getScanner(scan);
             fail();
         } catch (IllegalArgumentException e) {
-            Assert.assertTrue(e.getMessage().contains("family is blank"));
+            Assert.assertTrue(e.getMessage().contains("family is empty"));
         }
 
         Append append = new Append(key.getBytes());
@@ -2282,7 +2438,7 @@ public abstract class HTableTestBase {
         Put put1 = new Put(("key_c_f").getBytes());
         put1.add(null, ("column1").getBytes(), "value1_family_null".getBytes());
         expectedException.expect(IllegalArgumentException.class);
-        expectedException.expectMessage("family is blank");
+        expectedException.expectMessage("family is empty");
         hTable.put(put1);
     }
 
@@ -2291,7 +2447,7 @@ public abstract class HTableTestBase {
         Put put2 = new Put(("key_c_f").getBytes());
         put2.add("".getBytes(), ("column1").getBytes(), "value1_family_empty".getBytes());
         expectedException.expect(IllegalArgumentException.class);
-        expectedException.expectMessage("family is blank");
+        expectedException.expectMessage("family is empty");
         hTable.put(put2);
     }
 
@@ -2321,15 +2477,6 @@ public abstract class HTableTestBase {
         get.addFamily(null);
         expectedException.expect(FeatureNotSupportedException.class);
         expectedException.expectMessage("family is empty");
-        hTable.get(get);
-    }
-
-    @Test
-    public void testGetColumnFamilyEmpty() throws Exception {
-        Get get = new Get(("key_c_f").getBytes());
-        get.addFamily("".getBytes());
-        expectedException.expect(IllegalArgumentException.class);
-        expectedException.expectMessage("family is blank");
         hTable.get(get);
     }
 
@@ -2461,10 +2608,10 @@ public abstract class HTableTestBase {
     }
 
     public class IncrementHelper implements Runnable {
-        private HTableInterface hTable;
-        private Increment       increment;
+        private Table     hTable;
+        private Increment increment;
 
-        public IncrementHelper(HTableInterface hTable, Increment increment) {
+        public IncrementHelper(Table hTable, Increment increment) {
             this.hTable = hTable;
             this.increment = increment;
         }
@@ -2480,10 +2627,10 @@ public abstract class HTableTestBase {
     }
 
     public class PutHelper implements Runnable {
-        private HTableInterface hTable;
-        private Put             put;
+        private Table hTable;
+        private Put   put;
 
-        public PutHelper(HTableInterface hTable, Put put) {
+        public PutHelper(Table hTable, Put put) {
             this.hTable = hTable;
             this.put = put;
         }
