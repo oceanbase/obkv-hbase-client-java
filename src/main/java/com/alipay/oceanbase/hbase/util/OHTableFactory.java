@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTablePool;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.HTableFactory;
 import org.apache.hadoop.hbase.client.HTableInterface;
@@ -42,6 +43,7 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
  * Setting the table attributes through the method of {@link OHTablePool}.
  * For example, see {@link OHTablePool#setAutoFlush(String, boolean)}
  */
+@InterfaceAudience.Private
 public class OHTableFactory extends HTableFactory {
     private final ExecutorService threadPool;
     private final OHTablePool     tablePool;
