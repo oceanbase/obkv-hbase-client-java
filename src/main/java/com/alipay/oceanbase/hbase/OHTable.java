@@ -418,8 +418,9 @@ public class OHTable implements HTableInterface {
 
     public String getTargetTableName(String tableNameString) {
         if (configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
-            return tableNameString + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
-                    DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+            return tableNameString
+                   + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
+                       DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
         }
         return tableNameString;
     }
@@ -447,7 +448,8 @@ public class OHTable implements HTableInterface {
                             get.getMaxVersions(), null);
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
                             true, -1);
-                        request = buildObTableQueryRequest(obTableQuery, getTargetTableName(tableNameString));
+                        request = buildObTableQueryRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
@@ -535,7 +537,8 @@ public class OHTable implements HTableInterface {
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
                         }
-                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,

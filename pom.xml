@@ -3,8 +3,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.oceanbase</groupId>
-    <artifactId>obkv-hbase-client</artifactId>
+    <artifactId>obkv-hbase-client-base</artifactId>
     <version>0.1.6-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OceanBase JavaClient for HBaseApi</description>
@@ -25,24 +26,16 @@
         </developer>
     </developers>
 
+    <modules>
+        <module>shade-pom.xml</module>
+        <module>normal-pom.xml</module>
+    </modules>
+
     <scm>
         <connection>scm:git:https://github.com/oceanbase/obkv-hbase-client-java.git</connection>
         <tag>HEAD</tag>
         <url>https://github.com/oceanbase/obkv-hbase-client-java</url>
     </scm>
-
-    <distributionManagement>
-        <repository>
-            <id>obkv-hbase-client-staging</id>
-            <name>${project.name}</name>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-        <snapshotRepository>
-            <id>obkv-hbase-client-snapshot</id>
-            <name>${project.name}</name>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
 
     <properties>
         <hadoop.version>1.2.1</hadoop.version>
@@ -403,5 +396,4 @@
             </plugin>
         </plugins>
     </build>
-    <profiles />
 </project>
