@@ -85,6 +85,3 @@ test-output
 # Logs
 *.log.*
 
-# generated dependency-reduced-pom for shade plugin
-dependency-reduced-pom.xml*
-

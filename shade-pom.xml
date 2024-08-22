@@ -36,7 +36,6 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <minimizeJar>true</minimizeJar>
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.hadoop</pattern>
