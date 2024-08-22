@@ -5,7 +5,7 @@
         <artifactId>obkv-hbase-client-base</artifactId>
         <groupId>com.oceanbase</groupId>
         <version>0.1.6-SNAPSHOT</version>
-        <relativePath>base-pom.xml</relativePath>
+        <relativePath>pom.xml</relativePath>
     </parent>
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client-shade</artifactId>
