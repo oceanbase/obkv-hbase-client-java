@@ -9,20 +9,6 @@
     </parent>
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client-shade</artifactId>
-    <name>${project.groupId}:${project.artifactId}</name>
-    <distributionManagement>
-        <repository>
-            <id>obkv-hbase-client-shade-staging</id>
-            <name>${project.name}</name>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-        <snapshotRepository>
-            <id>obkv-hbase-client-shade-snapshot</id>
-            <name>${project.name}</name>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
-
     <build>
         <plugins>
             <plugin>
@@ -36,6 +22,8 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <minimizeJar>true</minimizeJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.hadoop</pattern>
