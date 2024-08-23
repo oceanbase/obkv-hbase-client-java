@@ -26,6 +26,7 @@ import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.ObTableClientManager;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.location.model.partition.Partition;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -573,6 +575,101 @@ public class OHTable implements HTableInterface {
                         e);
                     throw new IOException("scan table:" + tableNameString + " family "
                                           + Bytes.toString(family) + " error.", e);
+                }
+
+                throw new IOException("scan table:" + tableNameString + "has no family");
+            }
+        };
+        return executeServerCallable(serverCallable);
+    }
+
+    public List<ResultScanner> getScanners(final Scan scan) throws IOException {
+
+        if (scan.getFamilyMap().keySet() == null || scan.getFamilyMap().keySet().size() == 0) {
+            // check nothing, use table group;
+        } else {
+            checkFamilyViolation(scan.getFamilyMap().keySet());
+        }
+
+        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
+        ServerCallable<List<ResultScanner>> serverCallable = new ServerCallable<List<ResultScanner>>(
+                configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+                operationTimeout) {
+            public List<ResultScanner> call() throws IOException {
+                byte[] family = new byte[] {};
+                ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
+                ObTableQueryAsyncRequest request;
+                ObTableQuery obTableQuery;
+                ObHTableFilter filter;
+                try {
+                    if (scan.getFamilyMap().keySet() == null
+                            || scan.getFamilyMap().keySet().size() == 0) {
+                        filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                scan.getMaxVersions(), null);
+                        if (scan.isReversed()) {
+                            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                                    scan.getStartRow(), true, scan.getBatch());
+                        } else {
+                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                    scan.getStopRow(), false, scan.getBatch());
+                        }
+                        if (scan.isReversed()) { // reverse scan 时设置为逆序
+                            obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                        }
+                        List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+
+                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
+                        String phyTableName = obTableClient.getPhyTableNameFromTableGroup(request.getObTableQueryRequest(), tableNameString);
+                        List<Partition> partitions = obTableClient.getPartition(phyTableName);
+                        for (Partition partition : partitions) {
+                            request.getObTableQueryRequest().setTableQueryPartId(partition.getPartId());
+                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                    .execute(request);
+                            ClientStreamScanner clientScanner = new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true);
+                            resultScanners.add(clientScanner);
+                        }
+                        return resultScanners;
+                    } else {
+                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
+                                .entrySet()) {
+                            family = entry.getKey();
+                            filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                    scan.getMaxVersions(), entry.getValue());
+                            if (scan.isReversed()) {
+                                obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                                        scan.getStartRow(), true, scan.getBatch());
+                            } else {
+                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                        scan.getStopRow(), false, scan.getBatch());
+                            }
+                            if (scan.isReversed()) { // reverse scan 时设置为逆序
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            }
+
+                            // no support set maxResultSize.
+                            // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
+
+                            List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
+                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            List<Partition> partitions = obTableClient.getPartition(targetTableName);
+                            for (Partition partition : partitions) {
+                                request.getObTableQueryRequest().setTableQueryPartId(partition.getPartId());
+                                clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                        .execute(request);
+                                ClientStreamScanner clientScanner = new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, false);
+                                resultScanners.add(clientScanner);
+                            }
+                            return resultScanners;
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
+                            e);
+                    throw new IOException("scan table:" + tableNameString + " family "
+                            + Bytes.toString(family) + " error.", e);
                 }
 
                 throw new IOException("scan table:" + tableNameString + "has no family");
@@ -1450,10 +1547,10 @@ public class OHTable implements HTableInterface {
             return;
         }
         this.obTableClient.getOrRefreshTableEntry(
-            getNormalTargetTableName(tableNameString, familyString), true, true);
+            getNormalTargetTableName(tableNameString, familyString), true, true, true);
         if (hasTestLoad) {
             this.obTableClient.getOrRefreshTableEntry(
-                getTestLoadTargetTableName(tableNameString, familyString), true, true);
+                getTestLoadTargetTableName(tableNameString, familyString), true, true, true);
         }
     }
 
