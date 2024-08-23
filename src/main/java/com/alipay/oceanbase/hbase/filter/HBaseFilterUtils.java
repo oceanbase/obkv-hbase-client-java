@@ -17,11 +17,13 @@
 
 package com.alipay.oceanbase.hbase.filter;
 
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.util.List;
 
+@InterfaceAudience.Private
 public class HBaseFilterUtils {
 
     public static String toParseableString(Filter filter) {
@@ -51,7 +53,7 @@ public class HBaseFilterUtils {
         }
     }
 
-    private static String toParseableString(CompareFilter.CompareOp op) {
+    public static String toParseableString(CompareFilter.CompareOp op) {
         if (op == null) {
             throw new IllegalArgumentException("Compare operator is null");
         }

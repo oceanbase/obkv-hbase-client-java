@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
@@ -34,7 +35,7 @@ public class ObHTableTestUtil {
     public static String  DATABASE       = "";
 
     public static Configuration newConfiguration() {
-        Configuration conf = new Configuration();
+        Configuration conf = HBaseConfiguration.create();
         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
         conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
         if (ODP_MODE) {

@@ -147,16 +147,16 @@ public final class OHConstants {
 
     public static final int      DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX    = Integer.MAX_VALUE;
 
-    public static final String   HBASE_CLIENT_KEYVALUE_MAXSIZE               = "hbase.client.keyvalue.maxsize";
+    public static final String   WRITE_BUFFER_SIZE_KEY                       = "hbase.client.write.buffer";
 
-    public static final int      DEFAULT_HBASE_CLIENT_KEYVALUE_MAXSIZE       = -1;
-
-    public static final String   HBASE_HTABLE_CLIENT_WRITE_BUFFER            = "hbase.client.write.buffer";
-
-    public static final long     DEFAULT_HBASE_HTABLE_CLIENT_WRITE_BUFFER    = 2097152;
+    public static final String   MAX_KEYVALUE_SIZE_KEY                       = "hbase.client.keyvalue.maxsize";
 
     public static final String   HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK         = "hbase.htable.put.write.buffer.check";
 
     public static final int      DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK = 10;
+
+    public static final long     WRITE_BUFFER_SIZE_DEFAULT                   = 2097152L;
+
+    public static final int      MAX_KEYVALUE_SIZE_DEFAULT                   = -1;
 
 }

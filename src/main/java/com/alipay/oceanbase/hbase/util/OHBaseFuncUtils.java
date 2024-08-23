@@ -17,8 +17,11 @@
 
 package com.alipay.oceanbase.hbase.util;
 
+import org.apache.hadoop.classification.InterfaceAudience;
+
 import java.util.Arrays;
 
+@InterfaceAudience.Private
 public class OHBaseFuncUtils {
     public static byte[][] extractFamilyFromQualifier(byte[] qualifier) throws Exception {
         int familyLen = -1;
