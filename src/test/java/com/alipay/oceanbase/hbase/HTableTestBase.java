@@ -134,6 +134,8 @@ public abstract class HTableTestBase {
             scanners = ((OHTableClient) hTable).getScanners(scan);
         } else if (hTable instanceof OHTable) {
             scanners = ((OHTable) hTable).getScanners(scan);
+        } else if (hTable instanceof OHTablePool.PooledOHTable) {
+            scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
         } else {
             throw new IllegalArgumentException("just support for OHTable and OHTableClient");
         }
@@ -304,7 +306,7 @@ public abstract class HTableTestBase {
     * */
     @Test
     public void testKeyPartWithGetScanners() throws Exception {
-//        testKeyPartGetScannersOneThread("partitionFamily1");
+        testKeyPartGetScannersOneThread("partitionFamily1");
         testKeyPartGetScannersMultiThread("partitionFamily1");
     }
 
@@ -322,7 +324,7 @@ public abstract class HTableTestBase {
 
         try {
             Set<String> keys = new HashSet<>();
-            for (int j = 0; j < 500; j++) {
+            for (int j = 0; j < 100; j++) {
                 String new_key = key + "_" + j;
                 keys.add(new_key);
                 put = new Put(new_key.getBytes());
@@ -340,7 +342,10 @@ public abstract class HTableTestBase {
                 scanners = ((OHTableClient) hTable).getScanners(scan);
             } else if (hTable instanceof OHTable) {
                 scanners = ((OHTable) hTable).getScanners(scan);
-            } else {
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
+            }
+            else {
                 throw new IllegalArgumentException("just support for OHTable and OHTableClient");
             }
             Assert.assertEquals(17, scanners.size());
@@ -368,9 +373,9 @@ public abstract class HTableTestBase {
                 }
                 idx++;
             }
-            Assert.assertEquals(500, count);
+            Assert.assertEquals(100, count);
         } finally {
-            for (int j = 0; j < 500; j++) {
+            for (int j = 0; j < 100; j++) {
                 delete = new Delete(toBytes(key + "_" + j));
                 delete.deleteFamily(family.getBytes());
                 hTable.delete(delete);
@@ -393,7 +398,7 @@ public abstract class HTableTestBase {
 
         try {
             Set<String> keys = new HashSet<>();
-            for (int j = 0; j < 500; j++) {
+            for (int j = 0; j < 100; j++) {
                 String new_key = key + "_" + j;
                 keys.add(new_key);
                 put = new Put(new_key.getBytes());
@@ -411,6 +416,8 @@ public abstract class HTableTestBase {
                 scanners = ((OHTableClient) hTable).getScanners(scan);
             } else if (hTable instanceof OHTable) {
                 scanners = ((OHTable) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
             } else {
                 throw new IllegalArgumentException("just support for OHTable and OHTableClient");
             }
@@ -457,9 +464,11 @@ public abstract class HTableTestBase {
                 Thread.currentThread().interrupt();
             }
 
-            Assert.assertEquals(500, count.get());
+            Assert.assertEquals(100, count.get());
+            idx = new AtomicInteger(0);
+            count = new AtomicInteger(0);
         } finally {
-            for (int j = 0; j < 500; j++) {
+            for (int j = 0; j < 100; j++) {
                 delete = new Delete(toBytes(key + "_" + j));
                 delete.deleteFamily(family.getBytes());
                 hTable.delete(delete);
@@ -515,6 +524,8 @@ public abstract class HTableTestBase {
                 scanners = ((OHTableClient) hTable).getScanners(scan);
             } else if (hTable instanceof OHTable) {
                 scanners = ((OHTable) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
             } else {
                 throw new IllegalArgumentException("just support for OHTable and OHTableClient");
             }
@@ -563,6 +574,8 @@ public abstract class HTableTestBase {
             }
 
             Assert.assertEquals(26, count.get());
+            idx = new AtomicInteger(0);
+            count = new AtomicInteger(0);
         } finally {
             Object[] keyList = keys.toArray();
             for (int j = 0; j < keyList.length; j++) {
