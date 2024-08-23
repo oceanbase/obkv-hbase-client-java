@@ -79,55 +79,56 @@ public abstract class HTableTestBase {
         put.add("family_group".getBytes(), column1.getBytes(), timestamp, toBytes(value + "1"));
         hTable.put(put);
         // test get with empty family
-//        Get get = new Get(toBytes(key));
-//        Result r = hTable.get(get);
-//        Assert.assertEquals(1, r.raw().length);
-//        for (KeyValue keyValue : r.raw()) {
-//            Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
-//            Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
-//            Assert.assertEquals(timestamp, keyValue.getTimestamp());
-//            Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
-//            System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-//                    + new String(keyValue.getFamily()) + " columnQualifier:"
-//                    + new String(keyValue.getQualifier()) + " timestamp:"
-//                    + keyValue.getTimestamp() + " value:"
-//                    + new String(keyValue.getValue()));
-//        }
+        Get get = new Get(toBytes(key));
+        Result r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+        for (KeyValue keyValue : r.raw()) {
+            Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
+            Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+            Assert.assertEquals(timestamp, keyValue.getTimestamp());
+            Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
+            System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
+                    + new String(keyValue.getFamily()) + " columnQualifier:"
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
+        }
 
-//        get = new Get(toBytes(key1));
-//        get.setTimeStamp(r.raw()[0].getTimestamp());
-//        get.setMaxVersions(1);
-//        r = hTable.get(get);
-//        Assert.assertEquals(1, r.raw().length);
-//        for (KeyValue keyValue : r.raw()) {
-//            Assert.assertEquals(key1, Bytes.toString(keyValue.getRow()));
-//            Assert.assertEquals(column2, Bytes.toString(keyValue.getQualifier()));
-//            Assert.assertEquals(timestamp1, keyValue.getTimestamp());
-//            Assert.assertEquals(value1 + "1", Bytes.toString(keyValue.getValue()));
-//            System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-//                    + new String(keyValue.getFamily()) + " columnQualifier:"
-//                    + new String(keyValue.getQualifier()) + " timestamp:"
-//                    + keyValue.getTimestamp() + " value:"
-//                    + new String(keyValue.getValue()));
-//        }
+        get = new Get(toBytes(key));
+        get.setTimeStamp(r.raw()[0].getTimestamp());
+        get.setMaxVersions(1);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+        for (KeyValue keyValue : r.raw()) {
+            Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
+            Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+            Assert.assertEquals(timestamp, keyValue.getTimestamp());
+            Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
+            System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
+                    + new String(keyValue.getFamily()) + " columnQualifier:"
+                    + new String(keyValue.getQualifier()) + " timestamp:"
+                    + keyValue.getTimestamp() + " value:"
+                    + new String(keyValue.getValue()));
+        }
 
         // test scan with empty family
         Scan scan = new Scan();
-//        ResultScanner scanner = hTable.getScanner(scan);
-//        for (Result result : scanner) {
-//            for (KeyValue keyValue : result.raw()) {
-//                Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
-//                Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
-//                Assert.assertEquals(timestamp, keyValue.getTimestamp());
-//                Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
-//                System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-//                                   + new String(keyValue.getFamily()) + " columnQualifier:"
-//                                   + new String(keyValue.getQualifier()) + " timestamp:"
-//                                   + keyValue.getTimestamp() + " value:"
-//                                   + new String(keyValue.getValue()));
-//            }
-//        }
+        ResultScanner scanner = hTable.getScanner(scan);
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
+                Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+                Assert.assertEquals(timestamp, keyValue.getTimestamp());
+                Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
+                System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
+                        + new String(keyValue.getFamily()) + " columnQualifier:"
+                        + new String(keyValue.getQualifier()) + " timestamp:"
+                        + keyValue.getTimestamp() + " value:"
+                        + new String(keyValue.getValue()));
+            }
+        }
 
+        // test getScanners with non-partition and empty family
         List<ResultScanner> scanners = null;
         if (hTable instanceof OHTableClient) {
             scanners = ((OHTableClient) hTable).getScanners(scan);
@@ -138,13 +139,14 @@ public abstract class HTableTestBase {
         }
         Assert.assertNotNull(scanners);
         Assert.assertTrue(!scanners.isEmpty());
-        for (ResultScanner scanner : scanners) {
-            for (Result result : scanner) {
+        Assert.assertEquals(1, scanners.size());
+        for (ResultScanner singlePartScanner : scanners) {
+            for (Result result : singlePartScanner) {
                 for (KeyValue keyValue : result.raw()) {
-//                    Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
-//                    Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
-//                    Assert.assertEquals(timestamp, keyValue.getTimestamp());
-//                    Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
+                    Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
+                    Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+                    Assert.assertEquals(timestamp, keyValue.getTimestamp());
+                    Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
                     System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
                             + new String(keyValue.getFamily()) + " columnQualifier:"
                             + new String(keyValue.getQualifier()) + " timestamp:"
