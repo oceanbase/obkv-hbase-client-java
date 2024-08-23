@@ -109,7 +109,9 @@ public class ClientStreamScanner extends AbstractClientScanner {
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             keyValues.add(startKeyValue);
 
-            while (streamNext = streamResult.next()) {
+            int size = streamResult.getCacheRows().size();
+            int current = 0;
+            while (streamNext = streamResult.next() && current < size){
                 List<ObObj> row = streamResult.getRow();
                 if (this.isTableGroup) {
                     // split family and qualifier
@@ -126,6 +128,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 if (Arrays.equals(sk, k)) {
                     // when rowKey is equal to the previous rowKey ,merge the result into the same result
                     keyValues.add(new KeyValue(k, family, q, t, v));
+                    current++;
                 } else {
                     break;
                 }

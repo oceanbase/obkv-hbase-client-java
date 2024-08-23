@@ -24,6 +24,9 @@ import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.table.ObHBaseParams;
+import com.alipay.oceanbase.rpc.table.ObKVParamsBase;
+import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.property.Property;
@@ -166,6 +169,8 @@ public class OHTable implements HTableInterface {
      */
     private final Configuration  configuration;
 
+    private int                   scannerTimeout;
+
     /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
@@ -189,6 +194,9 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
         long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+        HBaseConfiguration.getInt(configuration, HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
+                HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
+                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         this.obTableClient = ObTableClientManager
             .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
@@ -388,7 +396,7 @@ public class OHTable implements HTableInterface {
     public boolean exists(Get get) throws IOException {
         get.setCheckExistenceOnly(true);
         Result r = get(get);
-        return !r.isEmpty();
+        return r.getExists();
     }
 
     @Override
@@ -401,8 +409,8 @@ public class OHTable implements HTableInterface {
         }
         Result[] r = get(list);
         boolean[] ret = new boolean[r.length];
-        for (int i = 0; i < r.length; ++i){
-            ret[i] = !r[i].isEmpty();
+        for (int i = 0; i < list.size(); ++i) {
+            ret[i] = exists(list.get(i));
         }
         return ret;
     }
@@ -497,11 +505,16 @@ public class OHTable implements HTableInterface {
                             get.getMaxVersions(), null);
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
                             true);
-                        request = buildObTableQueryRequest(obTableQuery,
-                            getTargetTableName(tableNameString));
+                        obTableQuery.setObKVParams(buildObHBaseParams(null, get));
+                        request = buildObTableQueryRequest(obTableQuery, getTargetTableName(tableNameString));
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
+                        if (get.isCheckExistenceOnly() ) {
+                            Result result = new Result();
+                            result.setExists(clientQueryStreamResult.getCacheRows().size() != 0);
+                            return result;
+                        }
                         getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
@@ -512,19 +525,25 @@ public class OHTable implements HTableInterface {
 
                             obTableQuery = buildObTableQuery(filter, get.getRow(), true,
                                 get.getRow(), true);
-//                            if (get.isClosestRowBefore()) {
-//                                obTableQuery = buildObTableQuery(filter, null, false,
-//                                        get.getRow(), true, 1);
-//                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
-//                            } else {
-//                                obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-//                                        get.getRow(), true, -1);
-//                            }
+                            if (get.isClosestRowBefore()) {
+                                obTableQuery = buildObTableQuery(filter, null, false,
+                                        get.getRow(), true);
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            } else {
+                                obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                                        get.getRow(), true);
+                            }
 
+                            obTableQuery.setObKVParams(buildObHBaseParams(null, get));
                             request = buildObTableQueryRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
+                            if (get.isCheckExistenceOnly() ) {
+                                Result result = new Result();
+                                result.setExists(clientQueryStreamResult.getCacheRows().size() != 0);
+                                return result;
+                            }
                             getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
                                 family);
                         }
@@ -583,24 +602,10 @@ public class OHTable implements HTableInterface {
                     if (scan.getFamilyMap().keySet().isEmpty()) {
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                             scan.getMaxVersions(), null);
-//                        obTableQuery = buildObTableQuery(filter, scan);
-//
-//                        request = buildObTableQueryAsyncRequest(obTableQuery,
-//                            getTargetTableName(tableNameString));
-//                        if (scan.isReversed()) {
-//                            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-//                                scan.getStartRow(), true, scan.getBatch());
-//                        } else {
-//                            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-//                                scan.getStopRow(), false, scan.getBatch());
-//                        }
-//                        if (scan.isReversed()) { // reverse scan 时设置为逆序
-//                            obTableQuery.setScanOrder(ObScanOrder.Reverse);
-//                        }
-//                        obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize() : conf.getLong(
-//                                HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
-//                                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
-//                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
+                        obTableQuery = buildObTableQuery(filter, scan);
+
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -612,22 +617,6 @@ public class OHTable implements HTableInterface {
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), entry.getValue());
                             obTableQuery = buildObTableQuery(filter, scan);
-//                            if (scan.isReversed()) {
-//                                obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-//                                    scan.getStartRow(), true, scan.getBatch());
-//                            } else {
-//                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-//                                    scan.getStopRow(), false, scan.getBatch());
-//                            }
-//                            if (scan.isReversed()) { // reverse scan 时设置为逆序
-//                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
-//                            }
-//
-//                            // no support set maxResultSize.
-//                             obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize() : conf.getLong(
-//                                     HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
-//                                     HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
-
                             request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
@@ -647,6 +636,23 @@ public class OHTable implements HTableInterface {
             }
         };
         return executeServerCallable(serverCallable);
+    }
+
+    public ObKVParams buildObHBaseParams(Scan scan, Get get) {
+        ObKVParams obKVParams = new ObKVParams();
+        ObHBaseParams obHBaseParams = new ObHBaseParams();
+        if (scan != null) {
+            obHBaseParams.setCaching(scan.getCaching());
+            obHBaseParams.setCallTimeout(scannerTimeout);
+            obHBaseParams.setCacheBlock(scan.isGetScan());
+            obHBaseParams.setAllowPartialResults(scan.getAllowPartialResults());
+        }
+        if (get != null) {
+            obHBaseParams.setCheckExistenceOnly(get.isCheckExistenceOnly());
+            obHBaseParams.setCacheBlock(get.getCacheBlocks());
+        }
+        obKVParams.setObParamsBase(obHBaseParams);
+        return obKVParams;
     }
 
     @Override
@@ -1452,6 +1458,10 @@ public class OHTable implements HTableInterface {
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());
         }
+        obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize() : configuration.getLong(
+                                HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
+        obTableQuery.setObKVParams(buildObHBaseParams(scan, null));
         return obTableQuery;
     }
 

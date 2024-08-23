@@ -230,28 +230,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public void setOperationTimeout(int operationTimeout) {
-        checkStatus();
-        ohTable.setOperationTimeout(operationTimeout);
-    }
-
-    @Override
-    public int getOperationTimeout() {
-        checkStatus();
-        return ohTable.getOperationTimeout();
-    }
-
-    @Override
-    public void setRpcTimeout(int rpcTimeout) {
-        conf.set(Property.RPC_EXECUTE_TIMEOUT.getKey(), String.valueOf(rpcTimeout));
-    }
-
-    @Override
-    public int getRpcTimeout() {
-        return Integer.parseInt(conf.get(Property.RPC_EXECUTE_TIMEOUT.getKey()));
-    }
-
-    @Override
     public byte[] getTableName() {
         return tableName;
     }

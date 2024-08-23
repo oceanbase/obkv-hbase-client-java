@@ -18,6 +18,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
@@ -49,6 +51,109 @@ public abstract class HTableTestBase {
     public ExpectedException expectedException = ExpectedException.none();
 
     protected Table          hTable;
+
+    @Test
+    public void testScanWithObParams() throws Exception {
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String key4 = "scanKey4x";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String family = "family1";
+
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteKey4Family = new Delete(toBytes(key4));
+        deleteKey4Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey4Column1Value1 = new Put(toBytes(key4));
+        putKey4Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey4Column1Value1);
+
+        Scan scan;
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey5x".getBytes());
+        scan.setMaxVersions(10);
+        scan.setCaching(1);
+        scan.setBatch(3);
+        ResultScanner scanner = hTable.getScanner(scan);
+        Result result = scanner.next();
+        Assert.assertEquals(3, result.size());
+        scanner.close();
+
+        scan.setMaxResultSize(10);
+        scan.setBatch(-1);
+        ResultScanner scanner1 = hTable.getScanner(scan);
+        result = scanner1.next();
+        Assert.assertEquals(7, result.size()); // 返回第一行全部数据，因为不允许行内部分返回
+
+        scanner1.close();
+
+        scan.setAllowPartialResults(true);
+        ResultScanner scanner2 = hTable.getScanner(scan);
+        result = scanner2.next();
+        Assert.assertEquals(1, result.size());
+
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+    }
 
     @Test
     public void testTableGroup() throws IOError, IOException {
