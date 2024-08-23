@@ -137,7 +137,7 @@ public abstract class HTableTestBase {
         } else if (hTable instanceof OHTablePool.PooledOHTable) {
             scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
         } else {
-            throw new IllegalArgumentException("just support for OHTable and OHTableClient");
+            throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
         }
         Assert.assertNotNull(scanners);
         Assert.assertTrue(!scanners.isEmpty());
@@ -346,7 +346,7 @@ public abstract class HTableTestBase {
                 scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
             }
             else {
-                throw new IllegalArgumentException("just support for OHTable and OHTableClient");
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
             }
             Assert.assertEquals(17, scanners.size());
 
@@ -419,7 +419,7 @@ public abstract class HTableTestBase {
             } else if (hTable instanceof OHTablePool.PooledOHTable) {
                 scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
             } else {
-                throw new IllegalArgumentException("just support for OHTable and OHTableClient");
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
             }
             // scanners' size is the number of partitions
             Assert.assertEquals(17, scanners.size());
@@ -527,7 +527,7 @@ public abstract class HTableTestBase {
             } else if (hTable instanceof OHTablePool.PooledOHTable) {
                 scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
             } else {
-                throw new IllegalArgumentException("just support for OHTable and OHTableClient");
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
             }
             // scanners' size is the number of partitions
             Assert.assertEquals(3, scanners.size());
@@ -562,9 +562,9 @@ public abstract class HTableTestBase {
             executorService.shutdown();
             try {
                 // wait for all tasks done
-                if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
                     executorService.shutdownNow();
-                    if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
+                    if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
                         System.err.println("the thread pool did not shut down");
                     }
                 }
