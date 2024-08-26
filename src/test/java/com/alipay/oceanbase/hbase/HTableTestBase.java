@@ -779,7 +779,7 @@ public abstract class HTableTestBase {
             new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
-        get.addFamily(toBytefamily));
+        get.addFamily(toBytes(family));
         get.setFilter(filterList);
         r = hTable.get(get);
         Assert.assertEquals(1, r.raw().length);
@@ -1128,7 +1128,7 @@ public abstract class HTableTestBase {
                 rowCount = res.getInt(1);
                 System.out.println("current cnt is " + rowCount);
             }
-            if (rowCount==1){
+            if (rowCount == 1) {
                 flag = true;
                 break;
             }
@@ -1142,7 +1142,8 @@ public abstract class HTableTestBase {
         scan.setReversed(isReversed);
         ResultScanner results = hTable.getScanner(scan);
         int num = 0;
-        for (Result result : results) {}
+        for (Result result : results) {
+        }
         results.close();
 
         flag = false;
@@ -1154,7 +1155,7 @@ public abstract class HTableTestBase {
                 rowCount = res.getInt(1);
                 System.out.println("current cnt is " + rowCount);
             }
-            if (rowCount==2){
+            if (rowCount == 2) {
                 flag = true;
                 break;
             }
@@ -1165,7 +1166,6 @@ public abstract class HTableTestBase {
         conn.close();
 
     }
-
 
     @Test
     public void testTTLRowkeyTTL() throws Exception {
@@ -1285,7 +1285,7 @@ public abstract class HTableTestBase {
                 rowCount = res.getInt(1);
                 System.out.println("current cnt is " + rowCount);
             }
-            if (rowCount==4){
+            if (rowCount == 4) {
                 flag = true;
                 break;
             }
@@ -1299,7 +1299,8 @@ public abstract class HTableTestBase {
         scan.setReversed(isReversed);
         ResultScanner results = hTable.getScanner(scan);
         int num = 0;
-        for (Result result : results) {}
+        for (Result result : results) {
+        }
         results.close();
 
         flag = false;
@@ -1311,7 +1312,7 @@ public abstract class HTableTestBase {
                 rowCount = res.getInt(1);
                 System.out.println("current cnt is " + rowCount);
             }
-            if (rowCount==10){
+            if (rowCount == 10) {
                 flag = true;
                 break;
             }
@@ -1322,7 +1323,6 @@ public abstract class HTableTestBase {
         conn.close();
 
     }
-
 
     @Test
     public void testMaxVersionRowkeyTTL() throws Exception {
