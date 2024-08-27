@@ -698,6 +698,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean[] existsAll(List<Get> list) throws IOException {
+            return new boolean[0];
+        }
+
+        @Override
         public Boolean[] exists(List<Get> gets) throws IOException {
             throw new FeatureNotSupportedException("not supported yet'");
         }
@@ -775,6 +780,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Put put) throws IOException {
+            return false;
+        }
+
+        @Override
         public void delete(Delete delete) throws IOException {
             table.delete(delete);
         }
@@ -788,6 +798,11 @@ public class OHTablePool implements Closeable {
         public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, byte[] value,
                                       Delete delete) throws IOException {
             return table.checkAndDelete(row, family, qualifier, value, delete);
+        }
+
+        @Override
+        public boolean checkAndDelete(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Delete delete) throws IOException {
+            return false;
         }
 
         @Override
@@ -932,6 +947,26 @@ public class OHTablePool implements Closeable {
                                       CompareFilter.CompareOp compareOp, byte[] value,
                                       RowMutations mutation) throws IOException {
             throw new FeatureNotSupportedException("not supported yet'");
+        }
+
+        @Override
+        public void setOperationTimeout(int i) {
+
+        }
+
+        @Override
+        public int getOperationTimeout() {
+            return 0;
+        }
+
+        @Override
+        public void setRpcTimeout(int i) {
+
+        }
+
+        @Override
+        public int getRpcTimeout() {
+            return 0;
         }
 
         public HTableInterface getTable() {

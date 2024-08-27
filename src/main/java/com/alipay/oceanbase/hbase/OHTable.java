@@ -368,6 +368,11 @@ public class OHTable implements HTableInterface {
         return !r.isEmpty();
     }
 
+    @Override
+    public boolean[] existsAll(List<Get> list) throws IOException {
+        return new boolean[0];
+    }
+
     public Boolean[] exists(List<Get> gets) throws IOException {
         throw new FeatureNotSupportedException("not supported yet'");
     }
@@ -658,6 +663,11 @@ public class OHTable implements HTableInterface {
         return checkAndMutation(row, family, qualifier, value, put);
     }
 
+    @Override
+    public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Put put) throws IOException {
+        return false;
+    }
+
     private void innerDelete(Delete delete) throws IOException {
         checkArgument(delete.getRow() != null, "row is null");
         checkArgument(!delete.isEmpty(), "delete is empty");
@@ -709,6 +719,11 @@ public class OHTable implements HTableInterface {
     public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, byte[] value,
                                   Delete delete) throws IOException {
         return checkAndMutation(row, family, qualifier, value, delete);
+    }
+
+    @Override
+    public boolean checkAndDelete(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Delete delete) throws IOException {
+        return false;
     }
 
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier, byte[] value,
@@ -1125,6 +1140,21 @@ public class OHTable implements HTableInterface {
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
+    }
+
+    @Override
+    public int getOperationTimeout() {
+        return 0;
+    }
+
+    @Override
+    public void setRpcTimeout(int i) {
+
+    }
+
+    @Override
+    public int getRpcTimeout() {
+        return 0;
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {

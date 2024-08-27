@@ -1186,6 +1186,10 @@ public abstract class HTableTestBase {
         stmt.execute(sql);
         sql = "delete from `test$rowkeyTTL2`";
         stmt.execute(sql);
+        sql = "alter system set ttl_thread_score = 10";
+        stmt.execute(sql);
+        sql = "ALTER SYSTEM SET enable_kv_ttl= true";
+        stmt.execute(sql);
 
         String key1 = "scanKey1x";
         String key2 = "scanKey2x";
@@ -1342,6 +1346,10 @@ public abstract class HTableTestBase {
         String sql = "create table if not exists `test$rowkeyTTL` (`K` varbinary(1024) NOT NULL, `Q` varbinary(256) NOT NULL, `T` bigint(20) NOT NULL, `V` varbinary(1024) DEFAULT NULL, PRIMARY KEY (`K`, `Q`, `T`)) kv_attributes ='{\"Hbase\": {\"TimeToLive\": 3600, \"MaxVersions\": 2}}'";
         // 执行查询
         boolean succ = stmt.execute(sql);
+        sql = "alter system set ttl_thread_score = 10";
+        stmt.execute(sql);
+        sql = "ALTER SYSTEM SET enable_kv_ttl= true";
+        stmt.execute(sql);
 
         stmt.close();
         conn.close();
