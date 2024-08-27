@@ -196,6 +196,26 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
+    public void setOperationTimeout(int i) {
+
+    }
+
+    @Override
+    public int getOperationTimeout() {
+        return 0;
+    }
+
+    @Override
+    public void setRpcTimeout(int i) {
+
+    }
+
+    @Override
+    public int getRpcTimeout() {
+        return 0;
+    }
+
+    @Override
     public byte[] getTableName() {
         return tableName;
     }
@@ -222,6 +242,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     public boolean exists(Get get) throws IOException {
         checkStatus();
         return ohTable.exists(get);
+    }
+
+    @Override
+    public boolean[] existsAll(List<Get> list) throws IOException {
+        return new boolean[0];
     }
 
     @Override
@@ -315,6 +340,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
+    public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Put put) throws IOException {
+        return false;
+    }
+
+    @Override
     public void delete(Delete delete) throws IOException {
         checkStatus();
         ohTable.delete(delete);
@@ -331,6 +361,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                   Delete delete) throws IOException {
         checkStatus();
         return ohTable.checkAndDelete(row, family, qualifier, value, delete);
+    }
+
+    @Override
+    public boolean checkAndDelete(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareFilter.CompareOp compareOp, byte[] bytes3, Delete delete) throws IOException {
+        return false;
     }
 
     // Not support.
