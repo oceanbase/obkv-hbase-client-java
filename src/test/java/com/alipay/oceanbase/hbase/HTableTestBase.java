@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
+import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
@@ -451,6 +452,308 @@ public abstract class HTableTestBase {
     public void tryPut(Table hTable, Put put) throws Exception {
         hTable.put(put);
         Thread.sleep(1);
+    }
+
+    @Test
+    public void testFilter() throws Exception {
+        String key1 = "getKey1";
+        String key2 = "getKey2";
+        String column1 = "abc";
+        String column2 = "def";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Get get;
+        Result r;
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+
+        ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("a"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filter);
+        r = hTable.get(get);
+        Assert.assertEquals(3, r.raw().length);
+
+        filter = new ColumnPrefixFilter(Bytes.toBytes("d"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filter);
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.raw().length);
+
+        filter = new ColumnPrefixFilter(Bytes.toBytes("b"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filter);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.raw().length);
+
+        filter = new ColumnPrefixFilter(Bytes.toBytes("e"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filter);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.raw().length);
+
+        FilterList filterList = new FilterList(MUST_PASS_ONE);
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("a")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("d")));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(7, r.raw().length);
+
+        filterList = new FilterList(MUST_PASS_ALL);
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("a")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("d")));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.raw().length);
+
+        filterList = new FilterList(MUST_PASS_ONE);
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("c")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("d")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("e")));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.raw().length);
+
+        filterList = new FilterList(MUST_PASS_ALL);
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("d")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("de")));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filterList);
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.raw().length);
+
+        ColumnPaginationFilter f = new ColumnPaginationFilter(8, 0);
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.raw().length);
+
+        Put putKey1Column3Value1 = new Put(toBytes(key1));
+        putKey1Column3Value1.add(toBytes(family), toBytes("ggg"), toBytes(value1));
+        tryPut(hTable, putKey1Column3Value1);
+
+        f = new ColumnPaginationFilter(8, 0);
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(3, r.raw().length);
+
+        f = new ColumnPaginationFilter(8, Bytes.toBytes("abc"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(3, r.raw().length);
+
+        f = new ColumnPaginationFilter(8, Bytes.toBytes("bc"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.raw().length);
+
+        f = new ColumnPaginationFilter(8, Bytes.toBytes("ef"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.raw().length);
+
+        f = new ColumnPaginationFilter(8, Bytes.toBytes("h"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(f);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.raw().length);
+
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey3".getBytes());
+        scan.setMaxVersions(10);
+        ResultScanner scanner = hTable.getScanner(scan);
+
+        int res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                if (res_count < 8) {
+                    Assert.assertArrayEquals(key1.getBytes(), keyValue.getRow());
+                } else {
+                    Assert.assertArrayEquals(key2.getBytes(), keyValue.getRow());
+                }
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 10);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey3".getBytes());
+        scan.setMaxVersions(10);
+        filter = new ColumnPrefixFilter(Bytes.toBytes("d"));
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                if (res_count < 4) {
+                    Assert.assertArrayEquals(key1.getBytes(), keyValue.getRow());
+                } else {
+                    Assert.assertArrayEquals(key2.getBytes(), keyValue.getRow());
+                }
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 6);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey3".getBytes());
+        scan.setMaxVersions(10);
+        filterList = new FilterList(MUST_PASS_ONE);
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("c")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("d")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("e")));
+        filterList.addFilter(new ColumnPrefixFilter(Bytes.toBytes("g")));
+        scan.setFilter(filterList);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                if (res_count < 5) {
+                    Assert.assertArrayEquals(key1.getBytes(), keyValue.getRow());
+                } else {
+                    Assert.assertArrayEquals(key2.getBytes(), keyValue.getRow());
+                }
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 7);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey3".getBytes());
+        scan.setMaxVersions(10);
+        f = new ColumnPaginationFilter(2, Bytes.toBytes("d"));
+        scan.setFilter(f);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                if (res_count < 2) {
+                    Assert.assertArrayEquals(key1.getBytes(), keyValue.getRow());
+                } else {
+                    Assert.assertArrayEquals(key2.getBytes(), keyValue.getRow());
+                }
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 3);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey3".getBytes());
+        scan.setMaxVersions(10);
+        f = new ColumnPaginationFilter(2, Bytes.toBytes("g"));
+        scan.setFilter(f);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                if (res_count < 1) {
+                    Assert.assertArrayEquals(key1.getBytes(), keyValue.getRow());
+                } else {
+                    Assert.assertArrayEquals(key2.getBytes(), keyValue.getRow());
+                }
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 1);
+        scanner.close();
     }
 
     @Test
