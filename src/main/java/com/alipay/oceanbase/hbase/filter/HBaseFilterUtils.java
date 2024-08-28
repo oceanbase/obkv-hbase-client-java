@@ -44,6 +44,8 @@ public class HBaseFilterUtils {
             return toParseableString((FilterList) filter);
         } else if (filter instanceof ColumnPaginationFilter) {
             return toParseableString((ColumnPaginationFilter) filter);
+        } else if (filter instanceof ColumnPrefixFilter) {
+            return toParseableString((ColumnPrefixFilter) filter);
         } else if (filter instanceof SkipFilter) {
             return toParseableString((SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
@@ -117,8 +119,17 @@ public class HBaseFilterUtils {
     }
 
     private static String toParseableString(ColumnPaginationFilter filter) {
-        return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ','
-               + filter.getOffset() + ')';
+        if (filter.getColumnOffset() != null) {
+            return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ",'"
+                    + Bytes.toString(filter.getColumnOffset()) + "')";
+        } else {
+            return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ','
+                    + filter.getOffset() + ')';
+        }
+    }
+
+    private static String toParseableString(ColumnPrefixFilter filter) {
+        return filter.getClass().getSimpleName() + "('" + Bytes.toString(filter.getPrefix()) + "')";
     }
 
     private static String toParseableString(ColumnCountGetFilter filter) {

@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.filter;
 
 import org.apache.hadoop.hbase.filter.*;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -129,6 +130,16 @@ public class HBaseFilterUtilsTest {
         ColumnPaginationFilter filter = new ColumnPaginationFilter(2, 2);
         Assert.assertEquals("ColumnPaginationFilter(2,2)",
             HBaseFilterUtils.toParseableString(filter));
+        filter = new ColumnPaginationFilter(2, Bytes.toBytes("a"));
+        Assert.assertEquals("ColumnPaginationFilter(2,'a')",
+                HBaseFilterUtils.toParseableString(filter));
+    }
+
+    @Test
+    public void testColumnPrefixFilter() {
+        ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("pre"));
+        Assert.assertEquals("ColumnPrefixFilter('pre')",
+                HBaseFilterUtils.toParseableString(filter));
     }
 
     @Test
