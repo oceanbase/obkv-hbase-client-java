@@ -24,6 +24,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
@@ -36,6 +37,7 @@ import java.util.List;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
+@InterfaceAudience.Private
 public class ClientStreamScanner extends AbstractClientScanner {
 
     private static final Logger             logger       = TableHBaseLoggerFactory

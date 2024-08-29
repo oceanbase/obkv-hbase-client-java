@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
@@ -43,8 +42,7 @@ import java.util.List;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public abstract class HTableTestBase {
 
@@ -400,6 +398,8 @@ public abstract class HTableTestBase {
             assertEquals(res[0].raw().length, 3);
         }
     }
+
+
 
     @Test
     public void testMultiPartitionDel() throws IOException {
@@ -1331,6 +1331,87 @@ public abstract class HTableTestBase {
     }
 
     @Test
+    public void testScanSessionClean() throws Exception {
+        String key1 = "bKey";
+        String key2 = "cKey";
+        String key3 = "dKey";
+        String key4 = "eKey";
+        String key5 = "fKey";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String family = "family1";
+
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteKey4Family = new Delete(toBytes(key4));
+        deleteKey4Family.deleteFamily(toBytes(family));
+        Delete deleteKey5Family = new Delete(toBytes(key5));
+        deleteKey5Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+        hTable.delete(deleteKey5Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column2Value1 = new Put(toBytes(key3));
+        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey4Column2Value1 = new Put(toBytes(key4));
+        putKey4Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey5Column2Value1 = new Put(toBytes(key5));
+        putKey5Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey3Column2Value1);
+        tryPut(hTable, putKey4Column2Value1);
+        tryPut(hTable, putKey5Column2Value1);
+
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setBatch(1);
+
+        ResultScanner scanner = hTable.getScanner(scan);
+        scanner.next();
+
+        // The server defaults to a lease of 60 seconds. Therefore, at 20 seconds,
+        // the transaction is checked to ensure it has not rolled back, and the lease is updated.
+        // At 55 seconds, the query should still be able to retrieve the data and update the lease.
+        // If it exceeds 60 seconds (at 61 seconds), the session is deleted.
+        Thread.sleep(20 * 1000);
+        scanner.next();
+
+        Thread.sleep(55 * 1000);
+        scanner.next();
+
+        Thread.sleep(61 * 1000);
+        try {
+            scanner.next();
+        } catch (IOException e) {
+            assertTrue(e.getCause().getMessage().contains("OB_HASH_NOT_EXIST"));
+        } finally {
+            scanner.close();
+        }
+    }
+
+    @Test
     public void testScan() throws Exception {
         String key1 = "scanKey1x";
         String key2 = "scanKey2x";
@@ -1478,6 +1559,36 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 7);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.setMaxVersions(10);
+        scan.setMaxResultsPerColumnFamily(1);
+        scanner = hTable.getScanner(scan);
+        for (Result result : scanner) {
+            assertEquals(result.rawCells().length,1);
+        }
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.setMaxVersions(10);
+        scan.setMaxResultsPerColumnFamily(2);
+        scan.setRowOffsetPerColumnFamily(1);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                Arrays.equals(key2.getBytes(), keyValue.getRow());
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 3);
         scanner.close();
 
         // scan with prefixFilter
