@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.core.Lifecycle;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.property.Property;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;

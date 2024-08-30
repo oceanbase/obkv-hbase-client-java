@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
+import com.alipay.oceanbase.rpc.property.Property;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.HTableInterface;

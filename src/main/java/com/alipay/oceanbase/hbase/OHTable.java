@@ -24,8 +24,12 @@ import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.table.ObHBaseParams;
+import com.alipay.oceanbase.rpc.table.ObKVParamsBase;
+import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
+import com.alipay.oceanbase.rpc.property.Property;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -165,6 +169,8 @@ public class OHTable implements HTableInterface {
      */
     private final Configuration  configuration;
 
+    private int                   scannerTimeout;
+
     /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
@@ -188,6 +194,9 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
         long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+        HBaseConfiguration.getInt(configuration, HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
+                HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
+                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         this.obTableClient = ObTableClientManager
             .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
@@ -385,18 +394,34 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public boolean exists(Get get) throws IOException {
+        get.setCheckExistenceOnly(true);
         Result r = get(get);
-        return !r.isEmpty();
+        return r.getExists();
     }
 
     @Override
     public boolean[] existsAll(List<Get> list) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet.");
+        if (list.isEmpty()) {
+            return new boolean[]{};
+        }
+        if (list.size() == 1) {
+            return new boolean[]{exists(list.get(0))};
+        }
+        Result[] r = get(list);
+        boolean[] ret = new boolean[r.length];
+        for (int i = 0; i < list.size(); ++i) {
+            ret[i] = exists(list.get(i));
+        }
+        return ret;
     }
 
-    @Override
     public Boolean[] exists(List<Get> gets) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        Boolean[] result = new Boolean[gets.size()];
+        boolean[] exists = existsAll(gets);
+        for (int i = 0; i < gets.size(); ++i) {
+            result[i] = exists[i];
+        }
+        return result;
     }
 
     @Override
@@ -480,11 +505,16 @@ public class OHTable implements HTableInterface {
                             get.getMaxVersions(), null);
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
                             true);
-                        request = buildObTableQueryRequest(obTableQuery,
-                            getTargetTableName(tableNameString));
+                        obTableQuery.setObKVParams(buildObHBaseParams(null, get));
+                        request = buildObTableQueryRequest(obTableQuery, getTargetTableName(tableNameString));
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
+                        if (get.isCheckExistenceOnly() ) {
+                            Result result = new Result();
+                            result.setExists(clientQueryStreamResult.getCacheRows().size() != 0);
+                            return result;
+                        }
                         getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
@@ -495,11 +525,25 @@ public class OHTable implements HTableInterface {
 
                             obTableQuery = buildObTableQuery(filter, get.getRow(), true,
                                 get.getRow(), true);
+                            if (get.isClosestRowBefore()) {
+                                obTableQuery = buildObTableQuery(filter, null, false,
+                                        get.getRow(), true);
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            } else {
+                                obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                                        get.getRow(), true);
+                            }
 
+                            obTableQuery.setObKVParams(buildObHBaseParams(null, get));
                             request = buildObTableQueryRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
+                            if (get.isCheckExistenceOnly() ) {
+                                Result result = new Result();
+                                result.setExists(clientQueryStreamResult.getCacheRows().size() != 0);
+                                return result;
+                            }
                             getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
                                 family);
                         }
@@ -573,7 +617,6 @@ public class OHTable implements HTableInterface {
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), entry.getValue());
                             obTableQuery = buildObTableQuery(filter, scan);
-
                             request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
@@ -593,6 +636,23 @@ public class OHTable implements HTableInterface {
             }
         };
         return executeServerCallable(serverCallable);
+    }
+
+    public ObKVParams buildObHBaseParams(Scan scan, Get get) {
+        ObKVParams obKVParams = new ObKVParams();
+        ObHBaseParams obHBaseParams = new ObHBaseParams();
+        if (scan != null) {
+            obHBaseParams.setCaching(scan.getCaching());
+            obHBaseParams.setCallTimeout(scannerTimeout);
+            obHBaseParams.setCacheBlock(scan.isGetScan());
+            obHBaseParams.setAllowPartialResults(scan.getAllowPartialResults());
+        }
+        if (get != null) {
+            obHBaseParams.setCheckExistenceOnly(get.isCheckExistenceOnly());
+            obHBaseParams.setCacheBlock(get.getCacheBlocks());
+        }
+        obKVParams.setObParamsBase(obHBaseParams);
+        return obKVParams;
     }
 
     @Override
@@ -1202,22 +1262,19 @@ public class OHTable implements HTableInterface {
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
     }
 
-    // todo
     @Override
     public int getOperationTimeout() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return operationTimeout;
     }
 
-    //todo
+    // rpcTimeout means server max execute time, equal Table API rpc_execute_time, it must be set before OHTable init; please pass this parameter through conf
     @Override
-    public void setRpcTimeout(int i) {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public void setRpcTimeout(int rpcTimeout) {
     }
 
-    // todo
     @Override
     public int getRpcTimeout() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return Integer.parseInt(configuration.get(Property.RPC_EXECUTE_TIMEOUT.getKey()));
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
@@ -1401,6 +1458,10 @@ public class OHTable implements HTableInterface {
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());
         }
+        obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize() : configuration.getLong(
+                                HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
+        obTableQuery.setObKVParams(buildObHBaseParams(scan, null));
         return obTableQuery;
     }
 
