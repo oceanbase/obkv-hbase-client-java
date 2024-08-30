@@ -121,10 +121,10 @@ public class HBaseFilterUtils {
     private static String toParseableString(ColumnPaginationFilter filter) {
         if (filter.getColumnOffset() != null) {
             return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ",'"
-                    + Bytes.toString(filter.getColumnOffset()) + "')";
+                   + Bytes.toString(filter.getColumnOffset()) + "')";
         } else {
             return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ','
-                    + filter.getOffset() + ')';
+                   + filter.getOffset() + ')';
         }
     }
 

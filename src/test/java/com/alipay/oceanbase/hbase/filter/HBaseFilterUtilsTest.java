@@ -132,14 +132,14 @@ public class HBaseFilterUtilsTest {
             HBaseFilterUtils.toParseableString(filter));
         filter = new ColumnPaginationFilter(2, Bytes.toBytes("a"));
         Assert.assertEquals("ColumnPaginationFilter(2,'a')",
-                HBaseFilterUtils.toParseableString(filter));
+            HBaseFilterUtils.toParseableString(filter));
     }
 
     @Test
     public void testColumnPrefixFilter() {
         ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("pre"));
-        Assert.assertEquals("ColumnPrefixFilter('pre')",
-                HBaseFilterUtils.toParseableString(filter));
+        Assert
+            .assertEquals("ColumnPrefixFilter('pre')", HBaseFilterUtils.toParseableString(filter));
     }
 
     @Test

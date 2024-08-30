@@ -59,6 +59,13 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.oceanbase</groupId>
+            <artifactId>obkv-table-client</artifactId>
+            <version>1.2.131-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/obkv-table-client-1.2.131-SNAPSHOT-jar-with-dependencies.jar</systemPath>
+        </dependency>
+        <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
             <version>${hadoop.version}</version>
@@ -109,11 +116,11 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <groupId>com.oceanbase</groupId>
-            <artifactId>obkv-table-client</artifactId>
-            <version>${table.client.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.oceanbase</groupId>-->
+<!--            <artifactId>obkv-table-client</artifactId>-->
+<!--            <version>${table.client.version}</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-client</artifactId>
