@@ -51,12 +51,12 @@ import static org.junit.Assert.fail;
 public abstract class HTableTestBase {
 
     @Rule
-    public ExpectedException  expectedException = ExpectedException.none();
+    public ExpectedException     expectedException = ExpectedException.none();
 
-    protected HTableInterface hTable;
+    protected HTableInterface    hTable;
 
-    private static AtomicInteger count = new AtomicInteger(0);
-    private static AtomicInteger idx = new AtomicInteger(0);
+    private static AtomicInteger count             = new AtomicInteger(0);
+    private static AtomicInteger idx               = new AtomicInteger(0);
 
     @Test
     public void testTableGroup() throws IOError, IOException, IllegalArgumentException {
@@ -88,10 +88,10 @@ public abstract class HTableTestBase {
             Assert.assertEquals(timestamp, keyValue.getTimestamp());
             Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
             System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                    + new String(keyValue.getFamily()) + " columnQualifier:"
-                    + new String(keyValue.getQualifier()) + " timestamp:"
-                    + keyValue.getTimestamp() + " value:"
-                    + new String(keyValue.getValue()));
+                               + new String(keyValue.getFamily()) + " columnQualifier:"
+                               + new String(keyValue.getQualifier()) + " timestamp:"
+                               + keyValue.getTimestamp() + " value:"
+                               + new String(keyValue.getValue()));
         }
 
         get = new Get(toBytes(key));
@@ -105,10 +105,10 @@ public abstract class HTableTestBase {
             Assert.assertEquals(timestamp, keyValue.getTimestamp());
             Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
             System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                    + new String(keyValue.getFamily()) + " columnQualifier:"
-                    + new String(keyValue.getQualifier()) + " timestamp:"
-                    + keyValue.getTimestamp() + " value:"
-                    + new String(keyValue.getValue()));
+                               + new String(keyValue.getFamily()) + " columnQualifier:"
+                               + new String(keyValue.getQualifier()) + " timestamp:"
+                               + keyValue.getTimestamp() + " value:"
+                               + new String(keyValue.getValue()));
         }
 
         // test scan with empty family
@@ -121,10 +121,10 @@ public abstract class HTableTestBase {
                 Assert.assertEquals(timestamp, keyValue.getTimestamp());
                 Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
                 System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                        + new String(keyValue.getFamily()) + " columnQualifier:"
-                        + new String(keyValue.getQualifier()) + " timestamp:"
-                        + keyValue.getTimestamp() + " value:"
-                        + new String(keyValue.getValue()));
+                                   + new String(keyValue.getFamily()) + " columnQualifier:"
+                                   + new String(keyValue.getQualifier()) + " timestamp:"
+                                   + keyValue.getTimestamp() + " value:"
+                                   + new String(keyValue.getValue()));
             }
         }
 
@@ -137,7 +137,8 @@ public abstract class HTableTestBase {
         } else if (hTable instanceof OHTablePool.PooledOHTable) {
             scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
         } else {
-            throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
+            throw new IllegalArgumentException(
+                "just support for OHTable, OHTableClient and PooledOHTable");
         }
         Assert.assertNotNull(scanners);
         Assert.assertTrue(!scanners.isEmpty());
@@ -150,10 +151,10 @@ public abstract class HTableTestBase {
                     Assert.assertEquals(timestamp, keyValue.getTimestamp());
                     Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
                     System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                            + new String(keyValue.getFamily()) + " columnQualifier:"
-                            + new String(keyValue.getQualifier()) + " timestamp:"
-                            + keyValue.getTimestamp() + " value:"
-                            + new String(keyValue.getValue()));
+                                       + new String(keyValue.getFamily()) + " columnQualifier:"
+                                       + new String(keyValue.getQualifier()) + " timestamp:"
+                                       + keyValue.getTimestamp() + " value:"
+                                       + new String(keyValue.getValue()));
                 }
             }
         }

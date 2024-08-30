@@ -420,8 +420,9 @@ public class OHTable implements HTableInterface {
 
     public String getTargetTableName(String tableNameString) {
         if (configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
-            return tableNameString + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
-                    DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+            return tableNameString
+                   + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
+                       DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
         }
         return tableNameString;
     }
@@ -449,7 +450,8 @@ public class OHTable implements HTableInterface {
                             get.getMaxVersions(), null);
                         obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
                             true, -1);
-                        request = buildObTableQueryRequest(obTableQuery, getTargetTableName(tableNameString));
+                        request = buildObTableQueryRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
 
                         clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                             .execute(request);
@@ -537,7 +539,8 @@ public class OHTable implements HTableInterface {
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
                         }
-                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -593,8 +596,8 @@ public class OHTable implements HTableInterface {
 
         //be careful about the packet size ,may the packet exceed the max result size ,leading to error
         ServerCallable<List<ResultScanner>> serverCallable = new ServerCallable<List<ResultScanner>>(
-                configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
-                operationTimeout) {
+            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+            operationTimeout) {
             public List<ResultScanner> call() throws IOException {
                 byte[] family = new byte[] {};
                 ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
@@ -603,45 +606,48 @@ public class OHTable implements HTableInterface {
                 ObHTableFilter filter;
                 try {
                     if (scan.getFamilyMap().keySet() == null
-                            || scan.getFamilyMap().keySet().size() == 0) {
+                        || scan.getFamilyMap().keySet().size() == 0) {
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-                                scan.getMaxVersions(), null);
+                            scan.getMaxVersions(), null);
                         if (scan.isReversed()) {
                             obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                    scan.getStartRow(), true, scan.getBatch());
+                                scan.getStartRow(), true, scan.getBatch());
                         } else {
                             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                    scan.getStopRow(), false, scan.getBatch());
+                                scan.getStopRow(), false, scan.getBatch());
                         }
                         if (scan.isReversed()) { // reverse scan 时设置为逆序
                             obTableQuery.setScanOrder(ObScanOrder.Reverse);
                         }
                         List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
 
-                        request = buildObTableQueryAsyncRequest(obTableQuery, getTargetTableName(tableNameString));
-                        String phyTableName = obTableClient.getPhyTableNameFromTableGroup(request.getObTableQueryRequest(), tableNameString);
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
+                        String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
+                            request.getObTableQueryRequest(), tableNameString);
                         List<Partition> partitions = obTableClient.getPartition(phyTableName);
                         for (Partition partition : partitions) {
-                            request.getObTableQueryRequest().setTableQueryPartId(partition.getPartId());
+                            request.getObTableQueryRequest().setTableQueryPartId(
+                                partition.getPartId());
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                    .execute(request);
-                            ClientStreamScanner clientScanner = new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                    tableNameString, family, true);
+                                .execute(request);
+                            ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                clientQueryAsyncStreamResult, tableNameString, family, true);
                             resultScanners.add(clientScanner);
                         }
                         return resultScanners;
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
-                                .entrySet()) {
+                            .entrySet()) {
                             family = entry.getKey();
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-                                    scan.getMaxVersions(), entry.getValue());
+                                scan.getMaxVersions(), entry.getValue());
                             if (scan.isReversed()) {
                                 obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
-                                        scan.getStartRow(), true, scan.getBatch());
+                                    scan.getStartRow(), true, scan.getBatch());
                             } else {
                                 obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
-                                        scan.getStopRow(), false, scan.getBatch());
+                                    scan.getStopRow(), false, scan.getBatch());
                             }
                             if (scan.isReversed()) { // reverse scan 时设置为逆序
                                 obTableQuery.setScanOrder(ObScanOrder.Reverse);
@@ -651,15 +657,18 @@ public class OHTable implements HTableInterface {
                             // obTableQuery.setMaxResultSize(scan.getMaxResultSize());
 
                             List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
-                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
+                            String targetTableName = getTargetTableName(tableNameString,
+                                Bytes.toString(family));
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
-                            List<Partition> partitions = obTableClient.getPartition(targetTableName);
+                            List<Partition> partitions = obTableClient
+                                .getPartition(targetTableName);
                             for (Partition partition : partitions) {
-                                request.getObTableQueryRequest().setTableQueryPartId(partition.getPartId());
+                                request.getObTableQueryRequest().setTableQueryPartId(
+                                    partition.getPartId());
                                 clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                        .execute(request);
-                                ClientStreamScanner clientScanner = new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                    tableNameString, family, false);
+                                    .execute(request);
+                                ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                    clientQueryAsyncStreamResult, tableNameString, family, false);
                                 resultScanners.add(clientScanner);
                             }
                             return resultScanners;
@@ -667,9 +676,9 @@ public class OHTable implements HTableInterface {
                     }
                 } catch (Exception e) {
                     logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                            e);
+                        e);
                     throw new IOException("scan table:" + tableNameString + " family "
-                            + Bytes.toString(family) + " error.", e);
+                                          + Bytes.toString(family) + " error.", e);
                 }
 
                 throw new IOException("scan table:" + tableNameString + "has no family");
