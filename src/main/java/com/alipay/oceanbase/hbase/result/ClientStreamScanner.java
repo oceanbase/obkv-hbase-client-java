@@ -31,9 +31,7 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
@@ -75,16 +73,8 @@ public class ClientStreamScanner extends AbstractClientScanner {
     public Result next() throws IOException {
         try {
             checkStatus();
-
-            if (!streamNext) {
-                return null;
-            }
-
             List<ObObj> startRow;
-
-            if (streamResult.getRowIndex() != -1) {
-                startRow = streamResult.getRow();
-            } else if (streamResult.next()) {
+            if (streamResult.next()) {
                 startRow = streamResult.getRow();
             } else {
                 return null;
@@ -108,8 +98,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
             KeyValue startKeyValue = new KeyValue(sk, family, sq, st, sv);
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             keyValues.add(startKeyValue);
-
-            while (streamNext = streamResult.next()) {
+            while (!streamResult.getCacheRows().isEmpty() && streamResult.next()) {
                 List<ObObj> row = streamResult.getRow();
                 if (this.isTableGroup) {
                     // split family and qualifier
@@ -127,6 +116,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
                     // when rowKey is equal to the previous rowKey ,merge the result into the same result
                     keyValues.add(new KeyValue(k, family, q, t, v));
                 } else {
+                    streamResult.getCacheRows().addFirst(row);
                     break;
                 }
             }

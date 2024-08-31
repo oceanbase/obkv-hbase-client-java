@@ -36,6 +36,8 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
+import com.alipay.oceanbase.rpc.table.ObHBaseParams;
+import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 
 import com.google.protobuf.Descriptors;
@@ -98,6 +100,11 @@ public class OHTable implements HTableInterface {
      * if operation timeout is not equal to the default value mean the <code>Get</code> execute in the pool
      */
     private int                  operationTimeout;
+
+    /**
+     * timeout for each rpc request
+     */
+    private int                  rpcTimeout;
 
     /**
      * if the <code>Get</code> executing pool is specified by user cleanupPoolOnClose will be false ,
@@ -164,6 +171,8 @@ public class OHTable implements HTableInterface {
      * <code>Configuration</code> extends from hbase configuration
      */
     private final Configuration  configuration;
+
+    private int                  scannerTimeout;
 
     /**
      * Creates an object to access a HBase table.
@@ -290,7 +299,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.cleanupPoolOnClose = false;
         }
-
+        this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
@@ -338,6 +347,12 @@ public class OHTable implements HTableInterface {
         checkArgument(configuration != null, "configuration is null.");
         checkArgument(tableName != null, "tableNameString is null.");
         checkArgument(tableNameString != null, "tableNameString is null.");
+        this.scannerTimeout = HBaseConfiguration.getInt(configuration,
+            HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
+            HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
+            HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
+        this.rpcTimeout = configuration.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
+            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         this.operationTimeout = this.configuration.getInt(
             HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
             HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
@@ -390,13 +405,29 @@ public class OHTable implements HTableInterface {
     }
 
     @Override
-    public boolean[] existsAll(List<Get> list) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public boolean[] existsAll(List<Get> gets) throws IOException {
+        if (gets.isEmpty()) {
+            return new boolean[] {};
+        }
+        if (gets.size() == 1) {
+            return new boolean[] { exists(gets.get(0)) };
+        }
+        Result[] r = get(gets);
+        boolean[] ret = new boolean[r.length];
+        for (int i = 0; i < gets.size(); ++i) {
+            ret[i] = exists(gets.get(i));
+        }
+        return ret;
     }
 
     @Override
     public Boolean[] exists(List<Get> gets) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        boolean[] results = existsAll(gets);
+        Boolean[] objectResults = new Boolean[results.length];
+        for (int i = 0; i < results.length; ++i) {
+            objectResults[i] = results[i];
+        }
+        return objectResults;
     }
 
     @Override
@@ -478,8 +509,18 @@ public class OHTable implements HTableInterface {
                         || get.getFamilyMap().keySet().size() == 0) {
                         filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
                             get.getMaxVersions(), null);
-                        obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(),
-                            true);
+                        if (get.isClosestRowBefore()) {
+                            Scan scan = new Scan();
+                            scan.setStartRow(get.getRow());
+                            scan.setCaching(1);
+                            scan.setReversed(true);
+                            obTableQuery = buildObTableQuery(filter, scan);
+                            obTableQuery.setObKVParams(buildOBKVParams(scan));
+                        } else {
+                            obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                                get.getRow(), true);
+                            obTableQuery.setObKVParams(buildOBKVParams(get));
+                        }
                         request = buildObTableQueryRequest(obTableQuery,
                             getTargetTableName(tableNameString));
 
@@ -492,10 +533,17 @@ public class OHTable implements HTableInterface {
                             family = entry.getKey();
                             filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
                                 get.getMaxVersions(), entry.getValue());
-
-                            obTableQuery = buildObTableQuery(filter, get.getRow(), true,
-                                get.getRow(), true);
-
+                            if (get.isClosestRowBefore()) {
+                                Scan scan = new Scan(get.getRow());
+                                scan.setCaching(1);
+                                scan.setReversed(true);
+                                obTableQuery = buildObTableQuery(filter, scan);
+                                obTableQuery.setObKVParams(buildOBKVParams(scan));
+                            } else {
+                                obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                                    get.getRow(), true);
+                                obTableQuery.setObKVParams(buildOBKVParams(get));
+                            }
                             request = buildObTableQueryRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
@@ -659,6 +707,28 @@ public class OHTable implements HTableInterface {
                 }
             }
         }
+    }
+
+    private ObKVParams buildOBKVParams(final Scan scan) {
+        ObKVParams obKVParams = new ObKVParams();
+        ObHBaseParams obHBaseParams = new ObHBaseParams();
+        if (scan != null) {
+            obHBaseParams.setCaching(scan.getCaching());
+            obHBaseParams.setCallTimeout(scannerTimeout);
+            obHBaseParams.setCacheBlock(scan.isGetScan());
+            obHBaseParams.setAllowPartialResults(scan.getAllowPartialResults());
+        }
+        obKVParams.setObParamsBase(obHBaseParams);
+        return obKVParams;
+    }
+
+    private ObKVParams buildOBKVParams(final Get get) {
+        ObKVParams obKVParams = new ObKVParams();
+        ObHBaseParams obHBaseParams = new ObHBaseParams();
+        obHBaseParams.setCheckExistenceOnly(get.isCheckExistenceOnly());
+        obHBaseParams.setCacheBlock(get.getCacheBlocks());
+        obKVParams.setObParamsBase(obHBaseParams);
+        return obKVParams;
     }
 
     /**
@@ -1202,22 +1272,22 @@ public class OHTable implements HTableInterface {
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
     }
 
-    // todo
     @Override
     public int getOperationTimeout() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return operationTimeout;
     }
 
     //todo
     @Override
-    public void setRpcTimeout(int i) {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public void setRpcTimeout(int rpcTimeout) {
+        this.rpcTimeout = rpcTimeout;
+        obTableClient.setRpcExecuteTimeout(rpcTimeout);
     }
 
     // todo
     @Override
     public int getRpcTimeout() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return this.rpcTimeout;
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
@@ -1376,7 +1446,6 @@ public class OHTable implements HTableInterface {
             obTableQuery.addSelectColumn(column);
         }
         obTableQuery.addKeyRange(obNewRange);
-
         return obTableQuery;
     }
 
@@ -1391,16 +1460,18 @@ public class OHTable implements HTableInterface {
         if (scan.isReversed()) {
             obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false, scan.getStartRow(),
                 true);
+            obTableQuery.setScanOrder(ObScanOrder.Reverse);
         } else {
             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true, scan.getStopRow(),
                 false);
         }
-        if (scan.isReversed()) { // reverse scan 时设置为逆序
-            obTableQuery.setScanOrder(ObScanOrder.Reverse);
-        }
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());
         }
+        obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize()
+            : configuration.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
+        obTableQuery.setObKVParams(buildOBKVParams(scan));
         return obTableQuery;
     }
 
