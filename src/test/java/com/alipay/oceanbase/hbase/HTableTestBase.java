@@ -34,10 +34,8 @@ import org.junit.rules.ExpectedException;
 import java.io.IOError;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
@@ -398,8 +396,6 @@ public abstract class HTableTestBase {
             assertEquals(res[0].raw().length, 3);
         }
     }
-
-
 
     @Test
     public void testMultiPartitionDel() throws IOException {
@@ -1331,6 +1327,109 @@ public abstract class HTableTestBase {
     }
 
     @Test
+    // todo: heyu
+    public void testScanWithObParams() throws Exception {
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String key4 = "scanKey4x";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String family = "family1";
+
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteKey4Family = new Delete(toBytes(key4));
+        deleteKey4Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey4Column1Value1 = new Put(toBytes(key4));
+        putKey4Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey4Column1Value1);
+
+        Scan scan;
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey5x".getBytes());
+        scan.setMaxVersions(10);
+        scan.setCaching(1);
+        scan.setBatch(3);
+        ResultScanner scanner = hTable.getScanner(scan);
+        Result result = scanner.next();
+        Assert.assertEquals(3, result.size());
+        scanner.close();
+
+        scan.setMaxResultSize(10);
+        scan.setBatch(-1);
+        ResultScanner scanner1 = hTable.getScanner(scan);
+        result = scanner1.next();
+        Assert.assertEquals(7, result.size()); // 返回第一行全部数据，因为不允许行内部分返回
+
+        scanner1.close();
+
+        scan.setAllowPartialResults(true);
+        ResultScanner scanner2 = hTable.getScanner(scan);
+        result = scanner2.next();
+        Assert.assertEquals(1, result.size());
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+    }
+
+    @Test
     public void testScanSessionClean() throws Exception {
         String key1 = "bKey";
         String key2 = "cKey";
@@ -1409,6 +1508,151 @@ public abstract class HTableTestBase {
         } finally {
             scanner.close();
         }
+    }
+
+    @Test
+    public void testGet() throws Exception {
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String zKey1 = "zScanKey1";
+        String zKey2 = "zScanKey2";
+        String column1 = "column1";
+        String column2 = "column2";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+
+        // delete previous data
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+        Delete deleteKey3Family = new Delete(toBytes(key3));
+        deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteZKey1Family = new Delete(toBytes(zKey1));
+        deleteZKey1Family.deleteFamily(toBytes(family));
+        Delete deleteZKey2Family = new Delete(toBytes(zKey2));
+        deleteZKey2Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteZKey1Family);
+        hTable.delete(deleteZKey2Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column1Value1 = new Put(toBytes(key3));
+        putKey3Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey3Column1Value2 = new Put(toBytes(key3));
+        putKey3Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey3Column2Value1 = new Put(toBytes(key3));
+        putKey3Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey3Column2Value2 = new Put(toBytes(key3));
+        putKey3Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putzKey1Column1Value1 = new Put(toBytes(zKey1));
+        putzKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putzKey2Column1Value1 = new Put(toBytes(zKey2));
+        putzKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Get get;
+        Result r;
+        int res_count = 0;
+
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1); // 2 * putKey1Column1Value1
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1); // 2 * putKey1Column2Value1
+        tryPut(hTable, putKey1Column2Value2); // 2 * putKey1Column2Value2
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+        tryPut(hTable, putKey3Column1Value1);
+        tryPut(hTable, putKey3Column1Value2);
+        tryPut(hTable, putKey3Column2Value1);
+        tryPut(hTable, putKey3Column2Value2);
+        tryPut(hTable, putzKey1Column1Value1);
+        tryPut(hTable, putzKey2Column1Value1);
+
+        // show table (time maybe different)
+        //+-----------+---------+----------------+--------+
+        //| K         | Q       | T              | V      |
+        //+-----------+---------+----------------+--------+
+        //| scanKey1x | column1 | -1709714409669 | value1 |
+        //| scanKey1x | column1 | -1709714409637 | value2 |
+        //| scanKey1x | column1 | -1709714409603 | value1 |
+        //| scanKey1x | column2 | -1709714409802 | value2 |
+        //| scanKey1x | column2 | -1709714409768 | value1 |
+        //| scanKey1x | column2 | -1709714409735 | value2 |
+        //| scanKey1x | column2 | -1709714409702 | value1 |
+        //| scanKey2x | column2 | -1709714409869 | value2 |
+        //| scanKey2x | column2 | -1709714409836 | value1 |
+        //| scanKey3x | column1 | -1709714409940 | value2 |
+        //| scanKey3x | column1 | -1709714409904 | value1 |
+        //| scanKey3x | column2 | -1709714410010 | value2 |
+        //| scanKey3x | column2 | -1709714409977 | value1 |
+        //+-----------+---------+----------------+--------+
+
+        // test closestRowBefore
+        get = new Get("scanKey2x2".getBytes());
+        get.addFamily(family.getBytes());
+        get.setClosestRowBefore(true);
+        r = hTable.get(get);
+        assertEquals(key2, Bytes.toString(r.getRow()));
+
+        // test exists
+        LinkedList<Get> gets = new LinkedList<>();
+        Get get1 = new Get(key1.getBytes());
+        get1.addFamily(family.getBytes());
+        Get get2 = new Get(key3.getBytes());
+        get2.addFamily(family.getBytes());
+        Get get3 = new Get(key1.getBytes());
+        get3.addFamily(family.getBytes());
+        Get get4 = new Get("scanKey2x2".getBytes());
+        get4.addFamily(family.getBytes());
+        Get get5 = new Get(key2.getBytes());
+        get5.addFamily(family.getBytes());
+        gets.add(get1);
+        gets.add(get2);
+        gets.add(get3);
+        gets.add(get4);
+        gets.add(get5);
+        boolean[] booleans = hTable.existsAll(gets);
+        assertTrue(booleans[0]);
+        assertTrue(booleans[1]);
+        assertTrue(booleans[2]);
+        assertFalse(booleans[3]);
+        assertTrue(booleans[4]);
     }
 
     @Test
@@ -1531,34 +1775,29 @@ public abstract class HTableTestBase {
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(7, r.raw().length);
-
         get = new Get(toBytes(key2));
         get.addFamily(toBytes(family));
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
-
         get = new Get(toBytes(key3));
         get.addFamily(toBytes(family));
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(4, r.raw().length);
-
         scan = new Scan();
         scan.addFamily(family.getBytes());
         scan.setStartRow("scanKey1x".getBytes());
         scan.setStopRow("scanKey2x".getBytes());
         scan.setMaxVersions(10);
         ResultScanner scanner = hTable.getScanner(scan);
-
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                Arrays.equals(key1.getBytes(), keyValue.getRow());
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 7);
+        Assert.assertEquals(7, res_count);
         scanner.close();
 
         scan = new Scan();
@@ -1569,8 +1808,48 @@ public abstract class HTableTestBase {
         scan.setMaxResultsPerColumnFamily(1);
         scanner = hTable.getScanner(scan);
         for (Result result : scanner) {
-            assertEquals(result.rawCells().length,1);
+            assertEquals(1, result.rawCells().length);
         }
+        scanner.close();
+
+        // test maxResultSize and AllowPartialResults
+        scan = new Scan();
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setMaxResultSize(100);
+        scan.setAllowPartialResults(true);
+        scanner = hTable.getScanner(scan);
+        Result next = scanner.next();
+        assertEquals(2, next.size());
+
+        scanner.close();
+
+        // test cacheSize
+        scan = new Scan();
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setCaching(1);
+        scanner = hTable.getScanner(scan);
+        next = scanner.next();
+        assertEquals(7, next.size());
+
+        scanner.close();
+
+        // test maxResultSize and not AllowPartialResults
+        scan = new Scan();
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setMaxResultSize(100);
+        scanner = hTable.getScanner(scan);
+        next = scanner.next();
+        assertEquals(7, next.size());
+
         scanner.close();
 
         scan = new Scan();
@@ -1584,11 +1863,10 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                Arrays.equals(key2.getBytes(), keyValue.getRow());
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 3);
+        Assert.assertEquals(3, res_count);
         scanner.close();
 
         // scan with prefixFilter
@@ -1608,7 +1886,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 2);
+        Assert.assertEquals(2, res_count);
         scanner.close();
 
         // scan with singleColumnValueFilter
@@ -2223,11 +2501,25 @@ public abstract class HTableTestBase {
         boolean ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
             value.getBytes(), put);
         Assert.assertTrue(ret);
+
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.GREATER, "value1".getBytes(), put);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.GREATER_OR_EQUAL, "value1".getBytes(), put);
+        Assert.assertTrue(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.LESS, "".getBytes(), put);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.LESS_OR_EQUAL, "".getBytes(), put);
+        Assert.assertFalse(ret);
+
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
         get.addColumn(family.getBytes(), column.getBytes());
         r = hTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
+        Assert.assertEquals(3, r.raw().length);
         Assert.assertEquals("value1", Bytes.toString(r.raw()[0].getValue()));
     }
 
@@ -2252,6 +2544,28 @@ public abstract class HTableTestBase {
         boolean ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
             value.getBytes(), delete);
         Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.add(family.getBytes(), column.getBytes(), "value6".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.GREATER, "value5".getBytes(), delete);
+        Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.add(family.getBytes(), column.getBytes(), "value5".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.GREATER_OR_EQUAL, "value5".getBytes(), delete);
+        Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.add(family.getBytes(), column.getBytes(), "value1".getBytes());
+        hTable.put(put);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.LESS, "value1".getBytes(), delete);
+        Assert.assertFalse(ret);
+        ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.LESS_OR_EQUAL, "value1".getBytes(), delete);
+        Assert.assertTrue(ret);
+
         Get get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);
         get.addColumn(family.getBytes(), column.getBytes());
@@ -2339,7 +2653,8 @@ public abstract class HTableTestBase {
         rowMutations.add(put3);
 
         //put data
-        boolean ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+        boolean ret = hTable.checkAndMutate(key.getBytes(),
+            family.getBytes(StandardCharsets.UTF_8), column1.getBytes(),
             CompareFilter.CompareOp.EQUAL, null, rowMutations);
 
         Assert.assertTrue(ret);
@@ -3105,62 +3420,5 @@ public abstract class HTableTestBase {
     @Test
     public void testHtableWithIndex() throws Exception {
         testBasic("family_with_local_index");
-    }
-
-    @Test
-    public void testFilterSpecialValue() throws IOException {
-        // 1. test checkAndMutate with special character
-        String specialValue = "AAEAAAGRnJiQbwAAAZGcmJwndjE=";
-        byte[] specialBytes = Base64.getDecoder().decode(specialValue);
-        String family = "family'1";
-        byte[] keyBytes = specialBytes;
-        byte[] columnBytes = specialBytes;
-        byte[] valueBytes = specialBytes;
-
-        Delete delete = new Delete(keyBytes);
-        delete.deleteFamily(family.getBytes());
-        hTable.delete(delete);
-
-        Put put = new Put(keyBytes);
-        put.add(family.getBytes(), columnBytes, valueBytes);
-        hTable.put(put);
-
-        // check delete column
-        delete = new Delete(keyBytes);
-        delete.deleteColumn(family.getBytes(), columnBytes);
-        boolean ret = hTable.checkAndDelete(keyBytes, family.getBytes(), columnBytes,
-                valueBytes, delete);
-        Assert.assertTrue(ret);
-
-        // 2. test normal filter with special chracter
-        put = new Put(keyBytes);
-        put.add(family.getBytes(), columnBytes, valueBytes);
-        hTable.put(put);
-
-
-        Get get = new Get(keyBytes);
-        get.addFamily(family.getBytes());
-        // 2.1 test special row
-        RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(keyBytes));
-        get.setFilter(rowFilter);
-        Result result = hTable.get(get);
-        Assert.assertEquals(1, result.raw().length);
-        Assert.assertArrayEquals(keyBytes, result.getRow());
-
-        // 2.2 test special column
-        SingleColumnValueFilter singleColumnValueFilter = new SingleColumnValueFilter(family.getBytes(),
-                columnBytes, CompareFilter.CompareOp.EQUAL, valueBytes);
-        get.setFilter(singleColumnValueFilter);
-        result = hTable.get(get);
-        Assert.assertEquals(1, result.raw().length);
-        Assert.assertArrayEquals(keyBytes, result.getRow());
-
-        // 2.3 test special value
-        ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(valueBytes));
-        get.setFilter(valueFilter);
-        result = hTable.get(get);
-        Assert.assertEquals(1, result.raw().length);
-        Assert.assertArrayEquals(keyBytes, result.getRow());
-
     }
 }
