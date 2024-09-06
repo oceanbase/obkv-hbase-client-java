@@ -1218,23 +1218,15 @@ public class OHTable implements HTableInterface {
 
     private byte[] buildCheckAndMutateFilterString(byte[] family, byte[] qualifier, byte[] value) throws IOException {
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        byteStream.write("CheckAndMutateFilter(=, 'binary:".getBytes());
+        writeBytesWithEscape(byteStream, value);
+        byteStream.write("', '".getBytes());
+        writeBytesWithEscape(byteStream, family);
+        byteStream.write("', '".getBytes());
+        writeBytesWithEscape(byteStream, qualifier);
         if (value != null) {
-            byteStream.write("CheckAndMutateFilter(=, 'binary:".getBytes());
-            writeBytesWithEscape(byteStream, value);
-            byteStream.write("', '".getBytes());
-            writeBytesWithEscape(byteStream, family);
-            byteStream.write("', '".getBytes());
-            if (qualifier != null) {
-                writeBytesWithEscape(byteStream, qualifier);
-            }
             byteStream.write("', false)".getBytes());
         } else {
-            byteStream.write("CheckAndMutateFilter(=, 'binary:', '".getBytes());
-            writeBytesWithEscape(byteStream, family);
-            byteStream.write("', '".getBytes());
-            if (qualifier != null) {
-                writeBytesWithEscape(byteStream, qualifier);
-            }
             byteStream.write("', true)".getBytes());
         }
         return byteStream.toByteArray();

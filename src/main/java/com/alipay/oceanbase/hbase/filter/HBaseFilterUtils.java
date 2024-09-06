@@ -217,6 +217,9 @@ public class HBaseFilterUtils {
     // when write family/qualifier/value/row into hbase filter, need add escape for
     // special character to prevent parse error in server
     public static void writeBytesWithEscape(ByteArrayOutputStream byteStream, byte[] bytes) throws IOException {
+        if (bytes == null) {
+            return;
+        }
         for (int i = 0; i < bytes.length; i++) {
             if (bytes[i] == '\'') {
                 byteStream.write('\'');
