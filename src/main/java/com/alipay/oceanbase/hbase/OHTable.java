@@ -515,11 +515,10 @@ public class OHTable implements HTableInterface {
                             scan.setCaching(1);
                             scan.setReversed(true);
                             obTableQuery = buildObTableQuery(filter, scan);
-                            obTableQuery.setObKVParams(buildOBKVParams(scan));
                         } else {
                             obTableQuery = buildObTableQuery(filter, get.getRow(), true,
                                 get.getRow(), true);
-                            obTableQuery.setObKVParams(buildOBKVParams(get));
+                            obTableQuery.setHBaseParams(buildObHBaseParams(get));
                         }
                         request = buildObTableQueryRequest(obTableQuery,
                             getTargetTableName(tableNameString));
@@ -538,11 +537,10 @@ public class OHTable implements HTableInterface {
                                 scan.setCaching(1);
                                 scan.setReversed(true);
                                 obTableQuery = buildObTableQuery(filter, scan);
-                                obTableQuery.setObKVParams(buildOBKVParams(scan));
                             } else {
                                 obTableQuery = buildObTableQuery(filter, get.getRow(), true,
                                     get.getRow(), true);
-                                obTableQuery.setObKVParams(buildOBKVParams(get));
+                                obTableQuery.setHBaseParams(buildObHBaseParams(get));
                             }
                             request = buildObTableQueryRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family)));
@@ -709,8 +707,7 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    private ObKVParams buildOBKVParams(final Scan scan) {
-        ObKVParams obKVParams = new ObKVParams();
+    private ObHBaseParams buildObHBaseParams(final Scan scan) {
         ObHBaseParams obHBaseParams = new ObHBaseParams();
         if (scan != null) {
             obHBaseParams.setCaching(scan.getCaching());
@@ -718,17 +715,14 @@ public class OHTable implements HTableInterface {
             obHBaseParams.setCacheBlock(scan.isGetScan());
             obHBaseParams.setAllowPartialResults(scan.getAllowPartialResults());
         }
-        obKVParams.setObParamsBase(obHBaseParams);
-        return obKVParams;
+        return obHBaseParams;
     }
 
-    private ObKVParams buildOBKVParams(final Get get) {
-        ObKVParams obKVParams = new ObKVParams();
+    private ObHBaseParams buildObHBaseParams(final Get get) {
         ObHBaseParams obHBaseParams = new ObHBaseParams();
         obHBaseParams.setCheckExistenceOnly(get.isCheckExistenceOnly());
         obHBaseParams.setCacheBlock(get.getCacheBlocks());
-        obKVParams.setObParamsBase(obHBaseParams);
-        return obKVParams;
+        return obHBaseParams;
     }
 
     /**
@@ -1471,7 +1465,7 @@ public class OHTable implements HTableInterface {
         obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize()
             : configuration.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
                 HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
-        obTableQuery.setObKVParams(buildOBKVParams(scan));
+        obTableQuery.setHBaseParams(buildObHBaseParams(scan));
         return obTableQuery;
     }
 
