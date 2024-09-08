@@ -61,6 +61,7 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -442,12 +443,21 @@ public class OHTable implements HTableInterface {
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
                 try {
-                    if (get.getFamilyMap() == null || get.getFamilyMap().size() != 1) {
+                    if (get.getFamilyMap() == null || get.getFamilyMap().size() >= 1 || get.getFamilyMap().keySet().size() == 0) {
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                                 .entrySet()) {
-                            for (int i = 0; i < entry.getValue().size(); i++) {
-                                columnFilters.add((byte[]) entry.getValue().toArray()[i]);
+                            if (entry.getValue() != null) {
+                                for (int i = 0; i < entry.getValue().size(); i++) {
+                                    byte[] column_name = (byte[]) entry.getValue().toArray()[i];
+                                    String column_name_str = Bytes.toString(column_name);
+                                    column_name_str = Bytes.toString(entry.getKey()) + "$" + column_name_str;
+                                    columnFilters.add(column_name_str.getBytes());
+                                }
+                            } else {
+                                String column_name_str = "";
+                                column_name_str = Bytes.toString(entry.getKey()) + "$" + column_name_str;
+                                columnFilters.add(column_name_str.getBytes());
                             }
                         }
                         
@@ -536,8 +546,17 @@ public class OHTable implements HTableInterface {
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                                 .entrySet()) {
-                            for (int i = 0; i < entry.getValue().size(); i++) {
-                                columnFilters.add((byte[]) entry.getValue().toArray()[i]);
+                            if (entry.getValue() != null) {
+                                for (int i = 0; i < entry.getValue().size(); i++) {
+                                    byte[] column_name = (byte[]) entry.getValue().toArray()[i];
+                                    String column_name_str = Bytes.toString(column_name);
+                                    column_name_str = Bytes.toString(entry.getKey()) + "$" + column_name_str;
+                                    columnFilters.add(column_name_str.getBytes());
+                                }
+                            } else {
+                                String column_name_str = "";
+                                column_name_str = Bytes.toString(entry.getKey()) + "$" + column_name_str;
+                                columnFilters.add(column_name_str.getBytes());
                             }
                         }
                         
@@ -692,7 +711,6 @@ public class OHTable implements HTableInterface {
                     .iterator().next().getValue(), false, null);
                 results = batch.execute();
             } else if (delete.getFamilyMap().size() > 1) {
-
                 BatchOperation batch = buildBatchOperation(tableNameString, delete.getFamilyMap(),
                     false, null);
                 results = batch.execute();
@@ -961,7 +979,6 @@ public class OHTable implements HTableInterface {
                 for (int i = 0; i < writeBuffer.size(); i++) {
                     Put aPut = writeBuffer.get(i);
                     Map<byte[], List<KeyValue>> innerFamilyMap = aPut.getFamilyMap();
-
                     if (innerFamilyMap.size() > 1) {
                         // Bypass logic: directly construct BatchOperation for puts with family map size > 1  
                         try {
@@ -1029,8 +1046,13 @@ public class OHTable implements HTableInterface {
                 }
 
             } finally {
+                // mutate list so that it is empty for complete success, or contains
+                // only failed records results are returned in the same order as the
+                // requests in list walk the list backwards, so we can remove from list
+                // without impacting the indexes of earlier members
                 for (int i = resultSuccess.length - 1; i >= 0; i--) {
                     if (resultSuccess[i]) {
+                        // successful Puts are removed from the list here.
                         writeBuffer.remove(i);
                     }
                 }
@@ -1040,6 +1062,7 @@ public class OHTable implements HTableInterface {
                 writeBuffer.clear();
                 currentWriteBufferSize = 0;
             } else {
+                // the write buffer was adjusted by processBatchOfPuts
                 currentWriteBufferSize = 0;
                 for (Put aPut : writeBuffer) {
                     currentWriteBufferSize += aPut.heapSize();
@@ -1513,14 +1536,6 @@ public class OHTable implements HTableInterface {
     }
 
     private void checkFamilyViolation(Collection<byte[]> families) {
-        //        if (families == null || families.size() == 0) {
-        //            throw new FeatureNotSupportedException("family is empty.");
-        //        }
-
-        //        if (families.size() > 1) {
-        //            throw new FeatureNotSupportedException("multi family is not supported yet.");
-        //        }
-
         for (byte[] family : families) {
             if (isBlank(Bytes.toString(family))) {
                 throw new IllegalArgumentException("family is blank");
