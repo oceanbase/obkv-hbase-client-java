@@ -711,9 +711,28 @@ public class OHTable implements HTableInterface {
                     .iterator().next().getValue(), false, null);
                 results = batch.execute();
             } else if (delete.getFamilyMap().size() > 1) {
-                BatchOperation batch = buildBatchOperation(tableNameString, delete.getFamilyMap(),
-                    false, null);
-                results = batch.execute();
+                // TODO: delete family 当前不好支持多cf原子执行, 转化为单表操作
+                boolean has_delete_family = false;
+                for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
+                    for (KeyValue kv : entry.getValue()) {
+                        if (KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily) {
+                            has_delete_family = true;
+                            break;
+                        }
+                    }
+                }
+                if (!has_delete_family) {
+                    BatchOperation batch = buildBatchOperation(tableNameString, delete.getFamilyMap(),
+                            false, null);
+                    results = batch.execute();
+                } else {
+                    for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
+                        BatchOperation batch = buildBatchOperation(
+                                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                                entry.getValue(), false, null);
+                        results = batch.execute();
+                    }
+                }
             } else {
                 Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet()
                     .iterator().next();
@@ -1369,6 +1388,40 @@ public class OHTable implements HTableInterface {
         return obTableQuery;
     }
 
+    private KeyValue modifyQualifier(KeyValue original, byte[] newQualifier) {
+        // Extract existing components  
+        byte[] row = original.getRow();
+        byte[] family = original.getFamily();
+        byte[] value = original.getValue();
+        long timestamp = original.getTimestamp();
+        byte type = original.getTypeByte();
+        // Create a new KeyValue with the modified qualifier  
+        return new KeyValue(row, family, newQualifier, timestamp, KeyValue.Type.codeToType(type),
+            value);
+    }
+
+    private BatchOperation buildBatchOperation(String tableName,
+                                               Map<byte[], List<KeyValue>> familyMap,
+                                               boolean putToAppend, List<byte[]> qualifiers) {
+        BatchOperation batch = obTableClient.batchOperation(tableName);
+
+        for (Map.Entry<byte[], List<KeyValue>> entry : familyMap.entrySet()) {
+            byte[] family = entry.getKey();
+            List<KeyValue> keyValueList = entry.getValue();
+            for (KeyValue kv : keyValueList) {
+                if (qualifiers != null) {
+                    qualifiers.add(kv.getQualifier());
+                }
+                KeyValue new_kv = modifyQualifier(kv,
+                    (Bytes.toString(family) + "$" + Bytes.toString(kv.getQualifier())).getBytes());
+                batch.addOperation(buildMutation(new_kv, putToAppend));
+            }
+        }
+
+        batch.setEntityType(ObTableEntityType.HKV);
+        return batch;
+    }
+
     private ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
                                                              boolean putToAppend,
                                                              List<byte[]> qualifiers) {
@@ -1378,6 +1431,29 @@ public class OHTable implements HTableInterface {
                 qualifiers.add(kv.getQualifier());
             }
             batch.addTableOperation(buildObTableOperation(kv, putToAppend));
+        }
+        batch.setSameType(true);
+        batch.setSamePropertiesNames(true);
+        return batch;
+    }
+
+    private ObTableBatchOperation buildObTableBatchOperation(Map<byte[], List<KeyValue>> familyMap,
+                                                             boolean putToAppend,
+                                                             List<byte[]> qualifiers) {
+        ObTableBatchOperation batch = new ObTableBatchOperation();
+        for (Map.Entry<byte[], List<KeyValue>> entry : familyMap.entrySet()) {
+            byte[] family = entry.getKey();
+            List<KeyValue> keyValueList = entry.getValue();
+            for (KeyValue kv : keyValueList) {
+                if (qualifiers != null) {
+                    qualifiers
+                        .add((Bytes.toString(family) + "$" + Bytes.toString(kv.getQualifier()))
+                            .getBytes());
+                }
+                KeyValue new_kv = modifyQualifier(kv,
+                    (Bytes.toString(family) + "$" + Bytes.toString(kv.getQualifier())).getBytes());
+                batch.addTableOperation(buildObTableOperation(new_kv, putToAppend));
+            }
         }
         batch.setSameType(true);
         batch.setSamePropertiesNames(true);
@@ -1424,40 +1500,6 @@ public class OHTable implements HTableInterface {
             }
             batch.addOperation(buildMutation(kv, putToAppend));
         }
-        batch.setEntityType(ObTableEntityType.HKV);
-        return batch;
-    }
-
-    private KeyValue modifyQualifier(KeyValue original, byte[] newQualifier) {
-        // Extract existing components  
-        byte[] row = original.getRow();
-        byte[] family = original.getFamily();
-        byte[] value = original.getValue();
-        long timestamp = original.getTimestamp();
-        byte type = original.getTypeByte();
-        // Create a new KeyValue with the modified qualifier  
-        return new KeyValue(row, family, newQualifier, timestamp, KeyValue.Type.codeToType(type),
-            value);
-    }
-
-    private BatchOperation buildBatchOperation(String tableName,
-                                               Map<byte[], List<KeyValue>> familyMap,
-                                               boolean putToAppend, List<byte[]> qualifiers) {
-        BatchOperation batch = obTableClient.batchOperation(tableName);
-
-        for (Map.Entry<byte[], List<KeyValue>> entry : familyMap.entrySet()) {
-            byte[] family = entry.getKey();
-            List<KeyValue> keyValueList = entry.getValue();
-            for (KeyValue kv : keyValueList) {
-                if (qualifiers != null) {
-                    qualifiers.add(kv.getQualifier());
-                }
-                KeyValue new_kv = modifyQualifier(kv,
-                    (Bytes.toString(family) + "$" + Bytes.toString(kv.getQualifier())).getBytes());
-                batch.addOperation(buildMutation(new_kv, putToAppend));
-            }
-        }
-
         batch.setEntityType(ObTableEntityType.HKV);
         return batch;
     }
