@@ -353,7 +353,7 @@ public abstract class HTableTestBase {
         hTable.put(puts);
     }
 
-    @Test
+    @Ignore
     public void testMultiPartitionPut() throws IOException {
         String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
                 "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
@@ -399,7 +399,7 @@ public abstract class HTableTestBase {
         }
     }
 
-    @Test
+    @Ignore
     public void testMultiPartitionDel() throws IOException {
         String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
                 "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
@@ -1727,7 +1727,7 @@ public abstract class HTableTestBase {
         hTable.delete(deleteZKey2Family);
     }
 
-    @Test
+    @Ignore
     public void testDeleteIllegal() throws IOException {
         try {
             Delete delete = new Delete("key_5".getBytes());

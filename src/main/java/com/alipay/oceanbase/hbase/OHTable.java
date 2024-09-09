@@ -37,9 +37,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
-import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
@@ -61,7 +59,6 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.slf4j.Logger;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -427,7 +424,7 @@ public class OHTable implements HTableInterface {
     }
 
     public Result get(final Get get) throws IOException {
-        if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().size() == 0) {
+        if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
             checkFamilyViolation(get.getFamilyMap().keySet());
@@ -443,7 +440,9 @@ public class OHTable implements HTableInterface {
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
                 try {
-                    if (get.getFamilyMap() == null || get.getFamilyMap().size() >= 1 || get.getFamilyMap().keySet().size() == 0) {
+                    if (get.getFamilyMap() == null 
+                        || get.getFamilyMap().size() > 1
+                        || get.getFamilyMap().keySet().isEmpty()) {
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                                 .entrySet()) {
@@ -541,7 +540,7 @@ public class OHTable implements HTableInterface {
                 ObHTableFilter filter;
                 try {
                     if (scan.getFamilyMap().keySet() == null
-                        || scan.getFamilyMap().keySet().size() == 0
+                        || scan.getFamilyMap().keySet().isEmpty()
                         || scan.getFamilyMap().size() > 1) {
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
@@ -722,14 +721,14 @@ public class OHTable implements HTableInterface {
                     }
                 }
                 if (!has_delete_family) {
-                    BatchOperation batch = buildBatchOperation(tableNameString, delete.getFamilyMap(),
-                            false, null);
+                    BatchOperation batch = buildBatchOperation(tableNameString,
+                        delete.getFamilyMap(), false, null);
                     results = batch.execute();
                 } else {
                     for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         BatchOperation batch = buildBatchOperation(
-                                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
-                                entry.getValue(), false, null);
+                            getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                            entry.getValue(), false, null);
                         results = batch.execute();
                     }
                 }
@@ -795,7 +794,7 @@ public class OHTable implements HTableInterface {
 
             ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
 
-            checkFamilyViolation(mutation.getFamilyMap().keySet());
+            checkFamilyViolationForOneFamily(mutation.getFamilyMap().keySet());
             // only one family operation is allowed
             Map.Entry<byte[], List<KeyValue>> entry = mutation.getFamilyMap().entrySet().iterator()
                 .next();
@@ -833,7 +832,7 @@ public class OHTable implements HTableInterface {
      */
     public Result append(Append append) throws IOException {
 
-        checkFamilyViolation(append.getFamilyMap().keySet());
+        checkFamilyViolationForOneFamily(append.getFamilyMap().keySet());
         checkArgument(!append.isEmpty(), "append is empty.");
         try {
             byte[] r = append.getRow();
@@ -881,7 +880,7 @@ public class OHTable implements HTableInterface {
      */
     public Result increment(Increment increment) throws IOException {
 
-        checkFamilyViolation(increment.getFamilyMap().keySet());
+        checkFamilyViolationForOneFamily(increment.getFamilyMap().keySet());
 
         try {
             List<byte[]> qualifiers = new ArrayList<byte[]>();
@@ -1583,7 +1582,22 @@ public class OHTable implements HTableInterface {
                 throw new IllegalArgumentException("family is blank");
             }
         }
+    }
 
+    // TOOD: 多列族做完后删掉，使用上面的方法
+    private void checkFamilyViolationForOneFamily(Collection<byte[]> families) {
+        if (families == null || families.size() == 0) {
+            throw new FeatureNotSupportedException("family is empty.");
+        }
+
+        if (families.size() > 1) {
+            throw new FeatureNotSupportedException("multi family is not supported yet.");
+        }
+        for (byte[] family : families) {
+            if (isBlank(Bytes.toString(family))) {
+                throw new IllegalArgumentException("family is blank");
+            }
+        }
     }
 
     public void refreshTableEntry(String familyString, boolean hasTestLoad) throws Exception {
