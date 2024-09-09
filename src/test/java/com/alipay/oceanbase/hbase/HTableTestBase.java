@@ -2874,4 +2874,12 @@ public abstract class HTableTestBase {
     public void testHtableWithIndex() throws Exception {
         testBasic("family_with_local_index");
     }
+
+    private static String generateRandomStringByUUID(int times) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < times; i++) {
+            sb.append(UUID.randomUUID().toString().replaceAll("-", ""));
+        }
+        return sb.toString();
+    }
 }
