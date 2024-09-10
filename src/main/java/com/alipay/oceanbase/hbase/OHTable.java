@@ -411,6 +411,7 @@ public class OHTable implements HTableInterface {
                 (byte[]) row.get(3).getValue()//  V
             );
             keyValueList.add(kv);
+            keyValueList.sort(KeyValue.COMPARATOR);
         }
     }
 
@@ -711,15 +712,9 @@ public class OHTable implements HTableInterface {
                 results = batch.execute();
             } else if (delete.getFamilyMap().size() > 1) {
                 // TODO: delete family 当前不好支持多cf原子执行, 转化为单表操作
-                boolean has_delete_family = false;
-                for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
-                    for (KeyValue kv : entry.getValue()) {
-                        if (KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily) {
-                            has_delete_family = true;
-                            break;
-                        }
-                    }
-                }
+                boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
+                        .flatMap(entry -> entry.getValue().stream())
+                        .anyMatch(kv -> KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily);
                 if (!has_delete_family) {
                     BatchOperation batch = buildBatchOperation(tableNameString,
                         delete.getFamilyMap(), false, null);
@@ -1284,7 +1279,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filter != null) {
-            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter));
+            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter).getBytes());
         }
 
         if (timeRange != null) {
@@ -1322,7 +1317,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filterString != null) {
-            obHTableFilter.setFilterString(filterString);
+            obHTableFilter.setFilterString(filterString.getBytes());
         }
 
         if (timeRange != null) {
