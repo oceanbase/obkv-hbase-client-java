@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -35,6 +36,7 @@ import sun.awt.image.ImageWatched;
 import javax.ws.rs.PUT;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.rmi.UnexpectedException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +49,7 @@ import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.DEL;
+import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 import static org.apache.commons.lang.StringUtils.isBlank;
 
 @InterfaceAudience.Private
@@ -163,13 +166,23 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     boolean validateSameFamily(List<? extends Mutation> mutations) {
+        byte[] family = null;
+        if (asyncWriteBuffer.isEmpty()) {
+            family = asyncWriteBuffer.peek().getFamilyMap().firstKey();
+        }
         for (Mutation mutation : mutations) {
-            if (mutation.getFamilyMap().keySet() == null
-                    || mutation.getFamilyMap().keySet().size() == 0) {
+            if (mutation.getFamilyMap() == null
+                    || mutation.getFamilyMap().keySet().isEmpty()) {
                 throw new IllegalArgumentException("Family is not provided in batch operations.");
             }
             if (mutation.getFamilyMap().keySet().size() > 1) {
                 return false;
+            }
+            if (family != null) {
+                byte[] curFamily = mutation.getFamilyMap().firstKey();
+                if (!Bytes.equals(family, curFamily)) {
+                    return false;
+                }
             }
         }
         return true;
@@ -186,26 +199,39 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private void asyncExecute(boolean flushAll) throws
             InterruptedIOException,
             RetriesExhaustedWithDetailsException {
-        while (true) {
-            if (!flushAll && currentAsyncBufferSize.get() <= writeBufferSize) {
-                // There is the room to accept more mutations.
-                break;
-            }
-            try {
+        try {
+            while (true) {
+                if (!flushAll && currentAsyncBufferSize.get() <= writeBufferSize) {
+                    // There is the room to accept more mutations.
+                    break;
+                }
                 // namespace n1, n1:table_name
                 // namespace default, table_name
                 String tableNameString = tableName.getNameAsString();
-                Map.Entry<byte[], List<KeyValue>> entry = asyncWriteBuffer.peek().getFamilyMap().entrySet().iterator().next();
-                byte[] family = entry.getKey();
+                // for now, operations' family is the same
+                byte[] family = asyncWriteBuffer.peek().getFamilyMap().firstKey();
                 ObTableBatchOperation batch = buildObTableBatchOperation(asyncWriteBuffer);
                 String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
                 ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch, targetTableName, pool);
                 ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
-            } catch (Exception ex) {
-
+            }
+        } catch (Exception ex) {
+            LOGGER.error(LCD.convert("01-00026"), ex);
+            // TODO: need to collect error information and actions during batch operations
+            // TODO: maybe keep in ObTableBatchOperationResult
+            List<Throwable> throwables = new ArrayList<Throwable>();
+            List<Row> actions = new ArrayList<Row>();
+            List<String> addresses = new ArrayList<String>();
+            throwables.add(ex);
+            RetriesExhaustedWithDetailsException error = new RetriesExhaustedWithDetailsException(
+                    new ArrayList<Throwable>(throwables),
+                    new ArrayList<Row>(actions), new ArrayList<String>(addresses));
+            if (listener == null) {
+                throw error;
+            } else {
+                listener.onException(error, this);
             }
         }
-
     }
 
     @Override
@@ -313,6 +339,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         request.setEntityType(ObTableEntityType.HKV);
         request.setBatchOperation(obTableBatchOperation);
         request.setPool(pool);
+        request.setTimeout(rpcTimeout);
         return request;
     }
 
