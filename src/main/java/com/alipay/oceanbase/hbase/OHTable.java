@@ -59,7 +59,6 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-import org.checkerframework.checker.units.qual.A;
 import org.slf4j.Logger;
 
 import java.io.IOException;
