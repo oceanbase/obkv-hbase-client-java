@@ -277,6 +277,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
         return ohTable.getRowOrBefore(row, family);
     }
 
+    public List<ResultScanner> getScanners(Scan scan) throws IOException {
+        checkStatus();
+        return ohTable.getScanners(scan);
+    }
+
     @Override
     public ResultScanner getScanner(Scan scan) throws IOException {
         checkStatus();
