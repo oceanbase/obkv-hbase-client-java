@@ -55,7 +55,7 @@ import static org.apache.commons.lang.StringUtils.isBlank;
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
     private static final Logger LOGGER     = TableHBaseLoggerFactory
-            .getLogger(OHConnectionImpl.class);
+                                                            .getLogger(OHBufferedMutatorImpl.class);
 
     private static final int  BUFFERED_PARAM_UNSET = -1;
 
