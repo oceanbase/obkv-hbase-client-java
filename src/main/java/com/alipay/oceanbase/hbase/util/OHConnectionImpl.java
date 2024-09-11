@@ -69,6 +69,10 @@ public class OHConnectionImpl implements Connection {
         return this.conf;
     }
 
+    public OHConnectionConfiguration getOHConnectionConfiguration() {
+        return this.connectionConfig;
+    }
+
     private ExecutorService getBatchPool() {
         if (batchPool == null) {
             synchronized (this) {
