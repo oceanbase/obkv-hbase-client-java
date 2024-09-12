@@ -71,13 +71,12 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     @VisibleForTesting
     AtomicLong currentAsyncBufferSize = new AtomicLong(0);
 
-    private long writeBufferSize;
+    private final long writeBufferSize;
     private final int maxKeyValueSize;
     private boolean closed = false;
     private final ExecutorService pool;
-    private int rpcTimeout;
-    private int operationTimeout;
-    private final boolean cleanupPoolOnClose;
+    private final int rpcTimeout;
+    private final int operationTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params) throws IOException {
         if (ohConnection == null || ohConnection.isClosed()) {
@@ -92,20 +91,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.conf = ohConnection.getConfiguration();
         this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
-
-        if (params.getPool() == null) {
-            this.pool = HTable.getDefaultExecutor(ohConnection.getConfiguration());
-            this.cleanupPoolOnClose = true;
-        } else {
-            this.pool = params.getPool();
-            this.cleanupPoolOnClose = false;
-        }
+        this.pool = params.getPool();
 
         this.writeBufferSize = params.getWriteBufferSize() != BUFFERED_PARAM_UNSET ?
                 params.getWriteBufferSize() : connectionConfig.getWriteBufferSize();
         this.maxKeyValueSize = params.getMaxKeyValueSize() != BUFFERED_PARAM_UNSET ?
                 params.getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
         this.rpcTimeout = connectionConfig.getRpcTimeout();
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
         this.operationTimeout = connectionConfig.getOperationTimeout();
     }
 
@@ -119,20 +112,28 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return this.conf;
     }
 
+    /**
+     * Add the mutation into asyncWriteBuffer
+     *
+     * @param mutation - mutation operation
+     */
     @Override
     public void mutate(Mutation mutation) throws InterruptedIOException,
     RetriesExhaustedWithDetailsException {
-        // convert mutation into list, use the interface below
         mutate(Collections.singletonList(mutation));
     }
 
-    // only support for Put and Delete for 1.x
+    /**
+     * Add all mutations in List into asyncWriteBuffer
+     *
+     * @param mutations - mutation operations
+     */
     @Override
     public void mutate(List<? extends Mutation> mutations) throws InterruptedIOException,
             RetriesExhaustedWithDetailsException {
         // add the mutations into writeAsyncBuffer
         // atomically add size of mutations into currentWriteBufferSize
-        // do the flush/backgroundFlushCommits if currentWriteBufferSize > writeBufferSize
+        // do the flush if currentWriteBufferSize > writeBufferSize
         if (closed) {
             throw new IllegalStateException("Cannot put when the BufferedMutator is closed.");
         }
@@ -140,7 +141,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         long toAddSize = 0;
         // check if every mutation's family is the same
         if (!validateSameFamily(mutations)) {
-            throw new IllegalStateException("Family should keep the same in one batch.");
+            throw new IllegalArgumentException("Family should keep the same in one batch.");
         }
         for (Mutation m : mutations) {
             if (!validateInsUpAndDelete(m)) {
@@ -158,6 +159,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         asyncExecute(false);
     }
 
+    /**
+     * Check whether the mutation is Put or Delete in 1.x
+     * @param mt - mutation operation
+     */
     boolean validateInsUpAndDelete(Mutation mt) {
         if (!(mt instanceof Put) && !(mt instanceof Delete)) {
             return false;
@@ -165,9 +170,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return true;
     }
 
+    /**
+     * Check whether the family in this batch is the same
+     * @param mutations - mutation operations
+     */
     boolean validateSameFamily(List<? extends Mutation> mutations) {
         byte[] family = null;
-        if (asyncWriteBuffer.isEmpty()) {
+        if (!asyncWriteBuffer.isEmpty()) {
             family = asyncWriteBuffer.peek().getFamilyMap().firstKey();
         }
         for (Mutation mutation : mutations) {
@@ -190,8 +199,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     /**
      * Send the operations in the buffer to the servers. Does not wait for the server's answer. If
-     * the is an error (max retried reach from a previous flush or bad operation), it tries to send
-     * all operations in the buffer and sends an exception.
+     * there is an error, either throw the error, or use the listener to deal with the error.
      *
      * @param flushAll - if true, sends all the writes and wait for all of them to finish before
      *        returning.
@@ -201,16 +209,30 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             RetriesExhaustedWithDetailsException {
         try {
             while (true) {
-                if (!flushAll && currentAsyncBufferSize.get() <= writeBufferSize) {
-                    // There is the room to accept more mutations.
+                if (!flushAll || asyncWriteBuffer.isEmpty()) {
+                    if (currentAsyncBufferSize.get() <= writeBufferSize) {
+                        break;
+                    }
+                }
+                Mutation m;
+                LinkedList<Mutation> execBuffer = new LinkedList<>();
+                while ((m = asyncWriteBuffer.poll()) != null) {
+                    execBuffer.add(m);
+                    long size = m.heapSize();
+                    currentAsyncBufferSize.addAndGet(-size);
+                }
+                // in concurrent situation, asyncWriteBuffer may be empty here
+                // for other threads flush all buffer
+                if (execBuffer.isEmpty()) {
                     break;
                 }
                 // namespace n1, n1:table_name
                 // namespace default, table_name
                 String tableNameString = tableName.getNameAsString();
                 // for now, operations' family is the same
-                byte[] family = asyncWriteBuffer.peek().getFamilyMap().firstKey();
-                ObTableBatchOperation batch = buildObTableBatchOperation(asyncWriteBuffer);
+                byte[] family = execBuffer.getFirst().getFamilyMap().firstKey();
+                ObTableBatchOperation batch = buildObTableBatchOperation(execBuffer);
+                // table_name$cf_name
                 String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
                 ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch, targetTableName, pool);
                 ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
@@ -242,21 +264,22 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         try {
             asyncExecute(true);
         } finally {
-            if (cleanupPoolOnClose) {
-                this.pool.shutdown();
-                try {
-                    if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
-                        LOGGER.warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
-                    }
-                } catch (InterruptedException e) {
-                    LOGGER.warn("waitForTermination interrupted");
-                    Thread.currentThread().interrupt();
+            this.pool.shutdown();
+            try {
+                if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
+                    LOGGER.warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
                 }
+            } catch (InterruptedException e) {
+                LOGGER.warn("waitForTermination interrupted");
+                Thread.currentThread().interrupt();
             }
             closed = true;
         }
     }
 
+    /**
+     * Force to commit all operations
+     */
     @Override
     public void flush() throws IOException {
         if (closed) {
@@ -270,14 +293,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return this.writeBufferSize;
     }
 
-    private ObTableBatchOperation buildObTableBatchOperation(ConcurrentLinkedQueue<Mutation> asyncWriteBuffer) {
-        LinkedList<Mutation> execBuffer = new LinkedList<>();
-        Mutation m;
-        while ((m = asyncWriteBuffer.poll()) != null) {
-            execBuffer.add(m);
-            long size = m.heapSize();
-            currentAsyncBufferSize.addAndGet(-size);
-        }
+    private ObTableBatchOperation buildObTableBatchOperation(LinkedList<Mutation> execBuffer) {
         List<KeyValue> keyValueList = new LinkedList<>();
         for (Mutation mutation : execBuffer) {
             checkFamilyViolation(mutation.getFamilyMap().keySet());
@@ -339,7 +355,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         request.setEntityType(ObTableEntityType.HKV);
         request.setBatchOperation(obTableBatchOperation);
         request.setPool(pool);
-        request.setTimeout(rpcTimeout);
         return request;
     }
 
