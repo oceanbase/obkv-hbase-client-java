@@ -21,13 +21,15 @@ import java.util.concurrent.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHBufferedMutatorTest {
-    protected Table hTable;
-    protected  Configuration conf;
+    protected Table         hTable;
+    protected Configuration conf;
+
     @Before
     public void setup() throws IOException {
         conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
     }
+
     /*
     CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
     CREATE TABLE `test$family_group` (

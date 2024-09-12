@@ -54,36 +54,38 @@ import static org.apache.commons.lang.StringUtils.isBlank;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
-    private static final Logger LOGGER     = TableHBaseLoggerFactory
-                                                            .getLogger(OHBufferedMutatorImpl.class);
+    private static final Logger             LOGGER                 = TableHBaseLoggerFactory
+                                                                       .getLogger(OHBufferedMutatorImpl.class);
 
-    private static final int  BUFFERED_PARAM_UNSET = -1;
+    private static final int                BUFFERED_PARAM_UNSET   = -1;
 
-    private final ExceptionListener listener;
+    private final ExceptionListener         listener;
 
-    protected final ObTableClient obTableClient;
-    private final TableName tableName;
-    private volatile Configuration conf;
+    protected final ObTableClient           obTableClient;
+    private final TableName                 tableName;
+    private volatile Configuration          conf;
     private final OHConnectionConfiguration connectionConfig;
 
     @VisibleForTesting
-    final ConcurrentLinkedQueue<Mutation> asyncWriteBuffer = new ConcurrentLinkedQueue<Mutation>();
+    final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
     @VisibleForTesting
-    AtomicLong currentAsyncBufferSize = new AtomicLong(0);
+    AtomicLong                              currentAsyncBufferSize = new AtomicLong(0);
 
-    private final long writeBufferSize;
-    private final int maxKeyValueSize;
-    private boolean closed = false;
-    private final ExecutorService pool;
-    private final int rpcTimeout;
-    private final int operationTimeout;
+    private final long                      writeBufferSize;
+    private final int                       maxKeyValueSize;
+    private boolean                         closed                 = false;
+    private final ExecutorService           pool;
+    private final int                       rpcTimeout;
+    private final int                       operationTimeout;
 
-    public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params) throws IOException {
+    public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
+                                                                                             throws IOException {
         if (ohConnection == null || ohConnection.isClosed()) {
             throw new IllegalArgumentException("Connection is null or closed.");
         }
         // create a ObTableClient to do rpc operations
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(ohConnection.getOHConnectionConfiguration());
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(ohConnection
+            .getOHConnectionConfiguration());
 
         // init params in OHBufferedMutatorImpl:
         // TableName + pool + Configuration + listener + writeBufferSize + maxKeyValueSize + rpcTimeout + operationTimeout
@@ -93,10 +95,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.listener = params.getListener();
         this.pool = params.getPool();
 
-        this.writeBufferSize = params.getWriteBufferSize() != BUFFERED_PARAM_UNSET ?
-                params.getWriteBufferSize() : connectionConfig.getWriteBufferSize();
-        this.maxKeyValueSize = params.getMaxKeyValueSize() != BUFFERED_PARAM_UNSET ?
-                params.getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
+        this.writeBufferSize = params.getWriteBufferSize() != BUFFERED_PARAM_UNSET ? params
+            .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
+        this.maxKeyValueSize = params.getMaxKeyValueSize() != BUFFERED_PARAM_UNSET ? params
+            .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
         this.operationTimeout = connectionConfig.getOperationTimeout();
@@ -119,7 +121,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     @Override
     public void mutate(Mutation mutation) throws InterruptedIOException,
-    RetriesExhaustedWithDetailsException {
+                                         RetriesExhaustedWithDetailsException {
         mutate(Collections.singletonList(mutation));
     }
 
@@ -130,7 +132,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     @Override
     public void mutate(List<? extends Mutation> mutations) throws InterruptedIOException,
-            RetriesExhaustedWithDetailsException {
+                                                          RetriesExhaustedWithDetailsException {
         // add the mutations into writeAsyncBuffer
         // atomically add size of mutations into currentWriteBufferSize
         // do the flush if currentWriteBufferSize > writeBufferSize
@@ -180,8 +182,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             family = asyncWriteBuffer.peek().getFamilyMap().firstKey();
         }
         for (Mutation mutation : mutations) {
-            if (mutation.getFamilyMap() == null
-                    || mutation.getFamilyMap().keySet().isEmpty()) {
+            if (mutation.getFamilyMap() == null || mutation.getFamilyMap().keySet().isEmpty()) {
                 throw new IllegalArgumentException("Family is not provided in batch operations.");
             }
             if (mutation.getFamilyMap().keySet().size() > 1) {
@@ -267,7 +268,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             this.pool.shutdown();
             try {
                 if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
-                    LOGGER.warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                    LOGGER
+                        .warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
                 }
             } catch (InterruptedException e) {
                 LOGGER.warn("waitForTermination interrupted");
@@ -330,17 +332,17 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                     operationType = INSERT_OR_UPDATE;
                 }
                 return getInstance(operationType,
-                        new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
-                        new Object[] { kv.getValue() });
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { kv.getValue() });
             case Delete:
                 return getInstance(DEL,
-                        new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
             case DeleteColumn:
                 return getInstance(DEL,
-                        new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null, null);
+                    new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null, null);
             case DeleteFamily:
                 return getInstance(DEL, new Object[] { kv.getRow(), null, -kv.getTimestamp() },
-                        null, null);
+                    null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
@@ -389,7 +391,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     private String getTestLoadTargetTableName(String tableNameString, String familyString) {
         String suffix = conf.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
-                DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+            DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
         return tableNameString + suffix + "$" + familyString;
     }
 
