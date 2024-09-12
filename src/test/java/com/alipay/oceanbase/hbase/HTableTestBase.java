@@ -495,6 +495,7 @@ public abstract class HTableTestBase {
 
         Get get;
         Result r;
+        ColumnPrefixFilter filter;
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
@@ -508,7 +509,15 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey2Column2Value1);
         tryPut(hTable, putKey2Column2Value2);
 
-        ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("a"));
+        filter = new ColumnPrefixFilter(Bytes.toBytes("e"));
+        get = new Get(toBytes(key1));
+        get.setMaxVersions(10);
+        get.addFamily(toBytes(family));
+        get.setFilter(filter);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.raw().length);
+
+        filter = new ColumnPrefixFilter(Bytes.toBytes("a"));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -525,14 +534,6 @@ public abstract class HTableTestBase {
         Assert.assertEquals(4, r.raw().length);
 
         filter = new ColumnPrefixFilter(Bytes.toBytes("b"));
-        get = new Get(toBytes(key1));
-        get.setMaxVersions(10);
-        get.addFamily(toBytes(family));
-        get.setFilter(filter);
-        r = hTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
-
-        filter = new ColumnPrefixFilter(Bytes.toBytes("e"));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -1732,6 +1733,7 @@ public abstract class HTableTestBase {
         Get get;
         Scan scan;
         Result r;
+        ResultScanner scanner;
         int res_count = 0;
 
         tryPut(hTable, putKey1Column1Value1);
@@ -1769,6 +1771,21 @@ public abstract class HTableTestBase {
         //| scanKey3x | column2 | -1709714409977 | value1 |
         //+-----------+---------+----------------+--------+
 
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey1x".getBytes());
+        scan.setStopRow("scanKey3x".getBytes());
+        scan.setMaxVersions(10);
+        scan.setMaxResultsPerColumnFamily(2);
+        scan.setRowOffsetPerColumnFamily(1);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            res_count += result.size();
+        }
+        Assert.assertEquals(3, res_count);
+        scanner.close();
+
         // check insert ok
         get = new Get(toBytes(key1));
         get.addFamily(toBytes(family));
@@ -1790,7 +1807,7 @@ public abstract class HTableTestBase {
         scan.setStartRow("scanKey1x".getBytes());
         scan.setStopRow("scanKey2x".getBytes());
         scan.setMaxVersions(10);
-        ResultScanner scanner = hTable.getScanner(scan);
+        scanner = hTable.getScanner(scan);
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
@@ -1850,23 +1867,6 @@ public abstract class HTableTestBase {
         next = scanner.next();
         assertEquals(7, next.size());
 
-        scanner.close();
-
-        scan = new Scan();
-        scan.addFamily(family.getBytes());
-        scan.setStartRow("scanKey1x".getBytes());
-        scan.setStopRow("scanKey3x".getBytes());
-        scan.setMaxVersions(10);
-        scan.setMaxResultsPerColumnFamily(2);
-        scan.setRowOffsetPerColumnFamily(1);
-        scanner = hTable.getScanner(scan);
-        res_count = 0;
-        for (Result result : scanner) {
-            for (KeyValue keyValue : result.raw()) {
-                res_count += 1;
-            }
-        }
-        Assert.assertEquals(3, res_count);
         scanner.close();
 
         // scan with prefixFilter
