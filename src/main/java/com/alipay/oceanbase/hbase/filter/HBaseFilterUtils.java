@@ -42,6 +42,8 @@ public class HBaseFilterUtils {
             return toParseableString((PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
             return toParseableString((FilterList) filter);
+        } else if (filter instanceof RandomRowFilter) {
+            return toParseableString((RandomRowFilter) filter);
         } else if (filter instanceof ColumnPaginationFilter) {
             return toParseableString((ColumnPaginationFilter) filter);
         } else if (filter instanceof ColumnPrefixFilter) {
@@ -116,6 +118,10 @@ public class HBaseFilterUtils {
 
     private static String toParseableString(PageFilter filter) {
         return filter.getClass().getSimpleName() + '(' + filter.getPageSize() + ')';
+    }
+
+    private static String toParseableString(RandomRowFilter filter) {
+        return filter.getClass().getSimpleName() + "(" + Bytes.toInt(Bytes.toBytes(filter.getChance())) + ")";
     }
 
     private static String toParseableString(ColumnPaginationFilter filter) {
