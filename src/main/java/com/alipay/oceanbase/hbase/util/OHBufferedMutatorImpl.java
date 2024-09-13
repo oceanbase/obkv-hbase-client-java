@@ -168,7 +168,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * Check whether the mutations in this batch are the same type
      * @param execBuffer - mutation operations
      */
-    private void checkAllOpsIsSameType(LinkedList<Mutation> execBuffer) {
+    private void checkAllOpsIsSameType(List<? extends Mutation> execBuffer) {
         Class<?> type = execBuffer.get(0).getClass();
         for (Mutation m : execBuffer) {
             Class<?> curType = m.getClass();
@@ -233,7 +233,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                             // poll elements from execBuffer to recollect remaining operations
                             Mutation m = execBuffer.poll();
                             byte[] family = m.getFamilyMap().firstKey();
-                            ObTableBatchOperation batch = buildObTableBatchOperation(new LinkedList<>(Collections.singletonList(m)));
+                            ObTableBatchOperation batch = buildObTableBatchOperation(Collections.singletonList(m));
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
                             request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName, pool);
                             ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
@@ -305,7 +305,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return this.writeBufferSize;
     }
 
-    private ObTableBatchOperation buildObTableBatchOperation(LinkedList<Mutation> execBuffer) {
+    private ObTableBatchOperation buildObTableBatchOperation(List<? extends Mutation> execBuffer) {
         List<KeyValue> keyValueList = new LinkedList<>();
         for (Mutation mutation : execBuffer) {
             for (Map.Entry<byte[], List<KeyValue>> entry : mutation.getFamilyMap().entrySet()) {
