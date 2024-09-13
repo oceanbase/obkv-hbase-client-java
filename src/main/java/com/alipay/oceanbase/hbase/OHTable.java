@@ -1478,8 +1478,8 @@ public class OHTable implements HTableInterface {
     }
 
     public static ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
-                                                             boolean putToAppend,
-                                                             List<byte[]> qualifiers) {
+                                                                   boolean putToAppend,
+                                                                   List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
         for (KeyValue kv : keyValueList) {
             if (qualifiers != null) {
