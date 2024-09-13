@@ -40,7 +40,7 @@ public class OHConnectionImpl implements Connection {
 
     private static final Marker             FATAL                = MarkerFactory.getMarker("FATAL");
 
-    private static final int                BUFFERED_PARAM_UNSET = -1;
+    public static final int                 BUFFERED_PARAM_UNSET = -1;
 
     private volatile boolean                closed;
     private volatile boolean                aborted;

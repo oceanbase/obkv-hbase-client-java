@@ -1475,9 +1475,9 @@ public class OHTable implements HTableInterface {
         return obTableQuery;
     }
 
-    private ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
-                                                             boolean putToAppend,
-                                                             List<byte[]> qualifiers) {
+    public static ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
+                                                                   boolean putToAppend,
+                                                                   List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
         for (KeyValue kv : keyValueList) {
             if (qualifiers != null) {
@@ -1534,7 +1534,7 @@ public class OHTable implements HTableInterface {
         return batch;
     }
 
-    private ObTableOperation buildObTableOperation(KeyValue kv, boolean putToAppend) {
+    public static ObTableOperation buildObTableOperation(KeyValue kv, boolean putToAppend) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
         switch (kvType) {
             case Put:
@@ -1583,13 +1583,15 @@ public class OHTable implements HTableInterface {
         return asyncRequest;
     }
 
-    private ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,
-                                                                           String targetTableName) {
+    public static ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,
+                                                                                 String targetTableName,
+                                                                                 ExecutorService pool) {
         ObTableBatchOperationRequest request = new ObTableBatchOperationRequest();
         request.setTableName(targetTableName);
         request.setReturningAffectedRows(true);
         request.setEntityType(ObTableEntityType.HKV);
         request.setBatchOperation(obTableBatchOperation);
+        request.setPool(pool);
         return request;
     }
 
@@ -1607,7 +1609,7 @@ public class OHTable implements HTableInterface {
         return request;
     }
 
-    private void checkFamilyViolation(Collection<byte[]> families) {
+    public static void checkFamilyViolation(Collection<byte[]> families) {
         if (families == null || families.size() == 0) {
             throw new FeatureNotSupportedException("family is empty.");
         }
