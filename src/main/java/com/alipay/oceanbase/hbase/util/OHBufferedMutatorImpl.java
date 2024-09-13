@@ -201,8 +201,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                             break;
                         }
                     }
-                    System.out.println("Flush background.");
-                    System.out.println("Threshold: " + writeBufferSize + ", flush size: " + currentAsyncBufferSize.get());
                     Mutation m;
                     while ((m = asyncWriteBuffer.poll()) != null) {
                         execBuffer.add(m);
