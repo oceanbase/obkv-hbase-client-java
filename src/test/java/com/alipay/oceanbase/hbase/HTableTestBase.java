@@ -751,6 +751,65 @@ public abstract class HTableTestBase {
         }
         Assert.assertEquals(res_count, 1);
         scanner.close();
+
+        Put putKey3Column3Value1 = new Put(toBytes("getKey3"));
+        putKey3Column3Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+        tryPut(hTable, putKey3Column3Value1);
+        Put putKey4Column3Value1 = new Put(toBytes("getKey4"));
+        putKey4Column3Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+        tryPut(hTable, putKey4Column3Value1);
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey5".getBytes());
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 30);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey5".getBytes());
+        scan.setMaxVersions(10);
+        RandomRowFilter rf = new RandomRowFilter(-1);
+        scan.setFilter(rf);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 0);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("getKey1".getBytes());
+        scan.setStopRow("getKey5".getBytes());
+        scan.setMaxVersions(10);
+        rf = new RandomRowFilter(2);
+        scan.setFilter(rf);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 30);
+        scanner.close();
     }
 
     @Test
