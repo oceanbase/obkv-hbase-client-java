@@ -40,7 +40,7 @@ public class OHConnectionImpl implements Connection {
 
     private static final Marker             FATAL                = MarkerFactory.getMarker("FATAL");
 
-    private static final int                BUFFERED_PARAM_UNSET = -1;
+    public static final int                 BUFFERED_PARAM_UNSET = -1;
 
     private volatile boolean                closed;
     private volatile boolean                aborted;
@@ -67,6 +67,10 @@ public class OHConnectionImpl implements Connection {
     @Override
     public Configuration getConfiguration() {
         return this.conf;
+    }
+
+    public OHConnectionConfiguration getOHConnectionConfiguration() {
+        return this.connectionConfig;
     }
 
     private ExecutorService getBatchPool() {
