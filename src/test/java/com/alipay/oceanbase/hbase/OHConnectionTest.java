@@ -17,13 +17,20 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Threads;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
@@ -174,4 +181,485 @@ public class OHConnectionTest {
 
     }
 
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
+    @Test
+    public void testBufferedMutatorWithFlush() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator putBufferMutator = null;
+        BufferedMutator delBufferedMutator = null;
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+            // use defualt params
+            putBufferMutator = connection.getBufferedMutator(tableName);
+            delBufferedMutator = connection.getBufferedMutator(tableName);
+
+            String key = "putKey";
+            String column1 = "putColumn1";
+            String value = "value333444";
+            long timestamp = System.currentTimeMillis();
+
+            // only support Put and Delete
+            // for other type of operations, BufferedMutator will not set its type for them
+            Append append = new Append(Bytes.toBytes(key));
+            append.add("family_group".getBytes(), column1.getBytes(), toBytes("_suffix"));
+            final BufferedMutator apMut = putBufferMutator;
+            Assert.assertThrows(IllegalArgumentException.class, () -> {
+                apMut.mutate(append);
+            });
+
+            List<Mutation> mutations = new ArrayList<>();
+            // test Put
+            Put put1 = new Put(Bytes.toBytes(key));
+            put1.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1), timestamp, Bytes.toBytes(value));
+            mutations.add(put1);
+            Put put2 = new Put(Bytes.toBytes(key));
+            put2.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1 + "1"), timestamp, Bytes.toBytes(value + "4"));
+            mutations.add(put2);
+            // test add Mutations with List
+            putBufferMutator.mutate(mutations);
+            putBufferMutator.flush();
+
+            Get get = new Get(toBytes(key));
+            Result r = hTable.get(get);
+            Assert.assertEquals(2, r.raw().length);
+
+            Delete del = new Delete(Bytes.toBytes(key));
+            final BufferedMutator noCfMut = putBufferMutator;
+            // test mutation without setting family
+            Assert.assertThrows(FeatureNotSupportedException.class, () -> {
+                noCfMut.mutate(del);
+            });
+            del.deleteFamily(Bytes.toBytes("family_group"));
+            // test reuse different type bufferedMutator
+            final BufferedMutator difTypeMut = putBufferMutator;
+            Assert.assertThrows(IllegalArgumentException.class, () -> {
+                difTypeMut.mutate(del);
+            });
+            // test add Mutation directly
+            delBufferedMutator.mutate(del);
+            delBufferedMutator.flush();
+
+            r = hTable.get(get);
+            Assert.assertEquals(0, r.raw().length);
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            if (putBufferMutator != null ) {
+                putBufferMutator.close();
+                // test flush after closed
+                putBufferMutator.flush();
+            }
+            if (delBufferedMutator != null) {
+                delBufferedMutator.close();
+                // test add mutations after closed
+                Delete delete = new Delete(Bytes.toBytes("putKey"));
+                delete.deleteFamily(Bytes.toBytes("family_group"));
+                final BufferedMutator closedMutator = delBufferedMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+            }
+        }
+    }
+
+    /*
+    CREATE TABLEGROUP `n1:test` SHARDING = 'ADAPTIVE';
+    CREATE TABLE `n1:test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = `n1:test`;
+     */
+    @Test
+    public void testBufferedMutatorUseNameSpaceWithFlush() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator putBufferMutator = null;
+        BufferedMutator delBufferedMutator = null;
+        try {
+            // use n1 database
+            TableName tableName = TableName.valueOf("n1:test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+            // use defualt params
+            putBufferMutator = connection.getBufferedMutator(tableName);
+            delBufferedMutator = connection.getBufferedMutator(tableName);
+
+            String key = "putKey";
+            String column1 = "putColumn1";
+            String value = "value333444";
+            long timestamp = System.currentTimeMillis();
+
+            // only support Put and Delete
+            // for other type of operations, BufferedMutator will not set its type for them
+            Append append = new Append(Bytes.toBytes(key));
+            append.add("family_group".getBytes(), column1.getBytes(), toBytes("_suffix"));
+            final BufferedMutator apMut = putBufferMutator;
+            Assert.assertThrows(IllegalArgumentException.class, () -> {
+                apMut.mutate(append);
+            });
+
+            List<Mutation> mutations = new ArrayList<>();
+            // test Put
+            Put put1 = new Put(Bytes.toBytes(key));
+            put1.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1), timestamp, Bytes.toBytes(value));
+            mutations.add(put1);
+            Put put2 = new Put(Bytes.toBytes(key));
+            put2.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1 + "1"), timestamp, Bytes.toBytes(value + "4"));
+            mutations.add(put2);
+            // test add Mutations with List
+            putBufferMutator.mutate(mutations);
+            putBufferMutator.flush();
+
+            Get get = new Get(toBytes(key));
+            Result r = hTable.get(get);
+            Assert.assertEquals(2, r.raw().length);
+
+            Delete del = new Delete(Bytes.toBytes(key));
+            final BufferedMutator noCfMut = putBufferMutator;
+            // test mutation without setting family
+            Assert.assertThrows(FeatureNotSupportedException.class, () -> {
+                noCfMut.mutate(del);
+            });
+            del.deleteFamily(Bytes.toBytes("family_group"));
+            final BufferedMutator difTypeMut = putBufferMutator;
+            // test reuse different type bufferedMutator
+            Assert.assertThrows(IllegalArgumentException.class, () -> {
+                difTypeMut.mutate(del);
+            });
+            // test add Mutation directly
+            delBufferedMutator.mutate(del);
+            delBufferedMutator.flush();
+
+            r = hTable.get(get);
+            Assert.assertEquals(0, r.raw().length);
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            if (putBufferMutator != null ) {
+                putBufferMutator.close();
+                // test flush after closed
+                putBufferMutator.flush();
+            }
+            if (delBufferedMutator != null) {
+                delBufferedMutator.close();
+                // test add mutations after closed
+                Delete delete = new Delete(Bytes.toBytes("putKey"));
+                delete.deleteFamily(Bytes.toBytes("family_group"));
+                final BufferedMutator closedMutator = delBufferedMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+            }
+        }
+    }
+
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
+    @Test
+    public void testBufferedMutatorWithAutoFlush() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator putBufferMutator = null;
+        BufferedMutatorParams params = null;
+        long bufferSize = 45000L;
+        int count = 0;
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+            // set params
+            params = new BufferedMutatorParams(tableName);
+            params.writeBufferSize(bufferSize);
+            putBufferMutator = connection.getBufferedMutator(params);
+
+            String key = "putKey";
+            String column1 = "putColumn1";
+            String value = "value333444";
+            long timestamp = System.currentTimeMillis();
+
+            List<Mutation> mutations = new ArrayList<>();
+            for (int i = 0; i < 50; ++i) {
+                mutations.clear();
+                for (int j = 0; j < 4; ++j) {
+                    Put put = new Put(Bytes.toBytes(key));
+                    put.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1 + "_" + i + "_" + j),
+                            timestamp, Bytes.toBytes(value + "_" + i + "_" + j));
+                    mutations.add(put);
+                }
+                putBufferMutator.mutate(mutations);
+            }
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            if (putBufferMutator != null) {
+                putBufferMutator.close();
+                Get get = new Get(toBytes("putKey"));
+                Result r = hTable.get(get);
+                for (KeyValue keyValue : r.raw()) {
+                    ++count;
+                }
+                Assert.assertEquals(200, count);
+                Delete delete = new Delete(toBytes("putKey"));
+                delete.deleteFamily(toBytes("family_group"));
+                hTable.delete(delete);
+                r = hTable.get(get);
+                Assert.assertEquals(0, r.raw().length);
+
+                // test add mutations after closed
+                final BufferedMutator closedMutator = putBufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+                // test flush after closed
+                putBufferMutator.flush();
+            }
+
+            if (params != null) {
+                if (params.getPool() != null) {
+                    Assert.assertTrue(params.getPool().isShutdown());
+                }
+            }
+        }
+    }
+
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
+    @Test
+    public void testBufferedMutatorWithUserPool() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator ohBufferMutator = null;
+        BufferedMutatorParams params = null;
+        long bufferSize = 45000L;
+        int count = 0;
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+            // set params
+            params = new BufferedMutatorParams(tableName);
+            params.writeBufferSize(bufferSize);
+
+            // set thread pool
+            long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+            pool.allowCoreThreadTimeOut(true);
+            params.pool(pool);
+
+            ohBufferMutator = connection.getBufferedMutator(params);
+
+            String key = "putKey";
+            String column1 = "putColumn1";
+            String value = "value333444";
+            long timestamp = System.currentTimeMillis();
+
+            List<Mutation> mutations = new ArrayList<>();
+            for (int i = 0; i < 50; ++i) {
+                mutations.clear();
+                for (int j = 0; j < 4; ++j) {
+                    Put put = new Put(Bytes.toBytes(key));
+                    put.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(column1 + "_" + i + "_" + j),
+                            timestamp, Bytes.toBytes(value + "_" + i + "_" + j));
+                    mutations.add(put);
+                }
+                ohBufferMutator.mutate(mutations);
+            }
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            if (ohBufferMutator != null) {
+                ohBufferMutator.close();
+                Get get = new Get(toBytes("putKey"));
+                Result r = hTable.get(get);
+                for (KeyValue keyValue : r.raw()) {
+                    ++count;
+                }
+                Assert.assertEquals(200, count);
+                Delete delete = new Delete(toBytes("putKey"));
+                delete.deleteFamily(toBytes("family_group"));
+                hTable.delete(delete);
+
+                r = hTable.get(get);
+                Assert.assertEquals(0, r.raw().length);
+                // test add mutations after closed
+                final BufferedMutator closedMutator = ohBufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+                // test flush after closed
+                ohBufferMutator.flush();
+            }
+            if (params != null) {
+                if (params.getPool() != null) {
+                    Assert.assertTrue(params.getPool().isShutdown());
+                }
+            }
+        }
+    }
+
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
+    @Test
+    public void testBufferedMutatorConcurrent() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator ohBufferMutator = null;
+        BufferedMutatorParams params = null;
+        ExecutorService executorService = Executors.newFixedThreadPool(10);
+        long bufferSize = 45000L;
+        int count = 0;
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+            // set params
+            params = new BufferedMutatorParams(tableName);
+            params.writeBufferSize(bufferSize);
+
+            // set thread pool
+            long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+            pool.allowCoreThreadTimeOut(true);
+            params.pool(pool);
+
+            ohBufferMutator = connection.getBufferedMutator(params);
+
+            String key = "putKey";
+            String column1 = "putColumn1";
+            String value = "value333444";
+            long timestamp = System.currentTimeMillis();
+
+            for (int i = 0; i < 50; ++i) {
+                final int taskId = i;
+                final BufferedMutator thrBufferMutator = ohBufferMutator;
+                executorService.submit(() -> {
+                    List<Mutation> mutations = new ArrayList<>();
+                    for (int j = 0; j < 4; ++j) {
+                        String thrKey = key;
+                        String thrColumn = column1 + "_" + taskId + "_" + j;
+                        String thrValue = value + "_" + taskId + "_" + j;
+                        long thrTimestamp = timestamp;
+
+                        Put put = new Put(Bytes.toBytes(thrKey));
+                        put.addColumn(Bytes.toBytes("family_group"), Bytes.toBytes(thrColumn),
+                                thrTimestamp, Bytes.toBytes(thrValue));
+                        mutations.add(put);
+                    }
+                    try {
+                        thrBufferMutator.mutate(mutations);
+                    } catch (Exception ex) {
+                        if (ex instanceof RetriesExhaustedWithDetailsException) {
+                            ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+                        } else {
+                            ex.printStackTrace();
+                        }
+                        Assert.assertTrue(false);
+                    }
+                });
+            }
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+            if (ohBufferMutator != null) {
+                ohBufferMutator.close();
+                Get get = new Get(toBytes("putKey"));
+                Result r = hTable.get(get);
+                for (KeyValue keyValue : r.raw()) {
+                    ++count;
+                }
+                Assert.assertEquals(200, count);
+                Delete delete = new Delete(toBytes("putKey"));
+                delete.deleteFamily(toBytes("family_group"));
+                hTable.delete(delete);
+
+                r = hTable.get(get);
+                Assert.assertEquals(0, r.raw().length);
+                // test add mutations after closed
+                final BufferedMutator closedMutator = ohBufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+                // test flush after closed
+                ohBufferMutator.flush();
+            }
+            if (params != null) {
+                if (params.getPool() != null) {
+                    Assert.assertTrue(params.getPool().isShutdown());
+                }
+            }
+        }
+    }
 }
