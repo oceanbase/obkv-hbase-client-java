@@ -193,13 +193,14 @@ public class OHConnectionTest {
     public void testBufferedMutatorWithFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        TableName tableName = TableName.valueOf("test");
-        connection = ConnectionFactory.createConnection(conf);
-        hTable = connection.getTable(tableName);
         BufferedMutator ohBufferMutator = null;
-        try (Connection conn = ConnectionFactory.createConnection(conf)) {
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
             // use defualt params
-            ohBufferMutator = conn.getBufferedMutator(tableName);
+            ohBufferMutator = connection.getBufferedMutator(tableName);
+            hTable = connection.getTable(tableName);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -221,13 +222,6 @@ public class OHConnectionTest {
             Get get = new Get(toBytes(key));
             Result r = hTable.get(get);
             Assert.assertEquals(2, r.raw().length);
-            for (KeyValue keyValue : r.raw()) {
-                System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                        + new String(keyValue.getFamily()) + " columnQualifier:"
-                        + new String(keyValue.getQualifier()) + " timestamp:"
-                        + keyValue.getTimestamp() + " value:"
-                        + new String(keyValue.getValue()));
-            }
 
             Delete del = new Delete(Bytes.toBytes(key));
             del.deleteFamily(Bytes.toBytes("family_group"));
@@ -260,27 +254,27 @@ public class OHConnectionTest {
     }
 
     /*
-    CREATE TABLEGROUP n1:test SHARDING = 'ADAPTIVE';
+    CREATE TABLEGROUP `n1:test` SHARDING = 'ADAPTIVE';
     CREATE TABLE `n1:test$family_group` (
                   `K` varbinary(1024) NOT NULL,
                   `Q` varbinary(256) NOT NULL,
                   `T` bigint(20) NOT NULL,
                   `V` varbinary(1024) DEFAULT NULL,
                   PRIMARY KEY (`K`, `Q`, `T`)
-            ) TABLEGROUP = n1:test;
+            ) TABLEGROUP = `n1:test`;
      */
     @Test
     public void testBufferedMutatorUseNameSpaceWithFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        // in "n1" database
-        TableName tableName = TableName.valueOf("n1:test");
-        connection = ConnectionFactory.createConnection(conf);
-        hTable = connection.getTable(tableName);
         BufferedMutator ohBufferMutator = null;
-        try (Connection conn = ConnectionFactory.createConnection(conf)) {
+        try {
+            // in "n1" database
+            TableName tableName = TableName.valueOf("n1:test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
             // use defualt params
-            ohBufferMutator = conn.getBufferedMutator(tableName);
+            ohBufferMutator = connection.getBufferedMutator(tableName);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -355,19 +349,18 @@ public class OHConnectionTest {
     public void testBufferedMutatorWithAutoFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        TableName tableName = TableName.valueOf("test");
-        connection = ConnectionFactory.createConnection(conf);
-        hTable = connection.getTable(tableName);
         BufferedMutator ohBufferMutator = null;
         BufferedMutatorParams params = null;
         long bufferSize = 45000L;
         int count = 0;
-        try (Connection conn = ConnectionFactory.createConnection(conf)) {
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
             // set params
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
-
-            ohBufferMutator = conn.getBufferedMutator(params);
+            ohBufferMutator = connection.getBufferedMutator(params);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -399,11 +392,6 @@ public class OHConnectionTest {
                 Result r = hTable.get(get);
                 for (KeyValue keyValue : r.raw()) {
                     ++count;
-                    System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                            + new String(keyValue.getFamily()) + " columnQualifier:"
-                            + new String(keyValue.getQualifier()) + " timestamp:"
-                            + keyValue.getTimestamp() + " value:"
-                            + new String(keyValue.getValue()));
                 }
                 Assert.assertEquals(200, count);
                 Delete delete = new Delete(toBytes("putKey"));
@@ -415,7 +403,6 @@ public class OHConnectionTest {
             }
             if (params != null) {
                 if (params.getPool() != null) {
-                    System.out.println("Check if user's pool is shut down.");
                     Assert.assertTrue(params.getPool().isShutdown());
                 }
             }
@@ -426,14 +413,14 @@ public class OHConnectionTest {
     public void testBufferedMutatorWithUserPool() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        TableName tableName = TableName.valueOf("test");
-        connection = ConnectionFactory.createConnection(conf);
-        hTable = connection.getTable(tableName);
         BufferedMutator ohBufferMutator = null;
         BufferedMutatorParams params = null;
         long bufferSize = 45000L;
         int count = 0;
-        try (Connection conn = ConnectionFactory.createConnection(conf)) {
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
             // set params
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
@@ -444,7 +431,7 @@ public class OHConnectionTest {
             pool.allowCoreThreadTimeOut(true);
             params.pool(pool);
 
-            ohBufferMutator = conn.getBufferedMutator(params);
+            ohBufferMutator = connection.getBufferedMutator(params);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -476,11 +463,6 @@ public class OHConnectionTest {
                 Result r = hTable.get(get);
                 for (KeyValue keyValue : r.raw()) {
                     ++count;
-                    System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                            + new String(keyValue.getFamily()) + " columnQualifier:"
-                            + new String(keyValue.getQualifier()) + " timestamp:"
-                            + keyValue.getTimestamp() + " value:"
-                            + new String(keyValue.getValue()));
                 }
                 Assert.assertEquals(200, count);
                 Delete delete = new Delete(toBytes("putKey"));
@@ -492,7 +474,6 @@ public class OHConnectionTest {
             }
             if (params != null) {
                 if (params.getPool() != null) {
-                    System.out.println("Check if user's pool is shut down.");
                     Assert.assertTrue(params.getPool().isShutdown());
                 }
             }
@@ -503,15 +484,15 @@ public class OHConnectionTest {
     public void testBufferedMutatorConcurrent() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        TableName tableName = TableName.valueOf("test");
-        connection = ConnectionFactory.createConnection(conf);
-        hTable = connection.getTable(tableName);
         BufferedMutator ohBufferMutator = null;
         BufferedMutatorParams params = null;
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         long bufferSize = 45000L;
         int count = 0;
-        try (Connection conn = ConnectionFactory.createConnection(conf)) {
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
             // set params
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
@@ -522,7 +503,7 @@ public class OHConnectionTest {
             pool.allowCoreThreadTimeOut(true);
             params.pool(pool);
 
-            ohBufferMutator = conn.getBufferedMutator(params);
+            ohBufferMutator = connection.getBufferedMutator(params);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -580,11 +561,6 @@ public class OHConnectionTest {
                 Result r = hTable.get(get);
                 for (KeyValue keyValue : r.raw()) {
                     ++count;
-                    System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
-                            + new String(keyValue.getFamily()) + " columnQualifier:"
-                            + new String(keyValue.getQualifier()) + " timestamp:"
-                            + keyValue.getTimestamp() + " value:"
-                            + new String(keyValue.getValue()));
                 }
                 Assert.assertEquals(200, count);
                 Delete delete = new Delete(toBytes("putKey"));
@@ -596,7 +572,6 @@ public class OHConnectionTest {
             }
             if (params != null) {
                 if (params.getPool() != null) {
-                    System.out.println("Check if user's pool is shut down.");
                     Assert.assertTrue(params.getPool().isShutdown());
                 }
             }
