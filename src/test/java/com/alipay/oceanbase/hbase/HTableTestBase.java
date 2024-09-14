@@ -752,6 +752,13 @@ public abstract class HTableTestBase {
         Assert.assertEquals(res_count, 1);
         scanner.close();
 
+        Delete deleteKey3Family = new Delete(toBytes("getKey3"));
+        deleteKey3Family.deleteFamily(toBytes(family));
+        Delete deleteKey4Family = new Delete(toBytes("getKey4"));
+        deleteKey4Family.deleteFamily(toBytes(family));
+        hTable.delete(deleteKey3Family);
+        hTable.delete(deleteKey4Family);
+
         Put putKey3Column3Value1 = new Put(toBytes("getKey3"));
         putKey3Column3Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
         tryPut(hTable, putKey3Column3Value1);
@@ -772,7 +779,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 30);
+        Assert.assertEquals(res_count, 12);
         scanner.close();
 
         scan = new Scan();
@@ -808,7 +815,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 30);
+        Assert.assertEquals(res_count, 12);
         scanner.close();
     }
 
@@ -1114,58 +1121,6 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 10);
-        scanner.close();
-    }
-
-    @Test
-    public void debugtest() throws Exception {
-        String key1 = "getKey1";
-        String key2 = "getKey2";
-        String column1 = "abc";
-        String column2 = "def";
-        String value1 = "value1";
-        String value2 = "value2";
-        String value3 = "value3";
-        String family = "family1";
-        long   ts;
-        Delete deleteKey1Family = new Delete(toBytes(key1));
-        deleteKey1Family.deleteFamily(toBytes(family));
-
-        Delete deleteKey2Family = new Delete(toBytes(key2));
-        deleteKey2Family.deleteFamily(toBytes(family));
-
-        hTable.delete(deleteKey1Family);
-        hTable.delete(deleteKey2Family);
-
-        Put putKey1Column1Value1 = new Put(toBytes(key1));
-        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
-        tryPut(hTable, putKey1Column1Value1);
-
-        Scan scan = new Scan();
-        scan.addFamily(family.getBytes());
-        scan.setStartRow("getKey1".getBytes());
-        scan.setStopRow("getKey3".getBytes());
-        scan.setMaxVersions(10);
-        KeyOnlyFilter kFilter = new KeyOnlyFilter(true);
-        scan.setFilter(kFilter);
-        ResultScanner scanner = hTable.getScanner(scan);
-
-        int res_count = 0;
-        for (Result result : scanner) {
-            for (Cell cell : result.rawCells()) {
-                if (res_count < 8) {
-                    Assert.assertArrayEquals(key1.getBytes(), cell.getRow());
-                } else {
-                    Assert.assertArrayEquals(key2.getBytes(), cell.getRow());
-                }
-                int offset = cell.getValueOffset();
-                System.out.println(Arrays.toString(CellUtil.cloneValue(cell)));
-                Assert.assertEquals(4, cell.getValueLength());
-                Assert.assertEquals(6, Bytes.toInt(CellUtil.cloneValue(cell)));
-                res_count += 1;
-            }
-        }
-        Assert.assertEquals(res_count, 2);
         scanner.close();
     }
 
