@@ -200,7 +200,6 @@ public class OHConnectionTest {
             hTable = connection.getTable(tableName);
             // use defualt params
             ohBufferMutator = connection.getBufferedMutator(tableName);
-            hTable = connection.getTable(tableName);
 
             String key = "putKey";
             String column1 = "putColumn1";
@@ -409,6 +408,16 @@ public class OHConnectionTest {
         }
     }
 
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
     @Test
     public void testBufferedMutatorWithUserPool() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
@@ -480,6 +489,16 @@ public class OHConnectionTest {
         }
     }
 
+    /*
+    CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test$family_group` (
+                  `K` varbinary(1024) NOT NULL,
+                  `Q` varbinary(256) NOT NULL,
+                  `T` bigint(20) NOT NULL,
+                  `V` varbinary(1024) DEFAULT NULL,
+                  PRIMARY KEY (`K`, `Q`, `T`)
+            ) TABLEGROUP = test;
+     */
     @Test
     public void testBufferedMutatorConcurrent() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
