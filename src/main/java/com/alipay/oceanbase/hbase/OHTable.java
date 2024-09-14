@@ -520,8 +520,10 @@ public class OHTable implements HTableInterface {
                             .entrySet()) {
                             family = entry.getKey();
                             obTableQuery = buildObTableQuery(get, entry.getValue());
-                            request = buildObTableQueryRequest(obTableQuery,
-                                getTargetTableName(tableNameString, Bytes.toString(family)));
+                            request = buildObTableQueryRequest(
+                                obTableQuery,
+                                getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration));
                             clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
                             getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
@@ -598,8 +600,10 @@ public class OHTable implements HTableInterface {
                                 scan.getMaxVersions(), entry.getValue());
                             obTableQuery = buildObTableQuery(filter, scan);
 
-                            request = buildObTableQueryAsyncRequest(obTableQuery,
-                                getTargetTableName(tableNameString, Bytes.toString(family)));
+                            request = buildObTableQueryAsyncRequest(
+                                obTableQuery,
+                                getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -749,7 +753,7 @@ public class OHTable implements HTableInterface {
                 .next();
 
             BatchOperation batch = buildBatchOperation(
-                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration),
                 entry.getValue(), false, null);
             BatchOperationResult results = batch.execute();
 
@@ -851,7 +855,7 @@ public class OHTable implements HTableInterface {
             ObTableBatchOperation batch = buildObTableBatchOperation(keyValueList, false, null);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                batch, getTargetTableName(tableNameString, Bytes.toString(family)));
+                batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration));
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             return result.getAffectedRows() > 0;
@@ -889,7 +893,8 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
             queryAndMutate.setMutations(batchOperation);
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                batchOperation, getTargetTableName(tableNameString, Bytes.toString(f)));
+                batchOperation,
+                getTargetTableName(tableNameString, Bytes.toString(f), configuration));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
@@ -949,7 +954,7 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                batch, getTargetTableName(tableNameString, Bytes.toString(f)));
+                batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
@@ -999,7 +1004,7 @@ public class OHTable implements HTableInterface {
             queryAndMutate.setTableQuery(obTableQuery);
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                batch, getTargetTableName(tableNameString, Bytes.toString(family)));
+                batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration));
             request.setReturningAffectedEntity(true);
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
@@ -1063,7 +1068,7 @@ public class OHTable implements HTableInterface {
                         .getSecond().size());
                     try {
                         String targetTableName = getTargetTableName(this.tableNameString,
-                            entry.getKey());
+                            entry.getKey(), configuration);
 
                         BatchOperation batch = buildBatchOperation(targetTableName, entry
                             .getValue().getSecond(), false, null);
@@ -1308,21 +1313,23 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    private String getTargetTableName(String tableNameString, String familyString) {
+    public static String getTargetTableName(String tableNameString, String familyString,
+                                            Configuration conf) {
         checkArgument(tableNameString != null, "tableNameString is null");
         checkArgument(familyString != null, "familyString is null");
-        if (configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
-            return getTestLoadTargetTableName(tableNameString, familyString);
+        if (conf.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
+            return getTestLoadTargetTableName(tableNameString, familyString, conf);
         }
         return getNormalTargetTableName(tableNameString, familyString);
     }
 
-    private String getNormalTargetTableName(String tableNameString, String familyString) {
+    private static String getNormalTargetTableName(String tableNameString, String familyString) {
         return tableNameString + "$" + familyString;
     }
 
-    private String getTestLoadTargetTableName(String tableNameString, String familyString) {
-        String suffix = configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
+    private static String getTestLoadTargetTableName(String tableNameString, String familyString,
+                                                     Configuration conf) {
+        String suffix = conf.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
             DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
         return tableNameString + suffix + "$" + familyString;
     }
@@ -1639,7 +1646,8 @@ public class OHTable implements HTableInterface {
             getNormalTargetTableName(tableNameString, familyString), true, true);
         if (hasTestLoad) {
             this.obTableClient.getOrRefreshTableEntry(
-                getTestLoadTargetTableName(tableNameString, familyString), true, true);
+                getTestLoadTargetTableName(tableNameString, familyString, configuration), true,
+                true);
         }
     }
 
