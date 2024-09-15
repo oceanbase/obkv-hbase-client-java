@@ -478,7 +478,6 @@ public class OHTable implements HTableInterface {
             );
             keyValueList.add(kv);
         }
-        keyValueList.sort(KeyValue.COMPARATOR);
     }
 
     private String getTargetTableName(String tableNameString) {
