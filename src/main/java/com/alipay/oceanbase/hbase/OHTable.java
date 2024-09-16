@@ -489,6 +489,24 @@ public class OHTable implements HTableInterface {
         return tableNameString;
     }
 
+    // To enable the server to identify the column family to which a qualifier belongs,  
+    // the client writes the column family name into the qualifier.  
+    // The server then parses this information to determine the table that needs to be operated on.
+    private void processColumnFilters(NavigableSet<byte[]> columnFilters, Map<byte[], NavigableSet<byte[]>> familyMap) {
+        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : familyMap.entrySet()) {
+            if (entry.getValue() != null) {
+                for (byte[] columnName : entry.getValue()) {
+                    String columnNameStr = Bytes.toString(columnName);
+                    columnNameStr = Bytes.toString(entry.getKey()) + "." + columnNameStr;
+                    columnFilters.add(columnNameStr.getBytes());
+                }
+            } else {
+                String columnNameStr = Bytes.toString(entry.getKey()) + ".";
+                columnFilters.add(columnNameStr.getBytes());
+            }
+        }
+    }
+
     @Override
     public Result get(final Get get) throws IOException {
         if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().isEmpty()) {
@@ -509,24 +527,11 @@ public class OHTable implements HTableInterface {
                     if (get.getFamilyMap().keySet() == null
                             || get.getFamilyMap().keySet().isEmpty()
                             || get.getFamilyMap().size() > 1) {
+                        // In a Get operation where the family map is greater than 1 or equal to 0,  
+                        // we handle this by appending the column family to the qualifier on the client side.  
+                        // The server can then use this information to filter the appropriate column families and qualifiers.
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
-                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
-                                .entrySet()) {
-                            if (entry.getValue() != null) {
-                                for (int i = 0; i < entry.getValue().size(); i++) {
-                                    byte[] column_name = (byte[]) entry.getValue().toArray()[i];
-                                    String column_name_str = Bytes.toString(column_name);
-                                    column_name_str = Bytes.toString(entry.getKey()) + "." + column_name_str;
-                                    System.out.println("add column : " + column_name_str);
-                                    columnFilters.add(column_name_str.getBytes());
-                                }
-                            } else {
-                                String column_name_str = "";
-                                column_name_str = Bytes.toString(entry.getKey()) + "." + column_name_str;
-                                columnFilters.add(column_name_str.getBytes());
-                            }
-                        }
-                        
+                        processColumnFilters(columnFilters, get.getFamilyMap());
                         obTableQuery = buildObTableQuery(get, columnFilters);
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                             getTargetTableName(tableNameString));
@@ -601,23 +606,11 @@ public class OHTable implements HTableInterface {
                     if (scan.getFamilyMap().keySet() == null
                         || scan.getFamilyMap().keySet().isEmpty()
                         || scan.getFamilyMap().size() > 1) {
+                        // In a Scan operation where the family map is greater than 1 or equal to 0,  
+                        // we handle this by appending the column family to the qualifier on the client side.  
+                        // The server can then use this information to filter the appropriate column families and qualifiers.
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
-                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
-                                .entrySet()) {
-                            if (entry.getValue() != null) {
-                                for (int i = 0; i < entry.getValue().size(); i++) {
-                                    byte[] column_name = (byte[]) entry.getValue().toArray()[i];
-                                    String column_name_str = Bytes.toString(column_name);
-                                    column_name_str = Bytes.toString(entry.getKey()) + "." + column_name_str;
-                                    columnFilters.add(column_name_str.getBytes());
-                                }
-                            } else {
-                                String column_name_str = "";
-                                column_name_str = Bytes.toString(entry.getKey()) + "." + column_name_str;
-                                columnFilters.add(column_name_str.getBytes());
-                            }
-                        }
-                        
+                        processColumnFilters(columnFilters, scan.getFamilyMap());
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                             scan.getMaxVersions(), columnFilters);
                         obTableQuery = buildObTableQuery(filter, scan);
@@ -786,12 +779,17 @@ public class OHTable implements HTableInterface {
         try {
             checkFamilyViolation(delete.getFamilyMap().keySet());
             if (delete.getFamilyMap().isEmpty()) {
+                // For a Delete operation without any qualifiers, we construct a DeleteFamily request.  
+                // The server then performs the operation on all column families.
                 KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
                         KeyValue.Type.DeleteFamily);
                 
                 BatchOperation batch = buildBatchOperation(tableNameString, Arrays.asList(kv), false, null);
                 results = batch.execute();
             } else if (delete.getFamilyMap().size() > 1) {
+                // Currently, the Delete Family operation type cannot transmit qualifiers to the server.  
+                // As a result, the server cannot identify which families need to be deleted.  
+                // Therefore, this process is handled sequentially.
                 boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
                         .flatMap(entry -> entry.getValue().stream())
                         .anyMatch(kv -> KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily);
@@ -1764,7 +1762,10 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    // TOOD: 多列族做完后删掉，使用上面的方法
+
+    // This method is currently only used for append and increment operations.  
+    // It restricts these two methods to use multi-column family operations.  
+    // Note: After completing operations on multiple column families, they are deleted using the method described above.
     private void checkFamilyViolationForOneFamily(Collection<byte[]> families) {
         if (families == null || families.size() == 0) {
             throw new FeatureNotSupportedException("family is empty.");
