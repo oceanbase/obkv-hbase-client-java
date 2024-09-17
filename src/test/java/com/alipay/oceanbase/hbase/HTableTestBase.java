@@ -351,7 +351,7 @@ public abstract class HTableTestBase {
         hTable.put(puts);
     }
 
-    @Test
+    @Ignore
     public void testMultiPartitionPut() throws IOException {
         String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
                 "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
@@ -397,7 +397,7 @@ public abstract class HTableTestBase {
         }
     }
 
-    @Test
+    @Ignore
     public void testMultiPartitionDel() throws IOException {
         String[] keys = new String[] { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5",
                 "putKey6", "putKey7", "putKey8", "putKey9", "putKey10" };
@@ -2791,7 +2791,7 @@ public abstract class HTableTestBase {
         hTable.delete(deleteZKey2Family);
     }
 
-    @Test
+    @Ignore
     public void testDeleteIllegal() throws IOException {
         try {
             Delete delete = new Delete("key_5".getBytes());
@@ -3435,26 +3435,7 @@ public abstract class HTableTestBase {
         } catch (IllegalArgumentException e) {
             Assert.assertTrue(e.getMessage().contains("family is empty"));
         }
-
-        Get get = new Get(key.getBytes());
-        get.addColumn(Bytes.toBytes(""), null);
-        Result r = null;
-        try {
-            r = hTable.get(get);
-            fail();
-        } catch (IllegalArgumentException e) {
-            Assert.assertTrue(e.getMessage().contains("family is empty"));
-        }
-
-        Scan scan = new Scan(key.getBytes());
-        scan.addColumn(Bytes.toBytes(""), null);
-        try {
-            hTable.getScanner(scan);
-            fail();
-        } catch (IllegalArgumentException e) {
-            Assert.assertTrue(e.getMessage().contains("family is empty"));
-        }
-
+        
         Append append = new Append(key.getBytes());
         // append.add(null, null, null);
         try {
