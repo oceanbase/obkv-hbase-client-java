@@ -1593,14 +1593,12 @@ public class OHTable implements HTableInterface {
     }
 
     public static ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,
-                                                                                 String targetTableName,
-                                                                                 ExecutorService pool) {
+                                                                                 String targetTableName) {
         ObTableBatchOperationRequest request = new ObTableBatchOperationRequest();
         request.setTableName(targetTableName);
         request.setReturningAffectedRows(true);
         request.setEntityType(ObTableEntityType.HKV);
         request.setBatchOperation(obTableBatchOperation);
-        request.setPool(pool);
         return request;
     }
 

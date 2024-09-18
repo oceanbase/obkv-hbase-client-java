@@ -88,13 +88,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(ohConnection
             .getOHConnectionConfiguration());
 
-        // init params in OHBufferedMutatorImpl:
-        // TableName + pool + Configuration + listener + writeBufferSize + maxKeyValueSize + rpcTimeout + operationTimeout
+        // init params in OHBufferedMutatorImpl
         this.tableName = params.getTableName();
         this.conf = ohConnection.getConfiguration();
         this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
         this.pool = params.getPool();
+        this.obTableClient.setRuntimeBatchExecutor(pool);
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
@@ -211,7 +211,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                     ObTableBatchOperation batch = buildObTableBatchOperation(execBuffer);
                     // table_name$cf_name
                     String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
-                    request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName, pool);
+                    request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName);
                 } catch (Exception ex) {
                     LOGGER.error("Errors occur before mutation operation", ex);
                     throw new IllegalArgumentException("Errors occur before mutation operation", ex);
@@ -229,7 +229,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                             byte[] family = m.getFamilyMap().firstKey();
                             ObTableBatchOperation batch = buildObTableBatchOperation(Collections.singletonList(m));
                             String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
-                            request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName, pool);
+                            request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName);
                             ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
                         }
                     } catch (Exception newEx) {
@@ -278,6 +278,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         try {
             asyncExecute(true);
         } finally {
+            // the pool in ObTableClient will be shut down too
             this.pool.shutdown();
             try {
                 if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
