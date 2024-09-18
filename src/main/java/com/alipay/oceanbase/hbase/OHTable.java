@@ -512,7 +512,7 @@ public class OHTable implements HTableInterface {
         if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
-            checkFamilyViolation(get.getFamilyMap().keySet());
+            checkFamilyViolation(get.getFamilyMap().keySet(), false);
         }
 
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
@@ -590,7 +590,7 @@ public class OHTable implements HTableInterface {
         if (scan.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
-            checkFamilyViolation(scan.getFamilyMap().keySet());
+            checkFamilyViolation(scan.getFamilyMap().keySet(), false);
         }
 
         //be careful about the packet size ,may the packet exceed the max result size ,leading to error
@@ -681,7 +681,7 @@ public class OHTable implements HTableInterface {
         int n = 0;
         for (Put put : puts) {
             validatePut(put);
-            checkFamilyViolation(put.getFamilyMap().keySet());
+            checkFamilyViolation(put.getFamilyMap().keySet(), true);
             writeBuffer.add(put);
             currentWriteBufferSize += put.heapSize();
 
@@ -778,7 +778,7 @@ public class OHTable implements HTableInterface {
         BatchOperationResult results = null;
         
         try {
-            checkFamilyViolation(delete.getFamilyMap().keySet());
+            checkFamilyViolation(delete.getFamilyMap().keySet(), false);
             if (delete.getFamilyMap().isEmpty()) {
                 // For a Delete operation without any qualifiers, we construct a DeleteFamily request.  
                 // The server then performs the operation on all column families.
@@ -830,7 +830,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void delete(Delete delete) throws IOException {
-        checkFamilyViolation(delete.getFamilyMap().keySet());
+        checkFamilyViolation(delete.getFamilyMap().keySet(), false);
         innerDelete(delete);
     }
 
@@ -1753,9 +1753,15 @@ public class OHTable implements HTableInterface {
         return request;
     }
 
-    public static void checkFamilyViolation(Collection<byte[]> families) {
+    public static void checkFamilyViolation(Collection<byte[]> families, boolean check_empty_family) {
+        if (check_empty_family && (families == null || families.isEmpty())) {
+            throw new FeatureNotSupportedException("family is empty");
+        }
+
         for (byte[] family : families) {
-            if (isBlank(Bytes.toString(family))) {
+            if (family == null || family.length == 0) {
+                throw new IllegalArgumentException("family is empty");
+            } else if (isBlank(Bytes.toString(family))) {
                 throw new IllegalArgumentException("family is blank");
             }
         }
@@ -1774,7 +1780,9 @@ public class OHTable implements HTableInterface {
             throw new FeatureNotSupportedException("multi family is not supported yet.");
         }
         for (byte[] family : families) {
-            if (isBlank(Bytes.toString(family))) {
+            if (family == null || family.length == 0) {
+                throw new IllegalArgumentException("family is empty");
+            } else if (isBlank(Bytes.toString(family))) {
                 throw new IllegalArgumentException("family is blank");
             }
         }
