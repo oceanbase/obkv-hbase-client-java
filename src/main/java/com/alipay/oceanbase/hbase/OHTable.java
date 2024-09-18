@@ -1765,7 +1765,7 @@ public class OHTable implements HTableInterface {
     // This method is currently only used for append and increment operations.  
     // It restricts these two methods to use multi-column family operations.  
     // Note: After completing operations on multiple column families, they are deleted using the method described above.
-    private void checkFamilyViolationForOneFamily(Collection<byte[]> families) {
+    public static void checkFamilyViolationForOneFamily(Collection<byte[]> families) {
         if (families == null || families.size() == 0) {
             throw new FeatureNotSupportedException("family is empty.");
         }

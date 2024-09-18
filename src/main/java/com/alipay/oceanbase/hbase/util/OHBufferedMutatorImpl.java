@@ -142,7 +142,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         // check if every mutation's family is the same
         // check if mutations are the same type
         for (Mutation m : mutations) {
-            OHTable.checkFamilyViolation(m.getFamilyMap().keySet());
+            OHTable.checkFamilyViolationForOneFamily(m.getFamilyMap().keySet());
             validateInsUpAndDelete(m);
             Class<?> curType = m.getClass();
             // set the type of this BufferedMutator
