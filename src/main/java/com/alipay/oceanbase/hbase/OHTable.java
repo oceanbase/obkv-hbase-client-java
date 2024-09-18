@@ -801,7 +801,7 @@ public class OHTable implements HTableInterface {
                 } else {
                     for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         BatchOperation batch = buildBatchOperation(
-                                getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                                getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration),
                                 entry.getValue(), false, null);
                         results = batch.execute();
                     }
@@ -1419,7 +1419,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filter != null) {
-            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter).getBytes());
+            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter));
         }
 
         if (timeRange != null) {
@@ -1459,7 +1459,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filterString != null) {
-            obHTableFilter.setFilterString(filterString.getBytes());
+            obHTableFilter.setFilterString(filterString);
         }
 
         if (timeRange != null) {
