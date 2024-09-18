@@ -545,7 +545,8 @@ public class OHTable implements HTableInterface {
                             family = entry.getKey();
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             request = buildObTableQueryAsyncRequest(obTableQuery,
-                                getTargetTableName(tableNameString, Bytes.toString(family)));
+                                getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration));
                             clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
@@ -810,7 +811,7 @@ public class OHTable implements HTableInterface {
                         .next();
 
                 BatchOperation batch = buildBatchOperation(
-                        getTargetTableName(tableNameString, Bytes.toString(entry.getKey())),
+                        getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration),
                         entry.getValue(), false, null);
                 results = batch.execute();
             }
@@ -1729,14 +1730,12 @@ public class OHTable implements HTableInterface {
     }
 
     public static ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,
-                                                                                 String targetTableName,
-                                                                                 ExecutorService pool) {
+                                                                                 String targetTableName) {
         ObTableBatchOperationRequest request = new ObTableBatchOperationRequest();
         request.setTableName(targetTableName);
         request.setReturningAffectedRows(true);
         request.setEntityType(ObTableEntityType.HKV);
         request.setBatchOperation(obTableBatchOperation);
-        request.setPool(pool);
         return request;
     }
 
@@ -1754,7 +1753,7 @@ public class OHTable implements HTableInterface {
         return request;
     }
 
-    private void checkFamilyViolation(Collection<byte[]> families) {
+    public static void checkFamilyViolation(Collection<byte[]> families) {
         for (byte[] family : families) {
             if (isBlank(Bytes.toString(family))) {
                 throw new IllegalArgumentException("family is blank");
