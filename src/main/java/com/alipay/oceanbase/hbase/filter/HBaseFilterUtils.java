@@ -21,6 +21,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import java.lang.reflect.Field;
 import java.util.List;
 
 @InterfaceAudience.Private
@@ -42,10 +43,18 @@ public class HBaseFilterUtils {
             return toParseableString((PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
             return toParseableString((FilterList) filter);
+        } else if (filter instanceof RandomRowFilter) {
+            return toParseableString((RandomRowFilter) filter);
         } else if (filter instanceof ColumnPaginationFilter) {
             return toParseableString((ColumnPaginationFilter) filter);
         } else if (filter instanceof ColumnPrefixFilter) {
             return toParseableString((ColumnPrefixFilter) filter);
+        } else if (filter instanceof FirstKeyOnlyFilter) {
+            return toParseableString((FirstKeyOnlyFilter) filter);
+        } else if (filter instanceof KeyOnlyFilter) {
+            return toParseableString((KeyOnlyFilter) filter);
+        } else if (filter instanceof TimestampsFilter) {
+            return toParseableString((TimestampsFilter) filter);
         } else if (filter instanceof SkipFilter) {
             return toParseableString((SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
@@ -118,6 +127,10 @@ public class HBaseFilterUtils {
         return filter.getClass().getSimpleName() + '(' + filter.getPageSize() + ')';
     }
 
+    private static String toParseableString(RandomRowFilter filter) {
+        return filter.getClass().getSimpleName() + "(" + Bytes.toInt(Bytes.toBytes(filter.getChance())) + ")";
+    }
+
     private static String toParseableString(ColumnPaginationFilter filter) {
         if (filter.getColumnOffset() != null) {
             return filter.getClass().getSimpleName() + '(' + filter.getLimit() + ",'"
@@ -130,6 +143,43 @@ public class HBaseFilterUtils {
 
     private static String toParseableString(ColumnPrefixFilter filter) {
         return filter.getClass().getSimpleName() + "('" + Bytes.toString(filter.getPrefix()) + "')";
+    }
+
+    private static String toParseableString(FirstKeyOnlyFilter filter) {
+        return filter.getClass().getSimpleName() + "()";
+    }
+
+    private static String toParseableString(KeyOnlyFilter filter) {
+        boolean lenAsVal;
+        try {
+            Field field = filter.getClass().getDeclaredField("lenAsVal");
+            field.setAccessible(true);
+            lenAsVal = (boolean)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        return filter.getClass().getSimpleName() + "(" + lenAsVal + ")";
+    }
+
+    private static String toParseableString(TimestampsFilter filter) {
+        StringBuilder paramBuilder = new StringBuilder();
+        List<Long> timestamps = filter.getTimestamps();
+        boolean canHint;
+        try {
+            Field field = filter.getClass().getDeclaredField("canHint");
+            field.setAccessible(true);
+            canHint = (boolean)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        for (int i = 0; i < timestamps.size(); i ++) {
+            Long timestamp = timestamps.get(i);
+            paramBuilder.append(timestamp);
+            paramBuilder.append(",");
+        }
+        String param = paramBuilder.toString();
+        return filter.getClass().getSimpleName() + "("
+                + param + canHint + ")";
     }
 
     private static String toParseableString(ColumnCountGetFilter filter) {
