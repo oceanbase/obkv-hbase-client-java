@@ -160,5 +160,5 @@ CREATE TABLE `test_t$family'1` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
-) TABLEGROUP = test;
+) TABLEGROUP = test_t;
 
