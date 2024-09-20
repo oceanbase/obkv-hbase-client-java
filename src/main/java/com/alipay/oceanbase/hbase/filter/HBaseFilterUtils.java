@@ -158,7 +158,7 @@ public class HBaseFilterUtils {
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, RandomRowFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
-        byteStream.write(Bytes.toInt(Bytes.toBytes(filter.getChance())));
+        byteStream.write(Integer.toString(Bytes.toInt(Bytes.toBytes(filter.getChance()))).getBytes());
         byteStream.write(')');
     }
 
