@@ -47,9 +47,6 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.CompareFilter;
@@ -62,6 +59,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.slf4j.Logger;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -76,6 +74,7 @@ import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static com.alipay.oceanbase.hbase.filter.HBaseFilterUtils.writeBytesWithEscape;
 
 public class OHTable implements HTableInterface {
 
@@ -894,7 +893,7 @@ public class OHTable implements HTableInterface {
 
             checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
 
-            String filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
+            byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
 
             ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
             List<Mutation> mutations = rowMutations.getMutations();
@@ -1415,11 +1414,11 @@ public class OHTable implements HTableInterface {
     }
 
     private ObHTableFilter buildObHTableFilter(Filter filter, TimeRange timeRange, int maxVersion,
-                                               Collection<byte[]> columnQualifiers) {
+                                               Collection<byte[]> columnQualifiers) throws IOException {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filter != null) {
-            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter));
+            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableByteArray(filter));
         }
 
         if (timeRange != null) {
@@ -1441,20 +1440,25 @@ public class OHTable implements HTableInterface {
         return obHTableFilter;
     }
 
-    private String buildCheckAndMutateFilterString(byte[] family, byte[] qualifier,
-                                                   CompareFilter.CompareOp compareOp, byte[] value) {
+    private byte[] buildCheckAndMutateFilterString(byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value) throws IOException {
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        byteStream.write("CheckAndMutateFilter(".getBytes());
+        byteStream.write(HBaseFilterUtils.toParseableByteArray(compareOp));
+        byteStream.write(", 'binary:".getBytes());
+        writeBytesWithEscape(byteStream, value);
+        byteStream.write("', '".getBytes());
+        writeBytesWithEscape(byteStream, family);
+        byteStream.write("', '".getBytes());
+        writeBytesWithEscape(byteStream, qualifier);
         if (value != null) {
-            return ("CheckAndMutateFilter(" + HBaseFilterUtils.toParseableString(compareOp)
-                    + ", 'binary:" + Bytes.toString(value) + "', '" + Bytes.toString(family)
-                    + "', '" + (qualifier == null ? "" : Bytes.toString(qualifier)) + "', false)");
+            byteStream.write("', false)".getBytes());
         } else {
-            return ("CheckAndMutateFilter(" + HBaseFilterUtils.toParseableString(compareOp)
-                    + ", 'binary:', '" + Bytes.toString(family) + "', '"
-                    + (qualifier == null ? "" : Bytes.toString(qualifier)) + "', true)");
+            byteStream.write("', true)".getBytes());
         }
+        return byteStream.toByteArray();
     }
 
-    private ObHTableFilter buildObHTableFilter(String filterString, TimeRange timeRange,
+    private ObHTableFilter buildObHTableFilter(byte[] filterString, TimeRange timeRange,
                                                int maxVersion, byte[]... columnQualifiers) {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
@@ -1541,7 +1545,7 @@ public class OHTable implements HTableInterface {
         return obTableQuery;
     }
 
-    private ObTableQuery buildObTableQuery(final Get get, Collection<byte[]> columnQualifiers) {
+    private ObTableQuery buildObTableQuery(final Get get, Collection<byte[]> columnQualifiers) throws IOException {
         ObTableQuery obTableQuery;
         if (get.isClosestRowBefore()) {
             PageFilter pageFilter = new PageFilter(1);
