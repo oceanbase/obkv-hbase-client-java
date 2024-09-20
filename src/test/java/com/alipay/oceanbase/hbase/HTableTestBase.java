@@ -1875,7 +1875,8 @@ public abstract class HTableTestBase {
         Thread.sleep(61 * 1000);
         try {
             scanner.next();
-        } catch (IOException e) {
+            fail();
+        } catch (Exception e) {
             assertTrue(e.getCause().getMessage().contains("OB_HASH_NOT_EXIST"));
         } finally {
             scanner.close();
