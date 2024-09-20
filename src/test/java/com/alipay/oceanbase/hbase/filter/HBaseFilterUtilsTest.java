@@ -22,6 +22,8 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+
 public class HBaseFilterUtilsTest {
     private static final CompareFilter.CompareOp[] ops     = { CompareFilter.CompareOp.LESS,
             CompareFilter.CompareOp.LESS_OR_EQUAL, CompareFilter.CompareOp.EQUAL,
@@ -35,135 +37,135 @@ public class HBaseFilterUtilsTest {
     }
 
     @Test
-    public void testRowFilter() {
+    public void testRowFilter() throws IOException {
         for (int i = 0; i < ops.length; i++) {
             RowFilter filter = new RowFilter(ops[i], new BinaryComparator(
                 "testRowFilter".getBytes()));
             String expect = String.format("RowFilter(%s,'binary:testRowFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new RowFilter(ops[i], new BinaryPrefixComparator("testRowFilter".getBytes()));
             expect = String.format("RowFilter(%s,'binaryprefix:testRowFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new RowFilter(ops[i], new RegexStringComparator("testRowFilter"));
             expect = String.format("RowFilter(%s,'regexstring:testRowFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new RowFilter(ops[i], new SubstringComparator("testRowFilter"));
             expect = String.format("RowFilter(%s,'substring:testrowfilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
         }
     }
 
     @Test
-    public void testValueFilter() {
+    public void testValueFilter() throws IOException {
         for (int i = 0; i < ops.length; i++) {
             ValueFilter filter = new ValueFilter(ops[i], new BinaryComparator(
                 "testValueFilter".getBytes()));
             String expect = String.format("ValueFilter(%s,'binary:testValueFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new ValueFilter(ops[i], new BinaryPrefixComparator(
                 "testValueFilter".getBytes()));
             expect = String.format("ValueFilter(%s,'binaryprefix:testValueFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new ValueFilter(ops[i], new RegexStringComparator("testValueFilter"));
             expect = String.format("ValueFilter(%s,'regexstring:testValueFilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new ValueFilter(ops[i], new SubstringComparator("testValueFilter"));
             expect = String.format("ValueFilter(%s,'substring:testvaluefilter')", opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
         }
     }
 
     @Test
-    public void testQualifierFilter() {
+    public void testQualifierFilter() throws IOException {
         for (int i = 0; i < ops.length; i++) {
             QualifierFilter filter = new QualifierFilter(ops[i], new BinaryComparator(
                 "testQualifierFilter".getBytes()));
             String expect = String.format("QualifierFilter(%s,'binary:testQualifierFilter')",
                 opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new QualifierFilter(ops[i], new BinaryPrefixComparator(
                 "testQualifierFilter".getBytes()));
             expect = String.format("QualifierFilter(%s,'binaryprefix:testQualifierFilter')",
                 opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new QualifierFilter(ops[i], new RegexStringComparator("testQualifierFilter"));
             expect = String.format("QualifierFilter(%s,'regexstring:testQualifierFilter')",
                 opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
 
             filter = new QualifierFilter(ops[i], new SubstringComparator("testQualifierFilter"));
             expect = String.format("QualifierFilter(%s,'substring:testqualifierfilter')",
                 opFlags[i]);
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
         }
     }
 
     @Test
-    public void testSingleColumnValueFilter() {
+    public void testSingleColumnValueFilter() throws IOException {
         for (int i = 0; i < ops.length; i++) {
             String expect = String.format(
                 "SingleColumnValueFilter('family','qualifier',%s,'binary:value',false,true)",
                 opFlags[i]);
             SingleColumnValueFilter filter = new SingleColumnValueFilter("family".getBytes(),
                 "qualifier".getBytes(), ops[i], "value".getBytes());
-            Assert.assertEquals(expect, HBaseFilterUtils.toParseableString(filter));
+            Assert.assertArrayEquals(expect.getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
         }
     }
 
     @Test
-    public void testPageFilter() {
+    public void testPageFilter() throws IOException {
         PageFilter filter = new PageFilter(128);
-        Assert.assertEquals("PageFilter(128)", HBaseFilterUtils.toParseableString(filter));
+        Assert.assertArrayEquals("PageFilter(128)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testColumnPaginationFilter() {
+    public void testColumnPaginationFilter() throws IOException {
         ColumnPaginationFilter filter = new ColumnPaginationFilter(2, 2);
-        Assert.assertEquals("ColumnPaginationFilter(2,2)",
-            HBaseFilterUtils.toParseableString(filter));
+        Assert.assertArrayEquals("ColumnPaginationFilter(2,2)".getBytes(),
+            HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testColumnCountGetFilter() {
+    public void testColumnCountGetFilter() throws IOException {
         ColumnCountGetFilter filter = new ColumnCountGetFilter(513);
-        Assert
-            .assertEquals("ColumnCountGetFilter(513)", HBaseFilterUtils.toParseableString(filter));
+        Assert.assertArrayEquals("ColumnCountGetFilter(513)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testPrefixFilter() {
+    public void testPrefixFilter() throws IOException {
         PrefixFilter filter = new PrefixFilter("prefix".getBytes());
-        Assert.assertEquals("PrefixFilter('prefix')", HBaseFilterUtils.toParseableString(filter));
+        System.out.println(new String(HBaseFilterUtils.toParseableByteArray(filter)));
+        Assert.assertArrayEquals("PrefixFilter('prefix')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testSkipFilter() {
+    public void testSkipFilter() throws IOException {
         RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
             "testSkipFilter".getBytes()));
         SkipFilter filter = new SkipFilter(rowFilter);
-        Assert.assertEquals("(SKIP RowFilter(=,'binary:testSkipFilter'))",
-            HBaseFilterUtils.toParseableString(filter));
+        Assert.assertArrayEquals("(SKIP RowFilter(=,'binary:testSkipFilter'))".getBytes(),
+            HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testWhileFilter() {
+    public void testWhileFilter() throws IOException {
         QualifierFilter qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
             new BinaryPrefixComparator("whileMatchFilter".getBytes()));
         WhileMatchFilter filter = new WhileMatchFilter(qualifierFilter);
-        Assert.assertEquals("(WHILE QualifierFilter(>,'binaryprefix:whileMatchFilter'))",
-            HBaseFilterUtils.toParseableString(filter));
+        Assert.assertArrayEquals("(WHILE QualifierFilter(>,'binaryprefix:whileMatchFilter'))".getBytes(),
+            HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
-    public void testFilterList() {
+    public void testFilterList() throws IOException {
         RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
             "testSkipFilter".getBytes()));
         QualifierFilter qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
@@ -177,21 +179,21 @@ public class HBaseFilterUtilsTest {
         filterList.addFilter(skipFilter);
         filterList.addFilter(columnPaginationFilter);
 
-        Assert
-            .assertEquals(
-                "(RowFilter(=,'binary:testSkipFilter') "
-                        + "AND QualifierFilter(>,'binaryprefix:whileMatchFilter') AND (SKIP PageFilter(128)) AND ColumnPaginationFilter(2,2))",
-                HBaseFilterUtils.toParseableString(filterList));
+
+        System.out.println(new String(HBaseFilterUtils.toParseableByteArray(filterList)));
+        Assert.assertArrayEquals(
+                ("(RowFilter(=,'binary:testSkipFilter') "
+                        + "AND QualifierFilter(>,'binaryprefix:whileMatchFilter') AND (SKIP PageFilter(128)) AND ColumnPaginationFilter(2,2))").getBytes(),
+                HBaseFilterUtils.toParseableByteArray(filterList));
 
         filterList = new FilterList(FilterList.Operator.MUST_PASS_ONE);
         filterList.addFilter(rowFilter);
         filterList.addFilter(qualifierFilter);
         filterList.addFilter(columnPaginationFilter);
 
-        Assert
-            .assertEquals(
-                "(RowFilter(=,'binary:testSkipFilter') "
-                        + "OR QualifierFilter(>,'binaryprefix:whileMatchFilter') OR ColumnPaginationFilter(2,2))",
-                HBaseFilterUtils.toParseableString(filterList));
+        Assert.assertArrayEquals(
+                    ("(RowFilter(=,'binary:testSkipFilter') "
+                        + "OR QualifierFilter(>,'binaryprefix:whileMatchFilter') OR ColumnPaginationFilter(2,2))").getBytes(),
+                HBaseFilterUtils.toParseableByteArray(filterList));
     }
 }

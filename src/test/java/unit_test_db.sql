@@ -145,3 +145,20 @@ CREATE TABLE `test_t$family_with_local_index` (
     key `idx1`(T) local,
     PRIMARY KEY (`K`, `Q`, `T`)
 );
+
+CREATE TABLE `test$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test;
+
+CREATE TABLE `test_t$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_t;
+
