@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
+import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHConnectionTest {
@@ -44,6 +45,8 @@ public class OHConnectionTest {
         c.set(ClusterConnection.HBASE_CLIENT_CONNECTION_IMPL,
             "com.alipay.oceanbase.hbase.util.OHConnectionImpl");
         c.set("rs.list.acquire.read.timeout", "10000");
+        // test set rpc connection timeout, the first one is the latest version
+        c.set(SOCKET_TIMEOUT_CONNECT, "15000");
         connection = ConnectionFactory.createConnection(c);
         TableName tableName = TableName.valueOf("test");
         hTable = connection.getTable(tableName);
@@ -55,6 +58,7 @@ public class OHConnectionTest {
 
         Configuration c = ObHTableTestUtil.newConfiguration();
         c.set("rs.list.acquire.read.timeout", "10000");
+        // can set rpc connection timeout in xml
         connection = ConnectionFactory.createConnection(c);
         TableName tableName = TableName.valueOf("test");
         hTable = connection.getTable(tableName);
@@ -195,6 +199,7 @@ public class OHConnectionTest {
     public void testBufferedMutatorWithFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
+        conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
         BufferedMutator putBufferMutator = null;
         BufferedMutator delBufferedMutator = null;
         try {
@@ -293,11 +298,12 @@ public class OHConnectionTest {
     public void testBufferedMutatorUseNameSpaceWithFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
+        conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
         BufferedMutator putBufferMutator = null;
         BufferedMutator delBufferedMutator = null;
         try {
             // use n1 database
-            TableName tableName = TableName.valueOf("n1:test");
+            TableName tableName = TableName.valueOf("n1","test");
             connection = ConnectionFactory.createConnection(conf);
             hTable = connection.getTable(tableName);
             // use defualt params

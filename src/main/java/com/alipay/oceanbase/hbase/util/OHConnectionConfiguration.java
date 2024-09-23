@@ -25,6 +25,8 @@ import org.apache.hadoop.hbase.HConstants;
 import java.util.Properties;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static org.apache.hadoop.hbase.ipc.RpcClient.DEFAULT_SOCKET_TIMEOUT_CONNECT;
+import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 
 @InterfaceAudience.Private
 public class OHConnectionConfiguration {
@@ -44,6 +46,7 @@ public class OHConnectionConfiguration {
     private final long       scannerMaxResultSize;
     private final int        maxKeyValueSize;
     private final int        rpcTimeout;
+    private final int        rpcConnectTimeout;
 
     public OHConnectionConfiguration(Configuration conf) {
         this.paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
@@ -59,6 +62,8 @@ public class OHConnectionConfiguration {
         this.operationTimeout = conf.getInt("hbase.client.operation.timeout", 1200000);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+        this.rpcConnectTimeout = conf
+            .getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
         this.scannerCaching = conf.getInt("hbase.client.scanner.caching", Integer.MAX_VALUE);
         this.scannerMaxResultSize = conf.getLong("hbase.client.scanner.max.result.size",
             WRITE_BUFFER_SIZE_DEFAULT);
@@ -94,6 +99,10 @@ public class OHConnectionConfiguration {
 
     public int getRpcTimeout() {
         return this.rpcTimeout;
+    }
+
+    public int getRpcConnectTimeout() {
+        return this.rpcConnectTimeout;
     }
 
     public long getScannerMaxResultSize() {
