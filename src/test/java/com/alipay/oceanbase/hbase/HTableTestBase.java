@@ -332,7 +332,7 @@ public abstract class HTableTestBase {
         Put put2 = new Put(Bytes.toBytes("testKey1"));
         put2.add(toBytes(family), toBytes(column2), toBytes(value1));
         put2.add(toBytes(family), toBytes(column2), System.currentTimeMillis(), toBytes(value1));
-        List<Put> puts = new ArrayList<Put>();
+        List<Put> puts = new ArrayList<>();
         puts.add(put1);
         puts.add(put2);
         hTable.put(puts);
@@ -1875,7 +1875,8 @@ public abstract class HTableTestBase {
         Thread.sleep(61 * 1000);
         try {
             scanner.next();
-        } catch (IOException e) {
+            fail();
+        } catch (Exception e) {
             assertTrue(e.getCause().getMessage().contains("OB_HASH_NOT_EXIST"));
         } finally {
             scanner.close();
@@ -3773,5 +3774,62 @@ public abstract class HTableTestBase {
     @Test
     public void testHtableWithIndex() throws Exception {
         testBasic("family_with_local_index");
+    }
+
+    @Test
+    public void testFilterSpecialValue() throws IOException {
+        // 1. test checkAndMutate with special character
+        String specialValue = "AAEAAAGRnJiQbwAAAZGcmJwndjE=";
+        byte[] specialBytes = Base64.getDecoder().decode(specialValue);
+        String family = "family'1";
+        byte[] keyBytes = specialBytes;
+        byte[] columnBytes = specialBytes;
+        byte[] valueBytes = specialBytes;
+
+        Delete delete = new Delete(keyBytes);
+        delete.deleteFamily(family.getBytes());
+        hTable.delete(delete);
+
+        Put put = new Put(keyBytes);
+        put.add(family.getBytes(), columnBytes, valueBytes);
+        hTable.put(put);
+
+        // check delete column
+        delete = new Delete(keyBytes);
+        delete.deleteColumn(family.getBytes(), columnBytes);
+        boolean ret = hTable.checkAndDelete(keyBytes, family.getBytes(), columnBytes,
+                valueBytes, delete);
+        Assert.assertTrue(ret);
+
+        // 2. test normal filter with special chracter
+        put = new Put(keyBytes);
+        put.add(family.getBytes(), columnBytes, valueBytes);
+        hTable.put(put);
+
+
+        Get get = new Get(keyBytes);
+        get.addFamily(family.getBytes());
+        // 2.1 test special row
+        RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(keyBytes));
+        get.setFilter(rowFilter);
+        Result result = hTable.get(get);
+        Assert.assertEquals(1, result.raw().length);
+        Assert.assertArrayEquals(keyBytes, result.getRow());
+
+        // 2.2 test special column
+        SingleColumnValueFilter singleColumnValueFilter = new SingleColumnValueFilter(family.getBytes(),
+                columnBytes, CompareFilter.CompareOp.EQUAL, valueBytes);
+        get.setFilter(singleColumnValueFilter);
+        result = hTable.get(get);
+        Assert.assertEquals(1, result.raw().length);
+        Assert.assertArrayEquals(keyBytes, result.getRow());
+
+        // 2.3 test special value
+        ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(valueBytes));
+        get.setFilter(valueFilter);
+        result = hTable.get(get);
+        Assert.assertEquals(1, result.raw().length);
+        Assert.assertArrayEquals(keyBytes, result.getRow());
+
     }
 }
