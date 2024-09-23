@@ -65,7 +65,8 @@ public class OHTableFactory extends HTableFactory {
     public HTableInterface createHTableInterface(Configuration config, byte[] tableName) {
         try {
             String tableNameStr = Bytes.toString(tableName);
-            tableNameStr = tableNameStr.equals(this.tablePool.getOriginTableName()) ?  tableNameStr : this.tablePool.getOriginTableName();
+            tableNameStr = tableNameStr.equals(this.tablePool.getOriginTableName()) ? tableNameStr
+                : this.tablePool.getOriginTableName();
 
             OHTable ht = new OHTable(adjustConfiguration(copyConfiguration(config), tableNameStr),
                 tableName, this.threadPool);

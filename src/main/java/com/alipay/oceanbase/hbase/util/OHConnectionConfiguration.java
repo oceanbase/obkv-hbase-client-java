@@ -28,7 +28,7 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 @InterfaceAudience.Private
 public class OHConnectionConfiguration {
-    private String     paramUrl;
+    private String           paramUrl;
     private final Properties properties;
     private final String     fullUsername;
     private final String     password;

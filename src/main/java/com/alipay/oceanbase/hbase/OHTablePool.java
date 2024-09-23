@@ -49,7 +49,7 @@ import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_
 
 public class OHTablePool implements Closeable {
 
-    private String originTabelName = null;
+    private String                                 originTabelName = null;
     private final PoolMap<String, HTableInterface> tables;
     private final int                              maxSize;
     private final PoolMap.PoolType                 poolType;

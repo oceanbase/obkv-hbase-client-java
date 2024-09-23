@@ -34,7 +34,7 @@ public class OHTableClientTestLoadTest extends HTableTestBase {
     @Before
     public void before() throws Exception {
         hTable = ObHTableTestUtil.newOHTableClient("test");
-//        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
+        //        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
         ((OHTableClient) hTable).init();
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
     }
