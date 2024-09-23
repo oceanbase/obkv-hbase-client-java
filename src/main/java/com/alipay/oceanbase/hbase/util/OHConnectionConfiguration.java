@@ -28,8 +28,8 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 @InterfaceAudience.Private
 public class OHConnectionConfiguration {
+    private String     paramUrl;
     private final Properties properties;
-    private final String     paramUrl;
     private final String     fullUsername;
     private final String     password;
     private final String     sysUsername;
@@ -70,6 +70,10 @@ public class OHConnectionConfiguration {
                 properties.put(property.getKey(), value);
             }
         }
+    }
+
+    public void setParamUrl(String paramUrl) {
+        this.paramUrl = paramUrl;
     }
 
     public long getWriteBufferSize() {

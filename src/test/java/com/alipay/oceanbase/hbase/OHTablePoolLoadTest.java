@@ -56,15 +56,18 @@ public class OHTablePoolLoadTest extends HTableTestBase {
             ohTablePool.setSysPassword("test", ObHTableTestUtil.SYS_PASSWORD);
         }
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
-        hTable = ohTablePool.getTable("test");
+//        hTable = ohTablePool.getTable("test");
+        hTable = ohTablePool.getTable("n1:test");
     }
 
     @Test
     public void testRefreshTableEntry() throws Exception {
-        ohTablePool.refreshTableEntry("test", "testload", false);
+//        ohTablePool.refreshTableEntry("test", "testload", false);
+        ohTablePool.refreshTableEntry("n1:test", "testload", false);
 
         try {
-            ohTablePool.refreshTableEntry("test", "testload", true);
+//            ohTablePool.refreshTableEntry("test", "testload", false);
+            ohTablePool.refreshTableEntry("n1:test", "testload", true);
         } catch (Exception e) {
             Throwable t = e;
             while (t.getCause() != null) {

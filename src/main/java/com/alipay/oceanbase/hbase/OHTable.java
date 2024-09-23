@@ -200,8 +200,9 @@ public class OHTable implements HTableInterface {
         long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         this.obTableClient = ObTableClientManager
-            .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
+            .getOrCreateObTableClient(setUserDefinedNamespace(this.tableNameString, ohConnectionConf));
 
         finishSetUp();
     }
@@ -247,8 +248,9 @@ public class OHTable implements HTableInterface {
         this.tableNameString = Bytes.toString(tableName);
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
+        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         this.obTableClient = ObTableClientManager
-            .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
+            .getOrCreateObTableClient(setUserDefinedNamespace(this.tableNameString, ohConnectionConf));
 
         finishSetUp();
     }
@@ -265,6 +267,7 @@ public class OHTable implements HTableInterface {
      * @param executePool   ExecutorService to be used.
      * @throws IllegalArgumentException if the param error
      */
+    @InterfaceAudience.Private
     public OHTable(final byte[] tableName, final ObTableClient obTableClient,
                    final ExecutorService executePool) {
         checkArgument(tableName != null, "tableNameString is blank.");
@@ -311,7 +314,7 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(this.tableNameString, connectionConfig));
     }
 
     /**
@@ -367,6 +370,29 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
+    }
+
+    private OHConnectionConfiguration setUserDefinedNamespace(String tableNameString, OHConnectionConfiguration ohConnectionConf)
+            throws IOException {
+        if (tableNameString.indexOf(':') != -1) {
+            String[] params = tableNameString.split(":");
+            if (params.length != 2) {
+                throw new IllegalArgumentException("Please check the format of self-defined " +
+                        "namespace and qualifier: { " + tableNameString + " }");
+            }
+            String database = params[0];
+            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null");
+            String databaseSuffix = "database=" + database;
+            String paramUrl = configuration.get(HBASE_OCEANBASE_PARAM_URL);
+            int databasePos = paramUrl.indexOf("database");
+            if (databasePos == -1) {
+                paramUrl += "&" + databaseSuffix;
+            } else {
+                paramUrl = paramUrl.substring(0, databasePos) + databaseSuffix;
+            }
+            ohConnectionConf.setParamUrl(paramUrl);
+        }
+        return ohConnectionConf;
     }
 
     @Override
@@ -1419,7 +1445,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filter != null) {
-            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter));
+            obHTableFilter.setFilterString(HBaseFilterUtils.toParseableString(filter).getBytes());
         }
 
         if (timeRange != null) {
@@ -1459,7 +1485,7 @@ public class OHTable implements HTableInterface {
         ObHTableFilter obHTableFilter = new ObHTableFilter();
 
         if (filterString != null) {
-            obHTableFilter.setFilterString(filterString);
+            obHTableFilter.setFilterString(filterString.getBytes());
         }
 
         if (timeRange != null) {

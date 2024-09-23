@@ -30,6 +30,7 @@ public class OHTableClientTest extends HTableTestBase {
     @Before
     public void before() throws Exception {
         hTable = ObHTableTestUtil.newOHTableClient("test");
+//        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
         ((OHTableClient) hTable).init();
     }
 
@@ -47,6 +48,7 @@ public class OHTableClientTest extends HTableTestBase {
     @Test
     public void testNew() throws Exception {
         OHTableClient hTable2 = ObHTableTestUtil.newOHTableClient("test");
+//        OHTableClient hTable2 = ObHTableTestUtil.newOHTableClient("n1:test");
         hTable2.init();
         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
 
@@ -58,7 +60,9 @@ public class OHTableClientTest extends HTableTestBase {
         hTable2.setWriteBufferSize(10000000L);
         assertEquals(10000000L, hTable2.getWriteBufferSize());
         assertEquals("test", hTable2.getTableNameString());
+//        assertEquals("n1:test", hTable2.getTableNameString());
         assertEquals("test", new String(hTable2.getTableName()));
+//        assertEquals("n1:test", new String(hTable2.getTableName()));
         hTable2.flushCommits();
         hTable2.close();
         assertTrue(true);
