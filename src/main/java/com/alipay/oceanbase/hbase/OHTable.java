@@ -383,16 +383,20 @@ public class OHTable implements HTableInterface {
                                                    + tableNameString + " }");
             }
             String database = params[0];
-            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null");
-            String databaseSuffix = "database=" + database;
-            String paramUrl = configuration.get(HBASE_OCEANBASE_PARAM_URL);
-            int databasePos = paramUrl.indexOf("database");
-            if (databasePos == -1) {
-                paramUrl += "&" + databaseSuffix;
+            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null { " + tableNameString + " }");
+            if (ohConnectionConf.isOdpMode()) {
+                ohConnectionConf.setDatabase(database);
             } else {
-                paramUrl = paramUrl.substring(0, databasePos) + databaseSuffix;
+                String databaseSuffix = "database=" + database;
+                String paramUrl = ohConnectionConf.getParamUrl();
+                int databasePos = paramUrl.indexOf("database");
+                if (databasePos == -1) {
+                    paramUrl += "&" + databaseSuffix;
+                } else {
+                    paramUrl = paramUrl.substring(0, databasePos) + databaseSuffix;
+                }
+                ohConnectionConf.setParamUrl(paramUrl);
             }
-            ohConnectionConf.setParamUrl(paramUrl);
         }
         return ohConnectionConf;
     }

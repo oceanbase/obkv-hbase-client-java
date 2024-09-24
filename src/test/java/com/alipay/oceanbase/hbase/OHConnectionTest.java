@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
+import static com.alipay.oceanbase.hbase.constants.OHConstants.SOCKET_TIMEOUT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
@@ -47,6 +48,8 @@ public class OHConnectionTest {
         c.set("rs.list.acquire.read.timeout", "10000");
         // test set rpc connection timeout, the first one is the latest version
         c.set(SOCKET_TIMEOUT_CONNECT, "15000");
+        // the second one is the deprecated version
+        c.set(SOCKET_TIMEOUT, "12000");
         connection = ConnectionFactory.createConnection(c);
         TableName tableName = TableName.valueOf("test");
         hTable = connection.getTable(tableName);

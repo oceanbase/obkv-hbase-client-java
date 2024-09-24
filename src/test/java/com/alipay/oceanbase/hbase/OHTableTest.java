@@ -40,8 +40,9 @@ public class OHTableTest extends HTableTestBase {
 
         Configuration c = ObHTableTestUtil.newConfiguration();
         c.set("rs.list.acquire.read.timeout", "10000");
-        hTable = new OHTable(c, "test");
-        //        hTable = new OHTable(c, "n1:test");
+//        hTable = new OHTable(c, "test");
+        // can uncomment the following line tshow o test self-defined namespace using database "n1"
+        hTable = new OHTable(c, "n1:test");
     }
 
     @Test

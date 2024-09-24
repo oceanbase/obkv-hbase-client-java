@@ -3579,7 +3579,7 @@ public abstract class HTableTestBase {
         get.addFamily("family_not_exists".getBytes());
         expectedException.expect(IOException.class);
         expectedException.expectMessage("query table:test family family_not_exists error.");
-        //        expectedException.expectMessage("query table:n1:test family family_not_exists error.");
+        // expectedException.expectMessage("query table:n1:test family family_not_exists error.");
         hTable.get(get);
     }
 

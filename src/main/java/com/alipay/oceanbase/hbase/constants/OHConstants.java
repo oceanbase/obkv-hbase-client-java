@@ -159,4 +159,8 @@ public final class OHConstants {
 
     public static final int      MAX_KEYVALUE_SIZE_DEFAULT                   = -1;
 
+    public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
+
+    public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000; // 20 seconds
+
 }
