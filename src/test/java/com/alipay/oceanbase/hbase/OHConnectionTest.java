@@ -288,6 +288,7 @@ public class OHConnectionTest {
     }
 
     /*
+    USE n1;
     CREATE TABLEGROUP `n1:test` SHARDING = 'ADAPTIVE';
     CREATE TABLE `n1:test$family_group` (
                   `K` varbinary(1024) NOT NULL,
