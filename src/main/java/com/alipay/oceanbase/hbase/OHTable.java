@@ -383,7 +383,8 @@ public class OHTable implements HTableInterface {
                                                    + tableNameString + " }");
             }
             String database = params[0];
-            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null { " + tableNameString + " }");
+            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null { "
+                                                + tableNameString + " }");
             if (ohConnectionConf.isOdpMode()) {
                 ohConnectionConf.setDatabase(database);
             } else {

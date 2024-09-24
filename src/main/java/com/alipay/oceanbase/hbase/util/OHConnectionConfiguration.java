@@ -69,14 +69,13 @@ public class OHConnectionConfiguration {
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         int rpcConnectTimeout = -1;
         if (conf.get(SOCKET_TIMEOUT_CONNECT) != null) {
-            rpcConnectTimeout = conf
-                    .getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
+            rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
         } else {
             if (conf.get(SOCKET_TIMEOUT) != null) {
                 rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, DEFAULT_SOCKET_TIMEOUT);
             } else {
-                rpcConnectTimeout = conf
-                        .getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
+                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT,
+                    DEFAULT_SOCKET_TIMEOUT_CONNECT);
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
