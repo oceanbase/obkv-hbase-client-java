@@ -83,11 +83,11 @@ public class ObTableClientManager {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
 
-        return getOrCreateObTableClient(obTableClientKey);
+        return getOrCreateObTableClient(obTableClientKey, connectionConfig.getRpcConnectTimeout());
     }
 
-    public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey)
-                                                                                           throws IOException {
+    public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey,
+                                                         int rpcConnectTimeout) throws IOException {
         if (OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey) == null) {
             ReentrantLock tmp = new ReentrantLock();
             ReentrantLock lock = OB_TABLE_CLIENT_LOCK.putIfAbsent(obTableClientKey, tmp);
@@ -112,6 +112,7 @@ public class ObTableClientManager {
                     }
                     obTableClient.setFullUserName(obTableClientKey.getFullUserName());
                     obTableClient.setPassword(obTableClientKey.getPassword());
+                    obTableClient.setRpcConnectTimeout(rpcConnectTimeout);
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }

@@ -49,6 +49,7 @@ import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_
 
 public class OHTablePool implements Closeable {
 
+    private String                                 originTabelName = null;
     private final PoolMap<String, HTableInterface> tables;
     private final int                              maxSize;
     private final PoolMap.PoolType                 poolType;
@@ -314,6 +315,9 @@ public class OHTablePool implements Closeable {
      * @param paramUrl  the table root server http url
      */
     public void setParamUrl(final String tableName, String paramUrl) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_PARAM_URL, Bytes.toBytes(paramUrl));
     }
 
@@ -334,6 +338,9 @@ public class OHTablePool implements Closeable {
      * @param fullUserName the table login username
      */
     public void setFullUserName(final String tableName, final String fullUserName) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_FULL_USER_NAME, Bytes.toBytes(fullUserName));
     }
 
@@ -354,6 +361,9 @@ public class OHTablePool implements Closeable {
      * @param password  the table login password
      */
     public void setPassword(final String tableName, final String password) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_PASSWORD, Bytes.toBytes(password));
     }
 
@@ -374,6 +384,9 @@ public class OHTablePool implements Closeable {
      * @param sysUserName  the sys username
      */
     public void setSysUserName(final String tableName, final String sysUserName) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_SYS_USER_NAME, Bytes.toBytes(sysUserName));
     }
 
@@ -394,6 +407,9 @@ public class OHTablePool implements Closeable {
      * @param sysPassword  the sys user password
      */
     public void setSysPassword(final String tableName, final String sysPassword) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_SYS_PASSWORD, Bytes.toBytes(sysPassword));
     }
 
@@ -481,6 +497,10 @@ public class OHTablePool implements Closeable {
             .toLong(attr);
     }
 
+    public String getOriginTableName() {
+        return this.originTabelName;
+    }
+
     /**
      * Sets the operation timeout for the specified tables in this pool.
      *
@@ -520,6 +540,9 @@ public class OHTablePool implements Closeable {
      * @param odpAddr ODP address
      */
     public void setOdpAddr(final String tableName, String odpAddr) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_ODP_ADDR, Bytes.toBytes(odpAddr));
     }
 
@@ -545,6 +568,9 @@ public class OHTablePool implements Closeable {
      * @param odpPort ODP port
      */
     public void setOdpPort(final String tableName, int odpPort) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_ODP_PORT, Bytes.toBytes(odpPort));
     }
 
@@ -564,6 +590,9 @@ public class OHTablePool implements Closeable {
      * @param odpMode ODP mode
      */
     public void setOdpMode(final String tableName, boolean odpMode) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE, Bytes.toBytes(odpMode));
     }
 
@@ -583,6 +612,9 @@ public class OHTablePool implements Closeable {
      * @param database ODP database name
      */
     public void setDatabase(final String tableName, String database) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableAttribute(tableName, HBASE_OCEANBASE_DATABASE, Bytes.toBytes(database));
     }
 
@@ -653,6 +685,9 @@ public class OHTablePool implements Closeable {
     }
 
     public void setRuntimeBatchExecutor(String tableName, ExecutorService runtimeBatchExecutor) {
+        if (originTabelName == null) {
+            originTabelName = tableName;
+        }
         setTableExtendAttribute(tableName, HBASE_OCEANBASE_BATCH_EXECUTOR, runtimeBatchExecutor);
     }
 
