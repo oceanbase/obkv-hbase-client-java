@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;

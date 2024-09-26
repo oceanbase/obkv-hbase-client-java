@@ -3436,7 +3436,7 @@ public abstract class HTableTestBase {
         } catch (IllegalArgumentException e) {
             Assert.assertTrue(e.getMessage().contains("family is empty"));
         }
-        
+
         Append append = new Append(key.getBytes());
         // append.add(null, null, null);
         try {
@@ -3796,8 +3796,8 @@ public abstract class HTableTestBase {
         // check delete column
         delete = new Delete(keyBytes);
         delete.deleteColumn(family.getBytes(), columnBytes);
-        boolean ret = hTable.checkAndDelete(keyBytes, family.getBytes(), columnBytes,
-                valueBytes, delete);
+        boolean ret = hTable.checkAndDelete(keyBytes, family.getBytes(), columnBytes, valueBytes,
+            delete);
         Assert.assertTrue(ret);
 
         // 2. test normal filter with special chracter
@@ -3805,26 +3805,27 @@ public abstract class HTableTestBase {
         put.add(family.getBytes(), columnBytes, valueBytes);
         hTable.put(put);
 
-
         Get get = new Get(keyBytes);
         get.addFamily(family.getBytes());
         // 2.1 test special row
-        RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(keyBytes));
+        RowFilter rowFilter = new RowFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            keyBytes));
         get.setFilter(rowFilter);
         Result result = hTable.get(get);
         Assert.assertEquals(1, result.raw().length);
         Assert.assertArrayEquals(keyBytes, result.getRow());
 
         // 2.2 test special column
-        SingleColumnValueFilter singleColumnValueFilter = new SingleColumnValueFilter(family.getBytes(),
-                columnBytes, CompareFilter.CompareOp.EQUAL, valueBytes);
+        SingleColumnValueFilter singleColumnValueFilter = new SingleColumnValueFilter(
+            family.getBytes(), columnBytes, CompareFilter.CompareOp.EQUAL, valueBytes);
         get.setFilter(singleColumnValueFilter);
         result = hTable.get(get);
         Assert.assertEquals(1, result.raw().length);
         Assert.assertArrayEquals(keyBytes, result.getRow());
 
         // 2.3 test special value
-        ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(valueBytes));
+        ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
+            new BinaryComparator(valueBytes));
         get.setFilter(valueFilter);
         result = hTable.get(get);
         Assert.assertEquals(1, result.raw().length);
