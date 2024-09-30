@@ -18,44 +18,24 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.exception.ObTableEntryRefreshException;
-import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
-import sun.awt.image.ImageWatched;
 
-import javax.ws.rs.PUT;
 import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.rmi.UnexpectedException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
-import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
-import static com.alipay.oceanbase.hbase.constants.OHConstants.DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX;
-import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
-import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
-import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
-import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.DEL;
 import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
-import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.RUNTIME;
-import static org.apache.commons.lang.StringUtils.isBlank;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
