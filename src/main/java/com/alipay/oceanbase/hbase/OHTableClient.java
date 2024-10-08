@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.core.Lifecycle;
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
@@ -111,7 +110,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
 
     @Override
     public CoprocessorRpcChannel coprocessorService(byte[] row) {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.coprocessorService(row);
     }
 
     @Override
@@ -120,7 +120,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                                                     Batch.Call<T, R> callable)
                                                                                               throws ServiceException,
                                                                                               Throwable {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.coprocessorService(service, startKey, endKey, callable);
     }
 
     @Override
@@ -129,7 +130,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                                           Batch.Callback<R> callback)
                                                                                      throws ServiceException,
                                                                                      Throwable {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        ohTable.coprocessorService(service, startKey, endKey, callable, callback);
     }
 
     private void checkStatus() throws IllegalStateException {
@@ -152,7 +154,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
 
     @Override
     public void setAutoFlushTo(boolean autoFlush) {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        ohTable.setAutoFlushTo(autoFlush);
     }
 
     @Override
@@ -175,7 +178,9 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                                                       R responsePrototype)
                                                                                           throws ServiceException,
                                                                                           Throwable {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.batchCoprocessorService(methodDescriptor, request, startKey, endKey,
+            responsePrototype);
     }
 
     @Override
@@ -185,14 +190,41 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                                             Batch.Callback<R> callback)
                                                                                        throws ServiceException,
                                                                                        Throwable {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        ohTable.batchCoprocessorService(methodDescriptor, request, startKey, endKey,
+            responsePrototype, callback);
     }
 
     @Override
     public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
                                   CompareFilter.CompareOp compareOp, byte[] value,
-                                  RowMutations mutation) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+                                  RowMutations mutations) throws IOException {
+        checkStatus();
+        return ohTable.checkAndMutate(row, family, qualifier, compareOp, value, mutations);
+    }
+
+    @Override
+    public void setOperationTimeout(int i) {
+        checkStatus();
+        ohTable.setOperationTimeout(i);
+    }
+
+    @Override
+    public int getOperationTimeout() {
+        checkStatus();
+        return ohTable.getOperationTimeout();
+    }
+
+    @Override
+    public void setRpcTimeout(int i) {
+        checkStatus();
+        ohTable.setRpcTimeout(i);
+    }
+
+    @Override
+    public int getRpcTimeout() {
+        checkStatus();
+        return ohTable.getRpcTimeout();
     }
 
     @Override
@@ -202,7 +234,7 @@ public class OHTableClient implements HTableInterface, Lifecycle {
 
     @Override
     public TableName getName() {
-        throw new FeatureNotSupportedException("not supported yet'");
+        return ohTable.getName();
     }
 
     @Override
@@ -225,8 +257,15 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
+    public boolean[] existsAll(List<Get> list) throws IOException {
+        checkStatus();
+        return ohTable.existsAll(list);
+    }
+
+    @Override
     public Boolean[] exists(List<Get> gets) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.exists(gets);
     }
 
     // Not support.
@@ -248,14 +287,16 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        ohTable.batchCallback(actions, results, callback);
     }
 
     @Override
     public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
                                                                                               throws IOException,
                                                                                               InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.batchCallback(actions, callback);
     }
 
     @Override
@@ -315,6 +356,14 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
+    public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier,
+                               CompareFilter.CompareOp compareOp, byte[] value, Put put)
+                                                                                        throws IOException {
+        checkStatus();
+        return ohTable.checkAndPut(row, family, qualifier, compareOp, value, put);
+    }
+
+    @Override
     public void delete(Delete delete) throws IOException {
         checkStatus();
         ohTable.delete(delete);
@@ -331,6 +380,14 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                   Delete delete) throws IOException {
         checkStatus();
         return ohTable.checkAndDelete(row, family, qualifier, value, delete);
+    }
+
+    @Override
+    public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier,
+                                  CompareFilter.CompareOp compareOp, byte[] value, Delete delete)
+                                                                                                 throws IOException {
+        checkStatus();
+        return ohTable.checkAndDelete(row, family, qualifier, compareOp, value, delete);
     }
 
     // Not support.
@@ -362,7 +419,8 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     @Override
     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
                                      Durability durability) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        checkStatus();
+        return ohTable.incrementColumnValue(row, family, qualifier, amount, durability);
     }
 
     @Override
@@ -394,18 +452,22 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     public void refreshTableEntry(String familyString, boolean hasTestLoad) throws Exception {
+        checkStatus();
         this.ohTable.refreshTableEntry(familyString, hasTestLoad);
     }
 
     public byte[][] getStartKeys() throws IOException {
+        checkStatus();
         return this.ohTable.getStartKeys();
     }
 
     public byte[][] getEndKeys() throws IOException {
+        checkStatus();
         return this.ohTable.getEndKeys();
     }
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
+        checkStatus();
         return this.ohTable.getStartEndKeys();
     }
 }

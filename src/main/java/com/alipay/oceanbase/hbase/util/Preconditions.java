@@ -33,6 +33,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.google.common.annotations.GwtCompatible;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.util.NoSuchElementException;
 
@@ -71,6 +72,7 @@ import java.util.NoSuchElementException;
  * @author Kevin Bourrillion
  * @since 2.0 (imported from Google Collections Library)
  */
+@InterfaceAudience.Private
 @GwtCompatible
 public final class Preconditions {
     private Preconditions() {

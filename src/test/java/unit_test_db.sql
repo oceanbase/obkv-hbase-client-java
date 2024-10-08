@@ -30,6 +30,22 @@ CREATE TABLE `test_t$partitionFamily1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
 
+CREATE TABLE `test$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+
+CREATE TABLE `test_t$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+
 CREATE TABLE `test$partitionFamily1` (
     `K` varbinary(1024) NOT NULL,
     `Q` varbinary(256) NOT NULL,
@@ -162,3 +178,28 @@ CREATE TABLE `test_t$family'1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) TABLEGROUP = test_t;
 
+CREATE TABLEGROUP test_multi_cf SHARDING = 'ADAPTIVE';
+
+CREATE TABLE `test_multi_cf$family_with_group1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_multi_cf$family_with_group2` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_multi_cf$family_with_group3` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
