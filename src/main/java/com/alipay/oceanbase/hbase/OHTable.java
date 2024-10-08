@@ -919,6 +919,7 @@ public class OHTable implements HTableInterface {
 
             byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
 
+
             ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
             List<Mutation> mutations = rowMutations.getMutations();
             List<KeyValue> keyValueList = new LinkedList<>();

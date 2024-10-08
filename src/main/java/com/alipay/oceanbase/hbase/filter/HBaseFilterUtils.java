@@ -19,10 +19,8 @@ package com.alipay.oceanbase.hbase.filter;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.*;
-import org.apache.hadoop.hbase.util.Bytes;
 
 import java.lang.reflect.Field;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
@@ -35,7 +33,7 @@ public class HBaseFilterUtils {
         toParseableByteArray(byteStream, filter);
         return byteStream.toByteArray();
     }
-
+    
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, Filter filter)
                                                                                              throws IOException {
         if (filter == null) {
@@ -276,7 +274,6 @@ public class HBaseFilterUtils {
     // when filter list is empty, "" is generated, and empty filter list member is removed
     // in result parseable byteArray
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, FilterList filterList)
-                                                                                                     throws IOException {
         List<Filter> filters = filterList.getFilters();
         boolean isEmpty = true;
         ByteArrayOutputStream oneFilterBytes = new ByteArrayOutputStream();
