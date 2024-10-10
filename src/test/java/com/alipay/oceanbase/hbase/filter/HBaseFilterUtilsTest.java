@@ -24,6 +24,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class HBaseFilterUtilsTest {
     private static final CompareFilter.CompareOp[] ops     = { CompareFilter.CompareOp.LESS,
@@ -157,6 +159,40 @@ public class HBaseFilterUtilsTest {
         ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("pre"));
         Assert.assertArrayEquals("ColumnPrefixFilter('pre')".getBytes(),
             HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testMultiRowRangeFilter() throws IOException {
+        List<MultiRowRangeFilter.RowRange> ranges = new ArrayList<>();
+        ranges.add(new MultiRowRangeFilter.RowRange(Bytes.toBytes("a"), true, Bytes.toBytes("b"), false));
+        ranges.add(new MultiRowRangeFilter.RowRange(Bytes.toBytes("c"), true, Bytes.toBytes("d$%%"), false));
+
+        MultiRowRangeFilter filter = new MultiRowRangeFilter(ranges);
+        System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
+        Assert.assertArrayEquals("MultiRowRangeFilter('a',true,'b',false,'c',true,'d$%%',false)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testInclusiveStopFilter() throws IOException {
+        InclusiveStopFilter filter = new InclusiveStopFilter(Bytes.toBytes("aaa"));
+        Assert.assertArrayEquals("InclusiveStopFilter('aaa')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testColumnRangeFilter() throws IOException {
+        ColumnRangeFilter filter = new ColumnRangeFilter(Bytes.toBytes("a"), true, Bytes.toBytes("b"), false);
+        Assert.assertArrayEquals("ColumnRangeFilter('a',true,'b',false)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testMultipleColumnPrefixFilter() throws IOException {
+        byte[][] prefix = {
+                Bytes.toBytes("a"),
+                Bytes.toBytes("b"),
+                Bytes.toBytes("d"),
+        };
+        MultipleColumnPrefixFilter filter = new MultipleColumnPrefixFilter(prefix);
+        Assert.assertArrayEquals("MultipleColumnPrefixFilter('a','b','d')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
