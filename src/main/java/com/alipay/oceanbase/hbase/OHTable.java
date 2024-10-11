@@ -49,10 +49,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.FilterList;
-import org.apache.hadoop.hbase.filter.PageFilter;
+import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -435,8 +432,8 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        Result r = get(get);
-        return !r.isEmpty();
+        get.setCheckExistenceOnly(true);
+        return this.get(get).getExists();
     }
 
     @Override
@@ -489,27 +486,51 @@ public class OHTable implements HTableInterface {
         throw new FeatureNotSupportedException("not supported yet'");
     }
 
-    private void getKeyValueFromResult(AbstractQueryStreamResult clientQueryStreamResult,
-                                       List<KeyValue> keyValueList, boolean isTableGroup,
-                                       byte[] family) throws Exception {
+    public static int compareByteArray(byte[] bt1, byte[] bt2) {
+        int minLength = Math.min(bt1.length, bt2.length);
+        for (int i = 0; i < minLength; i++) {
+            if (bt1[i] != bt2[i]) {
+                return bt1[i] - bt2[i];
+            }
+        }
+        return bt1.length - bt2.length;
+    }
+
+    private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                     List<KeyValue> keyValueList, boolean isTableGroup,
+                                     byte[] family) throws Exception {
         byte[][] familyAndQualifier = new byte[2][];
+        KeyValue kv = null;
         while (clientQueryStreamResult.next()) {
             List<ObObj> row = clientQueryStreamResult.getRow();
-            if (isTableGroup) {
-                // split family and qualifier
-                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row.get(1)
-                    .getValue());
+            if (row.isEmpty()) {
+                // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
+                keyValueList.add(new KeyValue());
+                return;
             } else {
-                familyAndQualifier[0] = family;
-                familyAndQualifier[1] = (byte[]) row.get(1).getValue();
+                if (kv == null
+                    || compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) <= 0) {
+                    if (kv != null
+                        && compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) != 0) {
+                        keyValueList.clear();
+                    }
+                    if (isTableGroup) {
+                        // split family and qualifier
+                        familyAndQualifier = OHBaseFuncUtils
+                            .extractFamilyFromQualifier((byte[]) row.get(1).getValue());
+                    } else {
+                        familyAndQualifier[0] = family;
+                        familyAndQualifier[1] = (byte[]) row.get(1).getValue();
+                    }
+                    kv = new KeyValue((byte[]) row.get(0).getValue(),//K
+                        familyAndQualifier[0], // family
+                        familyAndQualifier[1], // qualifiermat
+                        (Long) row.get(2).getValue(), // T
+                        (byte[]) row.get(3).getValue()//  V
+                    );
+                    keyValueList.add(kv);
+                }
             }
-            KeyValue kv = new KeyValue((byte[]) row.get(0).getValue(),//K
-                familyAndQualifier[0], // family
-                familyAndQualifier[1], // qualifier
-                (Long) row.get(2).getValue(), // T
-                (byte[]) row.get(3).getValue()//  V
-            );
-            keyValueList.add(kv);
         }
     }
 
@@ -572,7 +593,7 @@ public class OHTable implements HTableInterface {
 
                         clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        getKeyValueFromResult(clientQueryStreamResult, keyValueList, true, family);
+                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
@@ -583,7 +604,7 @@ public class OHTable implements HTableInterface {
                                     configuration));
                             clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            getKeyValueFromResult(clientQueryStreamResult, keyValueList, false,
+                            getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
                                 family);
                         }
                     }
@@ -592,6 +613,9 @@ public class OHTable implements HTableInterface {
                         e);
                     throw new IOException("query table:" + tableNameString + " family "
                                           + Bytes.toString(family) + " error.", e);
+                }
+                if (get.isCheckExistenceOnly()) {
+                    return Result.create(null, !keyValueList.isEmpty());
                 }
                 return new Result(keyValueList);
             }

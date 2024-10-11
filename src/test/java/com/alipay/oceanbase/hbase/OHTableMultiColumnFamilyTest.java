@@ -282,7 +282,7 @@ public class OHTableMultiColumnFamilyTest {
             }
             assertEquals(2, keyValues.length);
         }
-
+        scanner.close();
         scan = new Scan();
         scan.setStartRow(toBytes("Key"));
         scan.setStopRow(toBytes("Kf"));
@@ -306,7 +306,7 @@ public class OHTableMultiColumnFamilyTest {
             }
             assertEquals(5, keyValues.length);
         }
-
+        scanner.close();
         scan = new Scan();
         scan.setStartRow(toBytes("Key"));
         scan.setStopRow(toBytes("Kf"));
@@ -328,7 +328,7 @@ public class OHTableMultiColumnFamilyTest {
             }
             assertEquals(5, keyValues.length);
         }
-
+        scanner.close();
         scan = new Scan();
         scan.setStartRow(toBytes("Key"));
         scan.setStopRow(toBytes("Kf"));
@@ -351,6 +351,7 @@ public class OHTableMultiColumnFamilyTest {
             // f1c1 f1c2 f1c3 f3c1
             assertEquals(4, keyValues.length);
         }
+        scanner.close();
     }
 
     @Test

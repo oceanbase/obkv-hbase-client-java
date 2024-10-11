@@ -23,8 +23,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import java.lang.reflect.Field;
 
-import static org.apache.hadoop.hbase.util.Bytes.bytesToVint;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;

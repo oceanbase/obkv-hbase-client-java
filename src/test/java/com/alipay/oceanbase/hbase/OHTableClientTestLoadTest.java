@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
-import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import org.apache.hadoop.hbase.client.Delete;
 import org.junit.After;
 import org.junit.Assert;

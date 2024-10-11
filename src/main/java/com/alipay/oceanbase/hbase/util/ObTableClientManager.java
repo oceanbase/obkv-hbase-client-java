@@ -19,7 +19,6 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
-import com.alipay.oceanbase.rpc.property.Property;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
