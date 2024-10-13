@@ -60,7 +60,11 @@ public class ObTableClientManager {
             checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
                                                                       + " is blank");
             obTableClientKey = new ObTableClientKey();
-            obTableClientKey.setParamUrl(connectionConfig.getParamUrl());
+            String paramUrl = connectionConfig.getParamUrl();
+            if (!paramUrl.contains("database")) {
+                paramUrl += "&database=default";
+            }
+            obTableClientKey.setParamUrl(paramUrl);
             obTableClientKey.setSysUserName(connectionConfig.getSysUsername());
             if (connectionConfig.getSysPassword() == null) {
                 obTableClientKey.setSysPassword(Constants.EMPTY_STRING);
