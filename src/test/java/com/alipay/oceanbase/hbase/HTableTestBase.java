@@ -1125,6 +1125,158 @@ public abstract class HTableTestBase {
     }
 
     @Test
+    public void testFirstKeyValueMatchingQualifiersFilter() throws Exception {
+        String key1 = "getKey1";
+        String key2 = "getKey2";
+        String column1 = "c1";
+        String column2 = "c2";
+        String column3 = "c3";
+        String column4 = "c4";
+        String column5 = "c5";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey1Column3Value1 = new Put(toBytes(key1));
+        putKey1Column3Value1.add(toBytes(family), toBytes(column3), toBytes(value1));
+
+        Put putKey1Column4Value1 = new Put(toBytes(key1));
+        putKey1Column4Value1.add(toBytes(family), toBytes(column4), toBytes(value1));
+
+        Put putKey1Column5Value1 = new Put(toBytes(key1));
+        putKey1Column5Value1.add(toBytes(family), toBytes(column5), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column3Value1);
+        tryPut(hTable, putKey1Column4Value1);
+        tryPut(hTable, putKey1Column5Value1);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        TreeSet<byte []> qualifiers = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        qualifiers.add(Bytes.toBytes("c11"));
+        qualifiers.add(Bytes.toBytes("c2"));
+        FirstKeyValueMatchingQualifiersFilter filter = new FirstKeyValueMatchingQualifiersFilter(qualifiers);
+        scan.setFilter(filter);
+        ResultScanner scanner = hTable.getScanner(scan);
+
+        int res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 5);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        qualifiers = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        qualifiers.add(Bytes.toBytes("c22"));
+        qualifiers.add(Bytes.toBytes("c4"));
+        filter = new FirstKeyValueMatchingQualifiersFilter(qualifiers);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 11);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        qualifiers = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        qualifiers.add(Bytes.toBytes("c22"));
+        qualifiers.add(Bytes.toBytes("a"));
+        filter = new FirstKeyValueMatchingQualifiersFilter(qualifiers);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 12);
+        scanner.close();
+    }
+
+    @Test
     public void testGetFilter() throws Exception {
         String key1 = "getKey1";
         String key2 = "getKey2";

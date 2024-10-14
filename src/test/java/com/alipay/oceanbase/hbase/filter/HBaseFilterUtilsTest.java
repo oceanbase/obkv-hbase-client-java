@@ -24,6 +24,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.TreeSet;
 
 public class HBaseFilterUtilsTest {
     private static final CompareFilter.CompareOp[] ops     = { CompareFilter.CompareOp.LESS,
@@ -164,6 +165,16 @@ public class HBaseFilterUtilsTest {
         ColumnCountGetFilter filter = new ColumnCountGetFilter(513);
         Assert.assertArrayEquals("ColumnCountGetFilter(513)".getBytes(),
             HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testFirstKeyValueMatchingQualifiersFilter() throws IOException {
+        TreeSet<byte []> qualifiers = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        qualifiers.add(Bytes.toBytes("q1"));
+        qualifiers.add(Bytes.toBytes("q2"));
+        FirstKeyValueMatchingQualifiersFilter filter = new FirstKeyValueMatchingQualifiersFilter(qualifiers);
+        Assert.assertArrayEquals("FirstKeyValueMatchingQualifiersFilter('q1','q2')".getBytes(),
+                HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
