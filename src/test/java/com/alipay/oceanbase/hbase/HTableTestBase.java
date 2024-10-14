@@ -509,6 +509,21 @@ public abstract class HTableTestBase {
         tryPut(hTable, putKey2Column2Value1);
         tryPut(hTable, putKey2Column2Value2);
 
+//        time may be different
+//        +---------+-----+----------------+--------+
+//        | K       | Q   | T              | V      |
+//        +---------+-----+----------------+--------+
+//        | getKey1 | abc | -1728834971469 | value1 |
+//        | getKey1 | abc | -1728834971399 | value2 |
+//        | getKey1 | abc | -1728834971330 | value1 |
+//        | getKey1 | def | -1728834971748 | value2 |
+//        | getKey1 | def | -1728834971679 | value1 |
+//        | getKey1 | def | -1728834971609 | value2 |
+//        | getKey1 | def | -1728834971540 | value1 |
+//        | getKey2 | def | -1728834971887 | value2 |
+//        | getKey2 | def | -1728834971818 | value1 |
+//        +---------+-----+----------------+--------+
+
         filter = new ColumnPrefixFilter(Bytes.toBytes("e"));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3579,7 +3594,6 @@ public abstract class HTableTestBase {
         get.addFamily("family_not_exists".getBytes());
         expectedException.expect(IOException.class);
         expectedException.expectMessage("query table:test family family_not_exists error.");
-        // expectedException.expectMessage("query table:n1:test family family_not_exists error.");
         hTable.get(get);
     }
 

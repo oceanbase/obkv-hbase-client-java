@@ -58,8 +58,6 @@ public class OHTablePoolTest extends HTableTestBase {
         ohTablePool = newOHTablePool(10, null);
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
         hTable = ohTablePool.getTable("test");
-        // can uncomment the following line to test self-defined namespace using database "n1"
-        // hTable = ohTablePool.getTable("n1:test");
     }
 
     @After
@@ -84,9 +82,6 @@ public class OHTablePoolTest extends HTableTestBase {
                     }
                     OHTablePool.PooledOHTable pooledOHTable = ((OHTablePool.PooledOHTable) ohTablePool
                         .getTable("test"));
-                    // can uncomment the following line to test self-defined namespace using database "n1"
-                    // OHTablePool.PooledOHTable pooledOHTable = ((OHTablePool.PooledOHTable) ohTablePool
-                    //     .getTable("n1:test"));
                     HTableInterface htable = pooledOHTable.getTable();
                     ohTableSet.add(htable);
                     pooledHTableSet.add(pooledOHTable);
@@ -111,17 +106,12 @@ public class OHTablePoolTest extends HTableTestBase {
         Assert.assertEquals(concurrency, ohTableSet.size());
         Assert.assertEquals(1, OB_TABLE_CLIENT_INSTANCE.size());
         Assert.assertEquals(maxSize, ohTablePool.getCurrentPoolSize("test"));
-        // can uncomment the following line to test self-defined namespace using database "n1"
-        // Assert.assertEquals(maxSize, ohTablePool.getCurrentPoolSize("n1:test"));
     }
 
     @Test
     public void test_refresh_table_entry() throws Exception {
         ohTablePool.refreshTableEntry("test", "family1", false);
         ohTablePool.refreshTableEntry("test", "family1", true);
-        // can uncomment the following line to test self-defined namespace using database "n1"
-        // ohTablePool.refreshTableEntry("n1:test", "family1", false);
-        // ohTablePool.refreshTableEntry("n1:test", "family1", true);
     }
 
     @Test
