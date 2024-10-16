@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @InterfaceAudience.Private
 public class HBaseFilterUtils {
@@ -49,6 +50,8 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (PageFilter) filter);
         } else if (filter instanceof ColumnCountGetFilter) {
             toParseableByteArray(byteStream, (ColumnCountGetFilter) filter);
+        } else if (filter instanceof FirstKeyValueMatchingQualifiersFilter) {
+            toParseableByteArray(byteStream, (FirstKeyValueMatchingQualifiersFilter) filter);
         } else if (filter instanceof PrefixFilter) {
             toParseableByteArray(byteStream, (PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
@@ -240,6 +243,32 @@ public class HBaseFilterUtils {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write(Long.toString(filter.getLimit()).getBytes());
+        byteStream.write(')');
+    }
+
+    // FirstKeyValueMatchingQualifiersFilter('q1','q2')
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             FirstKeyValueMatchingQualifiersFilter filter) throws IOException {
+        Set<byte[]> qualifiers;
+        try {
+            Field field = filter.getClass().getDeclaredField("qualifiers");
+            field.setAccessible(true);
+            qualifiers = (Set<byte[]>)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        int i = 0;
+        for (byte[] qualifier: qualifiers) {
+            byteStream.write("'".getBytes());
+            byteStream.write(qualifier);
+            byteStream.write("'".getBytes());
+            if (i < qualifiers.size() - 1) {
+                byteStream.write(',');
+            }
+            i++;
+        }
         byteStream.write(')');
     }
 
