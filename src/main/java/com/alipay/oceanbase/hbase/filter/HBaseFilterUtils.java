@@ -40,13 +40,15 @@ public class HBaseFilterUtils {
                                                                                              throws IOException {
         if (filter == null) {
             throw new IllegalArgumentException("Filter is null");
+        } else if (filter instanceof DependentColumnFilter) {
+            toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else if (filter instanceof CompareFilter) {
             // RowFilter, ValueFilter, QualifierFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
-        } else if (filter instanceof SingleColumnValueFilter) {
-            toParseableByteArray(byteStream, (SingleColumnValueFilter) filter);
         } else if (filter instanceof SingleColumnValueExcludeFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueExcludeFilter) filter);
+        } else if (filter instanceof SingleColumnValueFilter) {
+            toParseableByteArray(byteStream, (SingleColumnValueFilter) filter);
         } else if (filter instanceof PageFilter) {
             toParseableByteArray(byteStream, (PageFilter) filter);
         } else if (filter instanceof ColumnCountGetFilter) {
@@ -71,8 +73,6 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
             toParseableByteArray(byteStream, (WhileMatchFilter) filter);
-        } else if (filter instanceof DependentColumnFilter) {
-            toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else {
             throw new IllegalArgumentException("Invalid filter: " + filter);
         }
@@ -192,14 +192,6 @@ public class HBaseFilterUtils {
 
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
                                              DependentColumnFilter filter) throws IOException {
-        boolean dropDependentColumn;
-        try {
-            Field field = filter.getClass().getDeclaredField("dropDependentColumn");
-            field.setAccessible(true);
-            dropDependentColumn = (boolean)field.get(filter);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
         // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ')'
         if (filter.getComparator() == null) {
             byteStream.write(filter.getClass().getSimpleName().getBytes());
@@ -208,7 +200,7 @@ public class HBaseFilterUtils {
             byteStream.write("','".getBytes());
             writeBytesWithEscape(byteStream, filter.getQualifier());
             byteStream.write("',".getBytes());
-            byteStream.write(Boolean.toString(dropDependentColumn).getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
             byteStream.write(')');
         } else { // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ',' compare_op ',' comparator ')'
             byteStream.write(filter.getClass().getSimpleName().getBytes());
@@ -217,7 +209,7 @@ public class HBaseFilterUtils {
             byteStream.write("','".getBytes());
             writeBytesWithEscape(byteStream, filter.getQualifier());
             byteStream.write("',".getBytes());
-            byteStream.write(Boolean.toString(dropDependentColumn).getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
             byteStream.write(',');
             byteStream.write(toParseableByteArray(filter.getOperator()));
             byteStream.write(',');

@@ -209,6 +209,10 @@ public class OHConnectionTest {
             String value = "value333444";
             long timestamp = System.currentTimeMillis();
 
+            Delete delete= new Delete(toBytes(key));
+            delete.deleteFamily(toBytes("family_group"));
+            hTable.delete(delete);
+
             // only support Put and Delete
             // for other type of operations, BufferedMutator will not set its type for them
             Append append = new Append(Bytes.toBytes(key));
@@ -409,6 +413,10 @@ public class OHConnectionTest {
             String value = "value333444";
             long timestamp = System.currentTimeMillis();
 
+            Delete delete= new Delete(toBytes(key));
+            delete.deleteFamily(toBytes("family_group"));
+            hTable.delete(delete);
+
             List<Mutation> mutations = new ArrayList<>();
             for (int i = 0; i < 50; ++i) {
                 mutations.clear();
@@ -498,6 +506,10 @@ public class OHConnectionTest {
             String value = "value333444";
             long timestamp = System.currentTimeMillis();
 
+            Delete delete= new Delete(toBytes(key));
+            delete.deleteFamily(toBytes("family_group"));
+            hTable.delete(delete);
+
             List<Mutation> mutations = new ArrayList<>();
             for (int i = 0; i < 50; ++i) {
                 mutations.clear();
@@ -586,6 +598,10 @@ public class OHConnectionTest {
             String column1 = "putColumn1";
             String value = "value333444";
             long timestamp = System.currentTimeMillis();
+
+            Delete delete= new Delete(toBytes(key));
+            delete.deleteFamily(toBytes("family_group"));
+            hTable.delete(delete);
 
             for (int i = 0; i < 50; ++i) {
                 final int taskId = i;
