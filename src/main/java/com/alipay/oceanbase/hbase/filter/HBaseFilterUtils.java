@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @InterfaceAudience.Private
 public class HBaseFilterUtils {
@@ -53,6 +54,8 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (PageFilter) filter);
         } else if (filter instanceof ColumnCountGetFilter) {
             toParseableByteArray(byteStream, (ColumnCountGetFilter) filter);
+        } else if (filter instanceof FirstKeyValueMatchingQualifiersFilter) {
+            toParseableByteArray(byteStream, (FirstKeyValueMatchingQualifiersFilter) filter);
         } else if (filter instanceof PrefixFilter) {
             toParseableByteArray(byteStream, (PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
@@ -69,6 +72,14 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (KeyOnlyFilter) filter);
         } else if (filter instanceof TimestampsFilter) {
             toParseableByteArray(byteStream, (TimestampsFilter) filter);
+        } else if (filter instanceof MultiRowRangeFilter) {
+            toParseableByteArray(byteStream, (MultiRowRangeFilter) filter);
+        } else if (filter instanceof InclusiveStopFilter) {
+            toParseableByteArray(byteStream, (InclusiveStopFilter) filter);
+        } else if (filter instanceof ColumnRangeFilter) {
+            toParseableByteArray(byteStream, (ColumnRangeFilter) filter);
+        } else if (filter instanceof MultipleColumnPrefixFilter) {
+            toParseableByteArray(byteStream, (MultipleColumnPrefixFilter) filter);
         } else if (filter instanceof SkipFilter) {
             toParseableByteArray(byteStream, (SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
@@ -285,12 +296,109 @@ public class HBaseFilterUtils {
         byteStream.write(')');
     }
 
+    // MultiRowRangeFilter('a',true,'b',false,'c',true,'d',false);
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, MultiRowRangeFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        List<MultiRowRangeFilter.RowRange> ranges = filter.getRowRanges();
+        for (int i = 0; i < ranges.size(); i ++) {
+            MultiRowRangeFilter.RowRange range = ranges.get(i);
+            byteStream.write("'".getBytes());
+            byteStream.write(range.getStartRow());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(range.isStartRowInclusive()).getBytes());
+            byteStream.write(',');
+
+            byteStream.write("'".getBytes());
+            byteStream.write(range.getStopRow());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(range.isStopRowInclusive()).getBytes());
+            if (i < ranges.size() - 1) {
+                byteStream.write(',');
+            }
+        }
+        byteStream.write(')');
+    }
+
+    // InclusiveStopFilter('aaa');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, InclusiveStopFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        byteStream.write('\'');
+        byteStream.write(filter.getStopRowKey());
+        byteStream.write('\'');
+        byteStream.write(')');
+    }
+
+    // ColumnRangeFilter('a',true,'b',false);
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, ColumnRangeFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        byteStream.write("'".getBytes());
+        byteStream.write(filter.getMinColumn());
+        byteStream.write("',".getBytes());
+        byteStream.write(Boolean.toString(filter.getMinColumnInclusive()).getBytes());
+        byteStream.write(',');
+
+        byteStream.write("'".getBytes());
+        byteStream.write(filter.getMaxColumn());
+        byteStream.write("',".getBytes());
+        byteStream.write(Boolean.toString(filter.getMaxColumnInclusive()).getBytes());
+        byteStream.write(')');
+    }
+
+    // MultipleColumnPrefixFilter('a','b','d');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, MultipleColumnPrefixFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        byte[][] ranges = filter.getPrefix();
+        for (int i = 0; i < ranges.length; i ++) {
+            byte[] range = ranges[i];
+            byteStream.write("'".getBytes());
+            byteStream.write(range);
+            byteStream.write("'".getBytes());
+            if (i < ranges.length - 1) {
+                byteStream.write(',');
+            }
+        }
+        byteStream.write(')');
+    }
+
     // ColumnCountGetFilter(100)
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
                                              ColumnCountGetFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write(Long.toString(filter.getLimit()).getBytes());
+        byteStream.write(')');
+    }
+
+    // FirstKeyValueMatchingQualifiersFilter('q1','q2')
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             FirstKeyValueMatchingQualifiersFilter filter) throws IOException {
+        Set<byte[]> qualifiers;
+        try {
+            Field field = filter.getClass().getDeclaredField("qualifiers");
+            field.setAccessible(true);
+            qualifiers = (Set<byte[]>)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        int i = 0;
+        for (byte[] qualifier: qualifiers) {
+            byteStream.write("'".getBytes());
+            byteStream.write(qualifier);
+            byteStream.write("'".getBytes());
+            if (i < qualifiers.size() - 1) {
+                byteStream.write(',');
+            }
+            i++;
+        }
         byteStream.write(')');
     }
 

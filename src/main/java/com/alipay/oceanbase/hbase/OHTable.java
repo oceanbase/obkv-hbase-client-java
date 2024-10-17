@@ -35,6 +35,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
+import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -195,8 +196,9 @@ public class OHTable implements HTableInterface {
         long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
-        this.obTableClient = ObTableClientManager
-            .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
+        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+            this.tableNameString, ohConnectionConf));
 
         finishSetUp();
     }
@@ -242,8 +244,9 @@ public class OHTable implements HTableInterface {
         this.tableNameString = Bytes.toString(tableName);
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
-        this.obTableClient = ObTableClientManager
-            .getOrCreateObTableClient(new OHConnectionConfiguration(configuration));
+        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+            this.tableNameString, ohConnectionConf));
 
         finishSetUp();
     }
@@ -260,6 +263,7 @@ public class OHTable implements HTableInterface {
      * @param executePool   ExecutorService to be used.
      * @throws IllegalArgumentException if the param error
      */
+    @InterfaceAudience.Private
     public OHTable(final byte[] tableName, final ObTableClient obTableClient,
                    final ExecutorService executePool) {
         checkArgument(tableName != null, "tableNameString is blank.");
@@ -306,7 +310,8 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+            this.tableNameString, connectionConfig));
     }
 
     /**
@@ -362,6 +367,36 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
+    }
+
+    private OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
+                                                              OHConnectionConfiguration ohConnectionConf)
+                                                                                                         throws IOException {
+        if (tableNameString.indexOf(':') != -1) {
+            String[] params = tableNameString.split(":");
+            if (params.length != 2) {
+                throw new IllegalArgumentException("Please check the format of self-defined "
+                                                   + "namespace and qualifier: { "
+                                                   + tableNameString + " }");
+            }
+            String database = params[0];
+            checkArgument(isNotBlank(database), "self-defined namespace cannot be blank or null { "
+                                                + tableNameString + " }");
+            if (ohConnectionConf.isOdpMode()) {
+                ohConnectionConf.setDatabase(database);
+            } else {
+                String databaseSuffix = "database=" + database;
+                String paramUrl = ohConnectionConf.getParamUrl();
+                int databasePos = paramUrl.indexOf("database");
+                if (databasePos == -1) {
+                    paramUrl += "&" + databaseSuffix;
+                } else {
+                    paramUrl = paramUrl.substring(0, databasePos) + databaseSuffix;
+                }
+                ohConnectionConf.setParamUrl(paramUrl);
+            }
+        }
+        return ohConnectionConf;
     }
 
     @Override

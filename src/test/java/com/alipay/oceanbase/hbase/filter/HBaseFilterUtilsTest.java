@@ -24,6 +24,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
 
 public class HBaseFilterUtilsTest {
     private static final CompareFilter.CompareOp[] ops     = { CompareFilter.CompareOp.LESS,
@@ -160,10 +163,54 @@ public class HBaseFilterUtilsTest {
     }
 
     @Test
+    public void testMultiRowRangeFilter() throws IOException {
+        List<MultiRowRangeFilter.RowRange> ranges = new ArrayList<>();
+        ranges.add(new MultiRowRangeFilter.RowRange(Bytes.toBytes("a"), true, Bytes.toBytes("b"), false));
+        ranges.add(new MultiRowRangeFilter.RowRange(Bytes.toBytes("c"), true, Bytes.toBytes("d$%%"), false));
+
+        MultiRowRangeFilter filter = new MultiRowRangeFilter(ranges);
+        System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
+        Assert.assertArrayEquals("MultiRowRangeFilter('a',true,'b',false,'c',true,'d$%%',false)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testInclusiveStopFilter() throws IOException {
+        InclusiveStopFilter filter = new InclusiveStopFilter(Bytes.toBytes("aaa"));
+        Assert.assertArrayEquals("InclusiveStopFilter('aaa')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testColumnRangeFilter() throws IOException {
+        ColumnRangeFilter filter = new ColumnRangeFilter(Bytes.toBytes("a"), true, Bytes.toBytes("b"), false);
+        Assert.assertArrayEquals("ColumnRangeFilter('a',true,'b',false)".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testMultipleColumnPrefixFilter() throws IOException {
+        byte[][] prefix = {
+                Bytes.toBytes("a"),
+                Bytes.toBytes("b"),
+                Bytes.toBytes("d"),
+        };
+        MultipleColumnPrefixFilter filter = new MultipleColumnPrefixFilter(prefix);
+        Assert.assertArrayEquals("MultipleColumnPrefixFilter('a','b','d')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
     public void testColumnCountGetFilter() throws IOException {
         ColumnCountGetFilter filter = new ColumnCountGetFilter(513);
         Assert.assertArrayEquals("ColumnCountGetFilter(513)".getBytes(),
             HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testFirstKeyValueMatchingQualifiersFilter() throws IOException {
+        TreeSet<byte []> qualifiers = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        qualifiers.add(Bytes.toBytes("q1"));
+        qualifiers.add(Bytes.toBytes("q2"));
+        FirstKeyValueMatchingQualifiersFilter filter = new FirstKeyValueMatchingQualifiersFilter(qualifiers);
+        Assert.assertArrayEquals("FirstKeyValueMatchingQualifiersFilter('q1','q2')".getBytes(),
+                HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
