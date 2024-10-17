@@ -30,6 +30,22 @@ CREATE TABLE `test_t$partitionFamily1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
 
+CREATE TABLE `test$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+
+CREATE TABLE `test_t$familyPartition` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+
 CREATE TABLE `test$partitionFamily1` (
     `K` varbinary(1024) NOT NULL,
     `Q` varbinary(256) NOT NULL,
@@ -70,6 +86,30 @@ CREATE TABLE `test$family_ttl` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLE `test$familyRange` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by range columns (`K`) (
+    PARTITION p0 VALUES LESS THAN ('d'),
+    PARTITION p1 VALUES LESS THAN ('j'),
+    PARTITION p2 VALUES LESS THAN MAXVALUE
+);
+
+CREATE TABLE `test_t$familyRange` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by range columns (`K`) (
+    PARTITION p0 VALUES LESS THAN ('d'),
+    PARTITION p1 VALUES LESS THAN ('j'),
+    PARTITION p2 VALUES LESS THAN MAXVALUE
 );
 
 CREATE TABLE `test$familyThrottle` (
@@ -145,3 +185,45 @@ CREATE TABLE `test_t$family_with_local_index` (
     key `idx1`(T) local,
     PRIMARY KEY (`K`, `Q`, `T`)
 );
+
+CREATE TABLE `test$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test;
+
+CREATE TABLE `test_t$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_t;
+
+CREATE TABLEGROUP test_multi_cf SHARDING = 'ADAPTIVE';
+
+CREATE TABLE `test_multi_cf$family_with_group1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_multi_cf$family_with_group2` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_multi_cf$family_with_group3` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`) 
+) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;

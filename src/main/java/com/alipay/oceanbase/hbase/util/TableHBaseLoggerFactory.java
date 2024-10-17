@@ -19,8 +19,10 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.sofa.common.code.LogCode2Description;
 import com.alipay.sofa.common.log.LoggerSpaceManager;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.slf4j.Logger;
 
+@InterfaceAudience.Private
 public class TableHBaseLoggerFactory {
 
     public static final String        TABLE_HBASE_LOGGER_SPACE = "oceanbase-table-hbase";
