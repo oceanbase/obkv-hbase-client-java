@@ -598,6 +598,11 @@ public class OHTable implements HTableInterface {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
                             family = entry.getKey();
+                            Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                            if (colFamTimeRangeMap.get(entry.getKey()) != null) {
+                                TimeRange tr = colFamTimeRangeMap.get(entry.getKey());
+                                get.setTimeRange(tr.getMin(), tr.getMax());
+                            }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family),
