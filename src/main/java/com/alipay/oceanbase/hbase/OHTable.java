@@ -605,8 +605,8 @@ public class OHTable implements HTableInterface {
                             if (colFamTimeRangeMap.size() > 1) {
                                 throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
                             }
-                            if (colFamTimeRangeMap.get(entry.getKey()) != null) {
-                                TimeRange tr = colFamTimeRangeMap.get(entry.getKey());
+                            if (colFamTimeRangeMap.get(family) != null) {
+                                TimeRange tr = colFamTimeRangeMap.get(family);
                                 get.setTimeRange(tr.getMin(), tr.getMax());
                             }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
@@ -702,8 +702,8 @@ public class OHTable implements HTableInterface {
                             if (colFamTimeRangeMap.size() > 1) {
                                 throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
                             }
-                            if (colFamTimeRangeMap.get(entry.getKey()) != null) {
-                                TimeRange tr = colFamTimeRangeMap.get(entry.getKey());
+                            if (colFamTimeRangeMap.get(family) != null) {
+                                TimeRange tr = colFamTimeRangeMap.get(family);
                                 scan.setTimeRange(tr.getMin(), tr.getMax());
                             }
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
