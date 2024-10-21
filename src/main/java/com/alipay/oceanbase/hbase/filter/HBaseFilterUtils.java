@@ -42,7 +42,7 @@ public class HBaseFilterUtils {
         if (filter == null) {
             throw new IllegalArgumentException("Filter is null");
         } else if (filter instanceof CompareFilter) {
-            // RowFilter, ValueFilter, QualifierFilter
+            // RowFilter, ValueFilter, QualifierFilter, FamilyFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
         } else if (filter instanceof SingleColumnValueFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueFilter) filter);
