@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -1668,6 +1669,293 @@ public abstract class HTableTestBase {
             }
         }
         Assert.assertEquals(res_count, 10);
+        scanner.close();
+    }
+
+    @Test
+    public void testFuzzyRowFilter() throws Exception {
+        String key1 = "abab";
+        String key2 = "abcc";
+        String column1 = "c1";
+        String column2 = "c2";
+        String column3 = "c3";
+        String column4 = "c4";
+        String column5 = "c5";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.deleteFamily(toBytes(family));
+
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.deleteFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey1Column2Value1 = new Put(toBytes(key1));
+        putKey1Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        Put putKey1Column3Value1 = new Put(toBytes(key1));
+        putKey1Column3Value1.add(toBytes(family), toBytes(column3), toBytes(value1));
+
+        Put putKey1Column4Value1 = new Put(toBytes(key1));
+        putKey1Column4Value1.add(toBytes(family), toBytes(column4), toBytes(value1));
+
+        Put putKey1Column5Value1 = new Put(toBytes(key1));
+        putKey1Column5Value1.add(toBytes(family), toBytes(column5), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family), toBytes(column1), toBytes(value2));
+
+        Put putKey2Column2Value2 = new Put(toBytes(key2));
+        putKey2Column2Value2.add(toBytes(family), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family), toBytes(column2), toBytes(value1));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column1Value2);
+        tryPut(hTable, putKey1Column1Value1);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column2Value1);
+        tryPut(hTable, putKey1Column2Value2);
+        tryPut(hTable, putKey1Column3Value1);
+        tryPut(hTable, putKey1Column4Value1);
+        tryPut(hTable, putKey1Column5Value1);
+        tryPut(hTable, putKey2Column2Value1);
+        tryPut(hTable, putKey2Column2Value2);
+
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        List<Pair<byte[], byte[]>> fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("abab"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        FuzzyRowFilter filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        ResultScanner scanner = hTable.getScanner(scan);
+
+        int res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 10);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("abcc"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("ccab"), Bytes.toBytes("1100")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 10);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("cccc"), Bytes.toBytes("1100")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("ab##"), Bytes.toBytes("0011")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 12);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("azc"), Bytes.toBytes("010")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("azccd"), Bytes.toBytes("01001")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setMaxVersions(10);
+        scan.setReversed(true);
+        fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes(""), Bytes.toBytes("")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        filter = new FuzzyRowFilter(fuzzyKey);
+        scan.setFilter(filter);
+        scanner = hTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 12);
         scanner.close();
     }
 
