@@ -3065,9 +3065,18 @@ public abstract class HTableTestBase {
         get.setColumnFamilyTimeRange(toBytes("mockFamily"), timeStamp8, timeStamp9);
         get.addFamily(toBytes(family));
         get.setMaxVersions();
-        final Get errorGet = get;
+        final Get multiFamGet = get;
         Assert.assertThrows(IOException.class, () -> {
-           hTable.get(errorGet);
+           hTable.get(multiFamGet);
+        });
+
+        get = new Get(toBytes(key3));
+        get.setColumnFamilyTimeRange(toBytes("mockFamily"), timeStamp8, timeStamp9);
+        get.addFamily(toBytes(family));
+        get.setMaxVersions();
+        final Get missFamGet = get;
+        Assert.assertThrows(IOException.class, () -> {
+            hTable.get(missFamGet);
         });
 
         hTable.delete(deleteKey1Family);
@@ -3543,9 +3552,18 @@ public abstract class HTableTestBase {
         scan.setColumnFamilyTimeRange(toBytes(family), timeStamp3, timeStamp9);
         scan.setColumnFamilyTimeRange(toBytes("mockFamily"), timeStamp3, timeStamp9);
         scan.setMaxVersions();
-        final Scan errorScan = scan;
+        final Scan multiFamScan = scan;
         Assert.assertThrows(IOException.class, () -> {
-            hTable.getScanner(errorScan);
+            hTable.getScanner(multiFamScan);
+        });
+
+        scan = new Scan();
+        scan.addFamily(toBytes(family));
+        scan.setColumnFamilyTimeRange(toBytes("mockFamily"), timeStamp3, timeStamp9);
+        scan.setMaxVersions();
+        final Scan missScan = scan;
+        Assert.assertThrows(IOException.class, () -> {
+            hTable.getScanner(missScan);
         });
 
         hTable.delete(deleteKey1Family);
