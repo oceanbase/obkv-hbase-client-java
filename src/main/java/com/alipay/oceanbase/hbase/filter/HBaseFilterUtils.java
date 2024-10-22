@@ -42,9 +42,13 @@ public class HBaseFilterUtils {
                                                                                              throws IOException {
         if (filter == null) {
             throw new IllegalArgumentException("Filter is null");
+        } else if (filter instanceof DependentColumnFilter) {
+            toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else if (filter instanceof CompareFilter) {
             // RowFilter, ValueFilter, QualifierFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
+        } else if (filter instanceof SingleColumnValueExcludeFilter) {
+            toParseableByteArray(byteStream, (SingleColumnValueExcludeFilter) filter);
         } else if (filter instanceof SingleColumnValueFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueFilter) filter);
         } else if (filter instanceof PageFilter) {
@@ -163,6 +167,25 @@ public class HBaseFilterUtils {
         byteStream.write(')');
     }
 
+    // SingleColumnValueExcludeFilter('cf1','col1',=,'binary:123',true,true)
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             SingleColumnValueExcludeFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write("('".getBytes());
+        writeBytesWithEscape(byteStream, filter.getFamily());
+        byteStream.write("','".getBytes());
+        writeBytesWithEscape(byteStream, filter.getQualifier());
+        byteStream.write("',".getBytes());
+        byteStream.write(toParseableByteArray(filter.getOperator()));
+        byteStream.write(',');
+        toParseableByteArray(byteStream, filter.getComparator());
+        byteStream.write(',');
+        byteStream.write(Boolean.toString(filter.getFilterIfMissing()).getBytes());
+        byteStream.write(',');
+        byteStream.write(Boolean.toString(filter.getLatestVersionOnly()).getBytes());
+        byteStream.write(')');
+    }
+
     // PageFilter(100);
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, PageFilter filter)
                                                                                                  throws IOException {
@@ -179,6 +202,34 @@ public class HBaseFilterUtils {
         byteStream.write(Integer.toString(Bytes.toInt(Bytes.toBytes(filter.getChance())))
             .getBytes());
         byteStream.write(')');
+    }
+
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             DependentColumnFilter filter) throws IOException {
+        // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ')'
+        if (filter.getComparator() == null) {
+            byteStream.write(filter.getClass().getSimpleName().getBytes());
+            byteStream.write("('".getBytes());
+            writeBytesWithEscape(byteStream, filter.getFamily());
+            byteStream.write("','".getBytes());
+            writeBytesWithEscape(byteStream, filter.getQualifier());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
+            byteStream.write(')');
+        } else { // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ',' compare_op ',' comparator ')'
+            byteStream.write(filter.getClass().getSimpleName().getBytes());
+            byteStream.write("('".getBytes());
+            writeBytesWithEscape(byteStream, filter.getFamily());
+            byteStream.write("','".getBytes());
+            writeBytesWithEscape(byteStream, filter.getQualifier());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
+            byteStream.write(',');
+            byteStream.write(toParseableByteArray(filter.getOperator()));
+            byteStream.write(',');
+            toParseableByteArray(byteStream, filter.getComparator());
+            byteStream.write(')');
+        }
     }
 
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
