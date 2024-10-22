@@ -3561,9 +3561,9 @@ public abstract class HTableTestBase {
         scan.addFamily(toBytes(family));
         scan.setColumnFamilyTimeRange(toBytes("mockFamily"), timeStamp3, timeStamp9);
         scan.setMaxVersions();
-        final Scan missScan = scan;
+        final Scan missFamScan = scan;
         Assert.assertThrows(IOException.class, () -> {
-            hTable.getScanner(missScan);
+            hTable.getScanner(missFamScan);
         });
 
         hTable.delete(deleteKey1Family);
