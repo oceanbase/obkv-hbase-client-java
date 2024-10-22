@@ -1717,6 +1717,9 @@ public class OHTable implements HTableInterface {
             case DeleteFamily:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
                     new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
+            case DeleteFamilyVersion:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[] { kv.getRow(), null, kv.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
