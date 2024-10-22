@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.filter;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 
 import java.lang.reflect.Field;
 
@@ -70,6 +71,8 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (FirstKeyOnlyFilter) filter);
         } else if (filter instanceof KeyOnlyFilter) {
             toParseableByteArray(byteStream, (KeyOnlyFilter) filter);
+        } else if (filter instanceof FuzzyRowFilter) {
+            toParseableByteArray(byteStream, (FuzzyRowFilter) filter);
         } else if (filter instanceof TimestampsFilter) {
             toParseableByteArray(byteStream, (TimestampsFilter) filter);
         } else if (filter instanceof MultiRowRangeFilter) {
@@ -272,6 +275,35 @@ public class HBaseFilterUtils {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write(Boolean.toString(lenAsVal).getBytes());
+        byteStream.write(')');
+    }
+
+    // FuzzyRowFilter('abc','101','ddd','010');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, FuzzyRowFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        List<Pair<byte[], byte[]>> fuzzyKeysData;
+        try {
+            Field field = filter.getClass().getDeclaredField("fuzzyKeysData");
+            field.setAccessible(true);
+            fuzzyKeysData = (List<Pair<byte[], byte[]>>)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        for (int i = 0; i < fuzzyKeysData.size(); i ++) {
+            Pair<byte[], byte[]> data = fuzzyKeysData.get(i);
+            byteStream.write("'".getBytes());
+            byteStream.write(data.getFirst());
+            byteStream.write("'".getBytes());
+            byteStream.write(',');
+            byteStream.write("'".getBytes());
+            byteStream.write(data.getSecond());
+            byteStream.write("'".getBytes());
+            if (i < fuzzyKeysData.size() - 1) {
+                byteStream.write(',');
+            }
+        }
         byteStream.write(')');
     }
 

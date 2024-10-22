@@ -601,13 +601,16 @@ public class OHTable implements HTableInterface {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
                             family = entry.getKey();
-                            Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
-                            if (colFamTimeRangeMap.size() > 1) {
-                                throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
-                            }
-                            if (colFamTimeRangeMap.get(family) != null) {
-                                TimeRange tr = colFamTimeRangeMap.get(family);
-                                get.setTimeRange(tr.getMin(), tr.getMax());
+                            if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                                Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                                if (colFamTimeRangeMap.size() > 1) {
+                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                } else if (colFamTimeRangeMap.get(family) == null) {
+                                    throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
+                                } else {
+                                    TimeRange tr = colFamTimeRangeMap.get(family);
+                                    get.setTimeRange(tr.getMin(), tr.getMax());
+                                }
                             }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             request = buildObTableQueryAsyncRequest(obTableQuery,
@@ -698,13 +701,16 @@ public class OHTable implements HTableInterface {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
                             family = entry.getKey();
-                            Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
-                            if (colFamTimeRangeMap.size() > 1) {
-                                throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
-                            }
-                            if (colFamTimeRangeMap.get(family) != null) {
-                                TimeRange tr = colFamTimeRangeMap.get(family);
-                                scan.setTimeRange(tr.getMin(), tr.getMax());
+                            if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                                Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
+                                if (colFamTimeRangeMap.size() > 1) {
+                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                } else if (colFamTimeRangeMap.get(family) == null) {
+                                    throw new IllegalArgumentException("Scan family is not matched in ColumnFamilyTimeRange");
+                                } else {
+                                    TimeRange tr = colFamTimeRangeMap.get(family);
+                                    scan.setTimeRange(tr.getMin(), tr.getMax());
+                                }
                             }
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), entry.getValue());
