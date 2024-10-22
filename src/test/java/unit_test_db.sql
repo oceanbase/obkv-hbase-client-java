@@ -63,6 +63,14 @@ CREATE TABLE `test$family_group` (
       PRIMARY KEY (`K`, `Q`, `T`)
 ) TABLEGROUP = test;
 
+CREATE TABLE `test$family_group1` (
+      `K` varbinary(1024) NOT NULL,
+      `Q` varbinary(256) NOT NULL,
+      `T` bigint(20) NOT NULL,
+      `V` varbinary(1024) DEFAULT NULL,
+      PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test;
+
 CREATE TABLEGROUP test_t SHARDING = 'ADAPTIVE';
 CREATE TABLE `test_t$family_group` (
       `K` varbinary(1024) NOT NULL,

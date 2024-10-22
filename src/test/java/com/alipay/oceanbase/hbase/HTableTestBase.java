@@ -4871,15 +4871,19 @@ public abstract class HTableTestBase {
         String value1 = "value1";
         String value2 = "value2";
         String value3 = "value3";
-        String family = "family1";
+        String family1 = "family_group";
+        String family2 = "family_group1";
 
         // delete previous data
         Delete deleteKey1Family = new Delete(toBytes(key1));
-        deleteKey1Family.deleteFamily(toBytes(family));
+        deleteKey1Family.deleteFamily(toBytes(family1));
+        deleteKey1Family.deleteFamily(toBytes(family2));
         Delete deleteKey2Family = new Delete(toBytes(key2));
-        deleteKey2Family.deleteFamily(toBytes(family));
+        deleteKey2Family.deleteFamily(toBytes(family1));
+        deleteKey2Family.deleteFamily(toBytes(family2));
         Delete deleteKey3Family = new Delete(toBytes(key3));
-        deleteKey3Family.deleteFamily(toBytes(family));
+        deleteKey3Family.deleteFamily(toBytes(family1));
+        deleteKey3Family.deleteFamily(toBytes(family2));
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
@@ -4912,111 +4916,251 @@ public abstract class HTableTestBase {
         long maxTimeStamp = System.currentTimeMillis();
 
 
-        Put putKey1Column1MinTs = new Put(toBytes(key1));
-        putKey1Column1MinTs.add(toBytes(family), toBytes(column1), minTimeStamp, toBytes(value1));
+        Put putKey1Fam1Column1MinTs = new Put(toBytes(key1));
+        putKey1Fam1Column1MinTs.add(toBytes(family1), toBytes(column1), minTimeStamp, toBytes(value1));
 
-        Put putKey3Column1Ts1 = new Put(toBytes(key3));
-        putKey3Column1Ts1.add(toBytes(family), toBytes(column1), timeStamp1, toBytes(value2));
+        Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
+        putKey3Fam1Column1Ts1.add(toBytes(family1), toBytes(column1), timeStamp1, toBytes(value2));
 
-        Put putKey1Column2MinTs = new Put(toBytes(key1));
-        putKey1Column2MinTs.add(toBytes(family), toBytes(column2), minTimeStamp, toBytes(value1));
+        Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
+        putKey1Fam1Column2MinTs.add(toBytes(family1), toBytes(column2), minTimeStamp, toBytes(value1));
 
-        Put putKey1Column2Ts3 = new Put(toBytes(key1));
-        putKey1Column2Ts3.add(toBytes(family), toBytes(column2), timeStamp3, toBytes(value2));
+        Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
+        putKey1Fam1Column2Ts3.add(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
 
-        Put putKey2Column2Ts3 = new Put(toBytes(key2));
-        putKey2Column2Ts3.add(toBytes(family), toBytes(column2), timeStamp3, toBytes(value2));
+        Put putKey2Fam1Column2Ts3 = new Put(toBytes(key2));
+        putKey2Fam1Column2Ts3.add(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
 
-        Put putKey2Column3Ts1 = new Put(toBytes(key2));
-        putKey2Column3Ts1.add(toBytes(family), toBytes(column3), timeStamp1, toBytes(value2));
+        Put putKey2Fam1Column3Ts1 = new Put(toBytes(key2));
+        putKey2Fam1Column3Ts1.add(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
 
-        Put putKey3Column3Ts1 = new Put(toBytes(key3));
-        putKey3Column3Ts1.add(toBytes(family), toBytes(column3), timeStamp1, toBytes(value2));
+        Put putKey3Fam1Column3Ts1 = new Put(toBytes(key3));
+        putKey3Fam1Column3Ts1.add(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
 
-        Put putKey3Column2Ts6 = new Put(toBytes(key3));
-        putKey3Column2Ts6.add(toBytes(family), toBytes(column2), timeStamp6, toBytes(value1));
+        Put putKey3Fam1Column2Ts6 = new Put(toBytes(key3));
+        putKey3Fam1Column2Ts6.add(toBytes(family1), toBytes(column2), timeStamp6, toBytes(value1));
 
-        Put putKey2Column3Ts6 = new Put(toBytes(key2));
-        putKey2Column3Ts6.add(toBytes(family), toBytes(column3), timeStamp3, toBytes(value1));
+        Put putKey2Fam1Column3Ts6 = new Put(toBytes(key2));
+        putKey2Fam1Column3Ts6.add(toBytes(family1), toBytes(column3), timeStamp3, toBytes(value1));
 
 
-        tryPut(hTable, putKey1Column1MinTs);
-        tryPut(hTable, putKey3Column1Ts1);
-        tryPut(hTable, putKey1Column2MinTs);
-        tryPut(hTable, putKey1Column2Ts3);
-        tryPut(hTable, putKey2Column2Ts3);
-        tryPut(hTable, putKey2Column3Ts1);
-        tryPut(hTable, putKey3Column3Ts1);
-        tryPut(hTable, putKey3Column2Ts6);
-        tryPut(hTable, putKey2Column3Ts6);
+        tryPut(hTable, putKey1Fam1Column1MinTs);
+        tryPut(hTable, putKey3Fam1Column1Ts1);
+        tryPut(hTable, putKey1Fam1Column2MinTs);
+        tryPut(hTable, putKey1Fam1Column2Ts3);
+        tryPut(hTable, putKey2Fam1Column2Ts3);
+        tryPut(hTable, putKey2Fam1Column3Ts1);
+        tryPut(hTable, putKey3Fam1Column3Ts1);
+        tryPut(hTable, putKey3Fam1Column2Ts6);
+        tryPut(hTable, putKey2Fam1Column3Ts6);
 
+        // test DeleteFamilyVersion single cf
         Get get = new Get(toBytes(key1));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         Result r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
 
         get = new Get(toBytes(key3));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
 
         get = new Get(toBytes(key2));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(2, r.raw().length);
 
         Delete delKey1MinTs = new Delete(toBytes(key1));
-        delKey1MinTs.deleteFamilyVersion(toBytes(family), minTimeStamp);
+        delKey1MinTs.deleteFamilyVersion(toBytes(family1), minTimeStamp);
         hTable.delete(delKey1MinTs);
 
         get = new Get(toBytes(key1));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
 
         Delete delKey3Ts1 = new Delete(toBytes(key3));
-        delKey3Ts1.deleteFamilyVersion(toBytes(family), timeStamp1);
+        delKey3Ts1.deleteFamilyVersion(toBytes(family1), timeStamp1);
         hTable.delete(delKey3Ts1);
 
         get = new Get(toBytes(key3));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
 
         Delete delKey2Ts3 = new Delete(toBytes(key2));
-        delKey2Ts3.deleteFamilyVersion(family.getBytes(), timeStamp3);
+        delKey2Ts3.deleteFamilyVersion(family1.getBytes(), timeStamp3);
         hTable.delete(delKey2Ts3);
 
         get = new Get(toBytes(key2));
-        get.addFamily(toBytes(family));
+        get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = hTable.get(get);
         Assert.assertEquals(0, r.raw().length);
 
         Scan scan = new Scan();
-        scan.addFamily(toBytes(family));
+        scan.addFamily(toBytes(family1));
         scan.setMaxVersions(10);
         ResultScanner scanner = hTable.getScanner(scan);
-        int cnt = 0;
+        int key1Cnt = 0, key2Cnt = 0, key3Cnt = 0;
         for (Result result : scanner) {
-            ++cnt;
             for (KeyValue kv : result.raw()) {
-                System.out.println("Key: " + Bytes.toString(kv.getRow()) + ", Qualifier: " + Bytes.toString(kv.getQualifier())
-                + ", Timestamp: " + kv.getTimestamp());
+                if (key1.equals(Bytes.toString(kv.getRow()))) {
+                    ++key1Cnt;
+                } else if (key2.equals(Bytes.toString(kv.getRow()))) {
+                    ++key2Cnt;
+                } else {
+                    ++key3Cnt;
+                }
             }
         }
-        Assert.assertEquals(3, cnt);
+        Assert.assertEquals(1, key1Cnt);
+        Assert.assertEquals(1, key2Cnt);
+        Assert.assertEquals(1, key3Cnt);
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+        hTable.delete(deleteKey3Family);
+
+        // test DeleteFamilyVersion multiple cf
+        Put putKey1Fam1Column3Ts6 = new Put(toBytes(key1));
+        putKey1Fam1Column3Ts6.add(toBytes(family1), toBytes(column3), timeStamp6, toBytes(value3));
+
+        Put putKey1Fam2Column2Ts2 = new Put(toBytes(key1));
+        putKey1Fam2Column2Ts2.add(toBytes(family2), toBytes(column2), timeStamp2, toBytes(value1));
+
+        Put putKey1Fam2Column3Ts2 = new Put(toBytes(key1));
+        putKey1Fam2Column3Ts2.add(toBytes(family2), toBytes(column3), timeStamp2, toBytes(value1));
+
+        Put putKey1Fam1Column2Ts1 = new Put(toBytes(key1));
+        putKey1Fam1Column2Ts1.add(toBytes(family1), toBytes(column2), timeStamp1, toBytes(value2));
+
+        Put putKey2Fam1Column2Ts8 = new Put(toBytes(key2));
+        putKey2Fam1Column2Ts8.add(toBytes(family1), toBytes(column2), timeStamp8, toBytes(value2));
+
+        Put putKey2Fam2Column3Ts1 = new Put(toBytes(key2));
+        putKey2Fam2Column3Ts1.add(toBytes(family2), toBytes(column3), timeStamp3, toBytes(value3));
+
+        Put putKey2Fam1Column1Ts1 = new Put(toBytes(key2));
+        putKey2Fam1Column1Ts1.add(toBytes(family1), toBytes(column1), timeStamp8, toBytes(value1));
+
+        Put putKey2Fam2Column1Ts3 = new Put(toBytes(key2));
+        putKey2Fam2Column1Ts3.add(toBytes(family2), toBytes(column1), timeStamp3, toBytes(value2));
+
+        Put putKey3Fam1Column2Ts9 = new Put(toBytes(key3));
+        putKey3Fam1Column2Ts9.add(toBytes(family1), toBytes(column2), timeStamp9, toBytes(value2));
+
+        Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
+        putKey3Fam2Column3Ts10.add(toBytes(family2), toBytes(column3), timeStamp10, toBytes(value1));
+
+        Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
+        putKey3Fam2Column1Ts10.add(toBytes(family2), toBytes(column1), timeStamp10, toBytes(value2));
+
+        Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
+        putKey3Fam1Column2Ts2.add(toBytes(family1), toBytes(column2), timeStamp2, toBytes(value1));
+
+        tryPut(hTable, putKey1Fam1Column3Ts6);
+        tryPut(hTable, putKey1Fam2Column2Ts2);
+        tryPut(hTable, putKey1Fam2Column3Ts2);
+        tryPut(hTable, putKey1Fam1Column2Ts1);
+        tryPut(hTable, putKey2Fam1Column2Ts8);
+        tryPut(hTable, putKey2Fam2Column3Ts1);
+        tryPut(hTable, putKey2Fam1Column1Ts1);
+        tryPut(hTable, putKey2Fam2Column1Ts3);
+        tryPut(hTable, putKey3Fam1Column2Ts9);
+        tryPut(hTable, putKey3Fam2Column3Ts10);
+        tryPut(hTable, putKey3Fam2Column1Ts10);
+        tryPut(hTable, putKey3Fam1Column2Ts2);
+
+        Get getKey1 = new Get(toBytes(key1));
+        getKey1.addFamily(toBytes(family1));
+        getKey1.addFamily(toBytes(family2));
+        getKey1.setMaxVersions(10);
+        r = hTable.get(getKey1);
+        Assert.assertEquals(4, r.raw().length);
+
+        Get getKey2 = new Get(toBytes(key2));
+        getKey2.addFamily(toBytes(family1));
+        getKey2.addFamily(toBytes(family2));
+        getKey2.setMaxVersions(10);
+        r = hTable.get(getKey2);
+        Assert.assertEquals(4, r.raw().length);
+
+        Get getKey3 = new Get(toBytes(key3));
+        getKey3.addFamily(toBytes(family1));
+        getKey3.addFamily(toBytes(family2));
+        getKey3.setMaxVersions(10);
+        r = hTable.get(getKey3);
+        Assert.assertEquals(4, r.raw().length);
+
+        Delete delKey1Ts_6_2 = new Delete(toBytes(key1));
+        delKey1Ts_6_2.deleteFamilyVersion(toBytes(family1), timeStamp6);
+        delKey1Ts_6_2.deleteFamilyVersion(toBytes(family2), timeStamp2);
+        hTable.delete(delKey1Ts_6_2);
+
+        getKey1 = new Get(toBytes(key1));
+        getKey1.addFamily(toBytes(family1));
+        getKey1.addFamily(toBytes(family2));
+        getKey1.setMaxVersions(10);
+        r = hTable.get(getKey1);
+        Assert.assertEquals(1, r.raw().length);
+        for (KeyValue kv : r.raw()) {
+            Assert.assertEquals(timeStamp1, kv.getTimestamp());
+        }
+
+        Delete delKey2Ts_8_3 = new Delete(toBytes(key2));
+        delKey2Ts_8_3.deleteFamilyVersion(toBytes(family1), timeStamp8);
+        delKey2Ts_8_3.deleteFamilyVersion(toBytes(family2), timeStamp3);
+        hTable.delete(delKey2Ts_8_3);
+
+        getKey2 = new Get(toBytes(key2));
+        getKey2.addFamily(toBytes(family1));
+        getKey2.addFamily(toBytes(family2));
+        getKey2.setMaxVersions(10);
+        r = hTable.get(getKey2);
+        Assert.assertEquals(0, r.raw().length);
+
+        Delete delKey3Ts_2_10 = new Delete(toBytes(key3));
+        delKey3Ts_2_10.deleteFamilyVersion(toBytes(family1), timeStamp2);
+        delKey3Ts_2_10.deleteFamilyVersion(toBytes(family2), timeStamp10);
+        hTable.delete(delKey3Ts_2_10);
+
+        getKey3 = new Get(toBytes(key3));
+        getKey3.addFamily(toBytes(family1));
+        getKey3.addFamily(toBytes(family2));
+        getKey3.setTimeStamp(timeStamp9);
+        getKey3.setMaxVersions(10);
+        r = hTable.get(getKey3);
+        Assert.assertEquals(1, r.raw().length);
+
+        scan = new Scan();
+        scan.addFamily(toBytes(family1));
+        scan.addFamily(toBytes(family2));
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        int ts1Cnt = 0, ts9Cnt = 0;
+        for (Result result : scanner) {
+            for (KeyValue kv : result.raw()) {
+                if (kv.getTimestamp() == timeStamp1) {
+                    ++ts1Cnt;
+                } else if (kv.getTimestamp() == timeStamp9) {
+                    ++ts9Cnt;
+                }
+            }
+        }
+        Assert.assertEquals(1, ts1Cnt);
+        Assert.assertEquals(1, ts9Cnt);
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);

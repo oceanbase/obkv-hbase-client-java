@@ -879,7 +879,8 @@ public class OHTable implements HTableInterface {
                 // Therefore, this process is handled sequentially.
                 boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
                         .flatMap(entry -> entry.getValue().stream())
-                        .anyMatch(kv -> KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily);
+                        .anyMatch(kv -> (KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily
+                                || KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamilyVersion));
                 if (!has_delete_family) {
                     BatchOperation batch = buildBatchOperation(tableNameString,
                             delete.getFamilyMap(), false, null);
