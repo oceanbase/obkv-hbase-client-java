@@ -104,7 +104,7 @@ public abstract class HTableTestBase {
         }
 
         // test scan with empty family
-        Scan scan = new Scan();
+        Scan scan = new Scan(toBytes(key));
         ResultScanner scanner = hTable.getScanner(scan);
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
@@ -3980,7 +3980,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 6);
+        Assert.assertEquals(6, res_count);
         scanner.close();
 
         // reverse scan with MaxVersion
@@ -3998,7 +3998,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 3);
+        Assert.assertEquals(3, res_count);
         scanner.close();
 
         // reverse scan with pageFilter
@@ -4018,7 +4018,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 6);
+        Assert.assertEquals(6, res_count);
         scanner.close();
 
         // reverse scan with not_exist_start_row
@@ -4036,7 +4036,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 6);
+        Assert.assertEquals(6, res_count);
         scanner.close();
 
         // reverse scan with abnormal range
@@ -4054,7 +4054,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 0);
+        Assert.assertEquals(0, res_count);
         scanner.close();
 
         // reverse scan with abnormal range
@@ -4072,7 +4072,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 13);
+        Assert.assertEquals(13, res_count);
         scanner.close();
 
         hTable.delete(deleteKey1Family);
@@ -4421,7 +4421,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 7);
+        Assert.assertEquals(7, res_count);
         scanner.close();
 
         // scan with prefixFilter
@@ -4441,7 +4441,7 @@ public abstract class HTableTestBase {
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 2);
+        Assert.assertEquals(2, res_count);
         scanner.close();
 
         // scan with singleColumnValueFilter
