@@ -585,6 +585,9 @@ public class OHTable implements HTableInterface {
                         // In a Get operation where the family map is greater than 1 or equal to 0,  
                         // we handle this by appending the column family to the qualifier on the client side.  
                         // The server can then use this information to filter the appropriate column families and qualifiers.
+                        if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                            throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                        }
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         processColumnFilters(columnFilters, get.getFamilyMap());
                         obTableQuery = buildObTableQuery(get, columnFilters);
@@ -598,6 +601,17 @@ public class OHTable implements HTableInterface {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
                             family = entry.getKey();
+                            if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                                Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                                if (colFamTimeRangeMap.size() > 1) {
+                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                } else if (colFamTimeRangeMap.get(family) == null) {
+                                    throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
+                                } else {
+                                    TimeRange tr = colFamTimeRangeMap.get(family);
+                                    get.setTimeRange(tr.getMin(), tr.getMax());
+                                }
+                            }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family),
@@ -668,6 +682,9 @@ public class OHTable implements HTableInterface {
                         // In a Scan operation where the family map is greater than 1 or equal to 0,  
                         // we handle this by appending the column family to the qualifier on the client side.  
                         // The server can then use this information to filter the appropriate column families and qualifiers.
+                        if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                            throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                        }
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         processColumnFilters(columnFilters, scan.getFamilyMap());
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
@@ -684,6 +701,17 @@ public class OHTable implements HTableInterface {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
                             family = entry.getKey();
+                            if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                                Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
+                                if (colFamTimeRangeMap.size() > 1) {
+                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                } else if (colFamTimeRangeMap.get(family) == null) {
+                                    throw new IllegalArgumentException("Scan family is not matched in ColumnFamilyTimeRange");
+                                } else {
+                                    TimeRange tr = colFamTimeRangeMap.get(family);
+                                    scan.setTimeRange(tr.getMin(), tr.getMax());
+                                }
+                            }
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), entry.getValue());
                             obTableQuery = buildObTableQuery(filter, scan);

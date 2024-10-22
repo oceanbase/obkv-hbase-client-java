@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.filter;
 
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -160,6 +161,17 @@ public class HBaseFilterUtilsTest {
         ColumnPrefixFilter filter = new ColumnPrefixFilter(Bytes.toBytes("pre"));
         Assert.assertArrayEquals("ColumnPrefixFilter('pre')".getBytes(),
             HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testFuzzyRowFilter() throws IOException {
+        List<Pair<byte[], byte[]>> fuzzyKey = new ArrayList<>();
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("abc"), Bytes.toBytes("101")));
+        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("ddd"), Bytes.toBytes("010")));
+
+        FuzzyRowFilter filter = new FuzzyRowFilter(fuzzyKey);
+        System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
+        Assert.assertArrayEquals("FuzzyRowFilter('abc','101','ddd','010')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
