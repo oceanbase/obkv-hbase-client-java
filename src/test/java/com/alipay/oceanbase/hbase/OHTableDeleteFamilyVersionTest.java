@@ -12,20 +12,20 @@ import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableDeleteFamilyVersionTest {
     @Rule
-    public ExpectedException expectedException = ExpectedException.none();
+    public ExpectedException    expectedException = ExpectedException.none();
 
-    protected HTableInterface hTable;
-    private static final String key1 = "scanKey1x";
-    private static final String key2 = "scanKey2x";
-    private static final String key3 = "scanKey3x";
-    private static final String column1 = "column1";
-    private static final String column2 = "column2";
-    private static final String column3 = "column3";
-    private static final String value1 = "value1";
-    private static final String value2 = "value2";
-    private static final String value3 = "value3";
-    private static final String family1 = "family_with_group1";
-    private static final String family2 = "family_with_group2";
+    protected HTableInterface   hTable;
+    private static final String key1              = "scanKey1x";
+    private static final String key2              = "scanKey2x";
+    private static final String key3              = "scanKey3x";
+    private static final String column1           = "column1";
+    private static final String column2           = "column2";
+    private static final String column3           = "column3";
+    private static final String value1            = "value1";
+    private static final String value2            = "value2";
+    private static final String value3            = "value3";
+    private static final String family1           = "family_with_group1";
+    private static final String family2           = "family_with_group2";
 
     @Before
     public void before() throws Exception {
@@ -88,14 +88,14 @@ public class OHTableDeleteFamilyVersionTest {
 
         Put putKey1Fam1Column1MinTs = new Put(toBytes(key1));
         putKey1Fam1Column1MinTs.add(toBytes(family1), toBytes(column1), minTimeStamp,
-                toBytes(value1));
+            toBytes(value1));
 
         Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
         putKey3Fam1Column1Ts1.add(toBytes(family1), toBytes(column1), timeStamp1, toBytes(value2));
 
         Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
         putKey1Fam1Column2MinTs.add(toBytes(family1), toBytes(column2), minTimeStamp,
-                toBytes(value1));
+            toBytes(value1));
 
         Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
         putKey1Fam1Column2Ts3.add(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
@@ -236,11 +236,11 @@ public class OHTableDeleteFamilyVersionTest {
 
         Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
         putKey3Fam2Column3Ts10
-                .add(toBytes(family2), toBytes(column3), timeStamp10, toBytes(value1));
+            .add(toBytes(family2), toBytes(column3), timeStamp10, toBytes(value1));
 
         Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
         putKey3Fam2Column1Ts10
-                .add(toBytes(family2), toBytes(column1), timeStamp10, toBytes(value2));
+            .add(toBytes(family2), toBytes(column1), timeStamp10, toBytes(value2));
 
         Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
         putKey3Fam1Column2Ts2.add(toBytes(family1), toBytes(column2), timeStamp2, toBytes(value1));
