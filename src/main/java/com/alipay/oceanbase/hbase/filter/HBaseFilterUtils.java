@@ -169,7 +169,8 @@ public class HBaseFilterUtils {
 
     // SingleColumnValueExcludeFilter('cf1','col1',=,'binary:123',true,true)
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
-                                             SingleColumnValueExcludeFilter filter) throws IOException {
+                                             SingleColumnValueExcludeFilter filter)
+                                                                                   throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write("('".getBytes());
         writeBytesWithEscape(byteStream, filter.getFamily());
@@ -329,12 +330,13 @@ public class HBaseFilterUtils {
     }
 
     // MultiRowRangeFilter('a',true,'b',false,'c',true,'d',false);
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream, MultiRowRangeFilter filter) throws IOException {
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             MultiRowRangeFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
 
         List<MultiRowRangeFilter.RowRange> ranges = filter.getRowRanges();
-        for (int i = 0; i < ranges.size(); i ++) {
+        for (int i = 0; i < ranges.size(); i++) {
             MultiRowRangeFilter.RowRange range = ranges.get(i);
             byteStream.write("'".getBytes());
             byteStream.write(range.getStartRow());
@@ -354,7 +356,8 @@ public class HBaseFilterUtils {
     }
 
     // InclusiveStopFilter('aaa');
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream, InclusiveStopFilter filter) throws IOException {
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             InclusiveStopFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write('\'');
@@ -364,7 +367,8 @@ public class HBaseFilterUtils {
     }
 
     // ColumnRangeFilter('a',true,'b',false);
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream, ColumnRangeFilter filter) throws IOException {
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             ColumnRangeFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
 
@@ -382,12 +386,13 @@ public class HBaseFilterUtils {
     }
 
     // MultipleColumnPrefixFilter('a','b','d');
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream, MultipleColumnPrefixFilter filter) throws IOException {
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             MultipleColumnPrefixFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
 
         byte[][] ranges = filter.getPrefix();
-        for (int i = 0; i < ranges.length; i ++) {
+        for (int i = 0; i < ranges.length; i++) {
             byte[] range = ranges[i];
             byteStream.write("'".getBytes());
             byteStream.write(range);

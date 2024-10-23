@@ -1656,9 +1656,9 @@ public class OHTable implements HTableInterface {
                 switch (kvType) {
                     case Delete:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
-                            null, null);
+                                ROW_KEY_COLUMNS,
+                                new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
+                                null, null);
                     case Maximum:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
                                 ROW_KEY_COLUMNS,
@@ -1671,9 +1671,14 @@ public class OHTable implements HTableInterface {
                                 null, null);
                     case DeleteFamily:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), isTableGroup?kv.getQualifier():null, -kv.getTimestamp() },
-                            null, null);
+                                ROW_KEY_COLUMNS,
+                                new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null, -kv.getTimestamp() },
+                                null, null);
+                    case DeleteFamilyVersion:
+                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                                ROW_KEY_COLUMNS,
+                                new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null, kv.getTimestamp() },
+                                null, null);
                     default:
                         throw new IllegalArgumentException("illegal mutation type " + kvType);
                 }
