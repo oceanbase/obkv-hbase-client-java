@@ -18,14 +18,11 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
-import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -34,7 +31,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
 @InterfaceAudience.Private
@@ -44,44 +40,40 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     private final ExceptionListener         listener;
 
-    protected final ObTableClient           obTableClient;
+    private final OHTable                   ohTable;
     private final TableName                 tableName;
     private volatile Configuration          conf;
     private final OHConnectionConfiguration connectionConfig;
 
+    @VisibleForTesting
     final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
+    @VisibleForTesting
     AtomicLong                              currentAsyncBufferSize = new AtomicLong(0);
 
-    private AtomicReference<Class<?>>       type                   = new AtomicReference<>(null);
     private final long                      writeBufferSize;
     private final int                       maxKeyValueSize;
     private boolean                         closed                 = false;
     private final ExecutorService           pool;
-    private final int                       rpcTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
         if (ohConnection == null || ohConnection.isClosed()) {
             throw new IllegalArgumentException("Connection is null or closed.");
         }
-        // create a ObTableClient to do rpc operations
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(ohConnection
-            .getOHConnectionConfiguration());
-
         // init params in OHBufferedMutatorImpl
         this.tableName = params.getTableName();
         this.conf = ohConnection.getConfiguration();
         this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
         this.pool = params.getPool();
-        this.obTableClient.setRuntimeBatchExecutor(pool);
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
         this.maxKeyValueSize = params.getMaxKeyValueSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
-        this.rpcTimeout = connectionConfig.getRpcTimeout();
-        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+
+        // create an OHTable object to do batch work
+        this.ohTable = new OHTable(tableName, ohConnection, connectionConfig, pool);
     }
 
     @Override
@@ -119,26 +111,18 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
 
         long toAddSize = 0;
-        // check if every mutation's family is the same
-        // check if mutations are the same type
         for (Mutation m : mutations) {
-            OHTable.checkFamilyViolation(m.getFamilyMap().keySet(), true);
             validateInsUpAndDelete(m);
-            Class<?> curType = m.getClass();
-            // set the type of this BufferedMutator
-            if (type.get() == null) {
-                type.compareAndSet(null, mutations.get(0).getClass());
-            }
-            if (!type.get().equals(curType)) {
-                throw new IllegalArgumentException("Not support different type in one batch.");
-            }
             toAddSize += m.heapSize();
         }
 
         currentAsyncBufferSize.addAndGet(toAddSize);
         asyncWriteBuffer.addAll(mutations);
 
-        asyncExecute(false);
+        if (currentAsyncBufferSize.get() > writeBufferSize) {
+            execute(false);
+        }
+
     }
 
     /**
@@ -150,7 +134,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             throw new IllegalArgumentException("Only support for Put and Delete for now.");
         }
         if (mt instanceof Put) {
+            // family empty check is in validatePut
             HTable.validatePut((Put) mt, maxKeyValueSize);
+            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
+        } else {
+            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
         }
     }
 
@@ -161,91 +149,65 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * @param flushAll - if true, sends all the writes and wait for all of them to finish before
      *        returning.
      */
-    private void asyncExecute(boolean flushAll) throws IOException {
+    private void execute(boolean flushAll) throws IOException {
         LinkedList<Mutation> execBuffer = new LinkedList<>();
-        ObTableBatchOperationRequest request = null;
-        // namespace n1, n1:table_name
-        // namespace default, table_name
-        String tableNameString = tableName.getNameAsString();
+        long dequeuedSize = 0L;
         try {
-            while (true) {
-                try{
-                    if (!flushAll || asyncWriteBuffer.isEmpty()) {
-                        if (currentAsyncBufferSize.get() <= writeBufferSize) {
-                            break;
-                        }
+            Mutation m;
+            while ((writeBufferSize <= 0 || dequeuedSize < (writeBufferSize * 2) || flushAll)
+                && (m = asyncWriteBuffer.poll()) != null) {
+                execBuffer.add(m);
+                long size = m.heapSize();
+                currentAsyncBufferSize.addAndGet(-size);
+                dequeuedSize += size;
+            }
+
+            if (execBuffer.isEmpty()) {
+                return;
+            }
+            try {
+                ohTable.batch(execBuffer);
+            } catch (Exception ex) {
+                if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
+                    // retry one time
+                    LOGGER.debug(tableName + ": One or more of the operations have failed -"
+                            + " waiting for all operations to complete (successfully or not) and retries");
+                    RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
+                    execBuffer.clear();
+                    for (int i = 0; i < retryException.getNumExceptions(); ++i) {
+                        execBuffer.add((Mutation) retryException.getRow(i));
                     }
-                    Mutation m;
-                    while ((m = asyncWriteBuffer.poll()) != null) {
-                        execBuffer.add(m);
-                        long size = m.heapSize();
-                        currentAsyncBufferSize.addAndGet(-size);
-                    }
-                    // in concurrent situation, asyncWriteBuffer may be empty here
-                    // for other threads flush all buffer
-                    if (execBuffer.isEmpty()) {
-                        break;
-                    }
-                    // for now, operations' family is the same
-                    byte[] family = execBuffer.getFirst().getFamilyMap().firstKey();
-                    ObTableBatchOperation batch = buildObTableBatchOperation(execBuffer);
-                    // table_name$cf_name
-                    String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
-                    request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName);
-                } catch (Exception ex) {
-                    LOGGER.error("Errors occur before mutation operation", ex);
-                    throw new IllegalArgumentException("Errors occur before mutation operation", ex);
-                }
-                try {
-                    ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
-                } catch (Exception ex) {
-                    LOGGER.debug("Errors occur during mutation operation", ex);
-                    Mutation m = null;
-                    try {
-                        // retry every single operation
-                        while (!execBuffer.isEmpty()) {
-                            // poll elements from execBuffer to recollect remaining operations
-                            m = execBuffer.poll();
-                            byte[] family = m.getFamilyMap().firstKey();
-                            ObTableBatchOperation batch = buildObTableBatchOperation(Collections.singletonList(m));
-                            String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
-                            request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName);
-                            ObTableBatchOperationResult result = (ObTableBatchOperationResult) obTableClient.execute(request);
-                        }
-                    } catch (Exception newEx) {
-                        if (m != null) {
-                            execBuffer.addFirst(m);
-                        }
-                        // if retry fails, only recollect remaining operations
-                        while(!execBuffer.isEmpty()) {
-                            m = execBuffer.poll();
-                            long size = m.heapSize();
-                            asyncWriteBuffer.add(m);
-                            currentAsyncBufferSize.addAndGet(size);
-                        }
-                        throw newEx;
-                    }
+                    ohTable.batch(execBuffer);
+                } else {
+                    LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
+                    throw ex;
                 }
             }
         } catch (Exception ex) {
             LOGGER.error(LCD.convert("01-00026"), ex);
-            // if the cause is illegal argument, directly throw to user
-            if (ex instanceof IllegalArgumentException) {
-                throw (IllegalArgumentException) ex;
-            }
-            // TODO: need to collect error information and actions during batch operations
-            // TODO: maybe keep in ObTableBatchOperationResult
-            List<Throwable> throwables = new ArrayList<Throwable>();
-            List<Row> actions = new ArrayList<Row>();
-            List<String> addresses = new ArrayList<String>();
-            throwables.add(ex);
-            RetriesExhaustedWithDetailsException error = new RetriesExhaustedWithDetailsException(
-                    new ArrayList<Throwable>(throwables),
-                    new ArrayList<Row>(actions), new ArrayList<String>(addresses));
-            if (listener == null) {
-                throw error;
+            if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
+                // retry one time
+                LOGGER.error(tableName + ": One or more of the operations have failed after retry.");
+                RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
+                // recollect mutations
+                execBuffer.clear();
+                for (int i = 0; i < retryException.getNumExceptions(); ++i) {
+                    execBuffer.add((Mutation) retryException.getRow(i));
+                }
+                if (listener != null) {
+                    listener.onException(retryException, this);
+                } else {
+                    throw retryException;
+                }
             } else {
-                listener.onException(error, this);
+                LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
+                throw ex;
+            }
+        } finally {
+            for (Mutation mutation : execBuffer) {
+                long size = mutation.heapSize();
+                currentAsyncBufferSize.addAndGet(size);
+                asyncWriteBuffer.add(mutation);
             }
         }
     }
@@ -256,7 +218,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             return;
         }
         try {
-            asyncExecute(true);
+            execute(true);
         } finally {
             // the pool in ObTableClient will be shut down too
             this.pool.shutdown();
@@ -279,21 +241,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     @Override
     public void flush() throws IOException {
-        asyncExecute(true);
+        execute(true);
     }
 
     @Override
     public long getWriteBufferSize() {
         return this.writeBufferSize;
-    }
-
-    private ObTableBatchOperation buildObTableBatchOperation(List<? extends Mutation> execBuffer) {
-        List<KeyValue> keyValueList = new LinkedList<>();
-        for (Mutation mutation : execBuffer) {
-            for (Map.Entry<byte[], List<KeyValue>> entry : mutation.getFamilyMap().entrySet()) {
-                keyValueList.addAll(entry.getValue());
-            }
-        }
-        return OHTable.buildObTableBatchOperation(keyValueList, false, null);
     }
 }

@@ -17,7 +17,9 @@
 
 package com.alipay.oceanbase.hbase;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -45,6 +47,197 @@ public class OHTableMultiColumnFamilyTest {
     @After
     public void finish() throws IOException {
         hTable.close();
+    }
+
+    @Test
+    public void testMulfiColumnFamilyBufferedMutator() throws Exception {
+        byte[] family1 = "family_with_group1".getBytes();
+        byte[] family2 = "family_with_group2".getBytes();
+        byte[] family3 = "family_with_group3".getBytes();
+
+        byte[] family1_column1 = "family1_column1".getBytes();
+        byte[] family1_column2 = "family1_column2".getBytes();
+        byte[] family1_column3 = "family1_column3".getBytes();
+        byte[] family2_column1 = "family2_column1".getBytes();
+        byte[] family2_column2 = "family2_column2".getBytes();
+        byte[] family3_column1 = "family3_column1".getBytes();
+        byte[] family3_column2 = "family3_column2".getBytes();
+        byte[] family1_value = "VVV1".getBytes();
+        byte[] family2_value = "VVV2".getBytes();
+        byte[] family3_value = "VVV3".getBytes();
+
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        TableName tableName = TableName.valueOf("test_multi_cf");
+        Connection connection = ConnectionFactory.createConnection(conf);
+        BufferedMutator mutator = connection.getBufferedMutator(tableName);
+
+        int rows = 10;
+        List<String> keys = new ArrayList<>();
+        List<Mutation> mutations = new ArrayList<>();
+        for (int i = 0; i < rows; ++i) {
+            String key = "Key" + i;
+            keys.add(key);
+            Delete delete = new Delete(toBytes(key));
+            mutations.add(delete);
+            Put put = new Put(toBytes(key));
+            put.add(family1, family1_column1, family1_value);
+            put.add(family1, family1_column2, family1_value);
+            put.add(family1, family1_column3, family1_value);
+            put.add(family2, family2_column1, family2_value);
+            put.add(family2, family2_column2, family2_value);
+            put.add(family3, family3_column1, family3_value);
+            mutations.add(put);
+        }
+        mutator.mutate(mutations);
+
+        // test force flush
+        mutator.flush();
+        Get get = new Get(toBytes("Key2"));
+        get.addFamily(family1);
+        get.addFamily(family2);
+        Result result = hTable.get(get);
+        Assert.assertEquals(5, result.raw().length);
+
+        mutations.clear();
+        for (int i = 0; i < rows; ++i) {
+            if (i % 5 == 0) { // 0, 5
+                Delete delete = new Delete(toBytes("Key" + i));
+                delete.deleteFamily(family2);
+                delete.deleteFamily(family3);
+                mutations.add(delete);
+            }
+        }
+        mutator.mutate(mutations);
+        mutator.flush();
+
+        get = new Get(toBytes("Key0"));
+        result = hTable.get(get);
+        Assert.assertEquals(3, result.raw().length);
+        Assert.assertFalse(result.containsColumn(family2, family2_column1));
+        Assert.assertFalse(result.containsColumn(family2, family2_column2));
+        Assert.assertFalse(result.containsColumn(family3, family3_column1));
+
+        get = new Get(toBytes("Key5"));
+        result = hTable.get(get);
+        Assert.assertEquals(3, result.raw().length);
+        Assert.assertFalse(result.containsColumn(family2, family2_column1));
+        Assert.assertFalse(result.containsColumn(family2, family2_column2));
+        Assert.assertFalse(result.containsColumn(family3, family3_column1));
+
+        mutations.clear();
+        for (String key : keys) {
+            Delete delete = new Delete(toBytes(key));
+            mutations.add(delete);
+        }
+        mutator.mutate(mutations);
+        mutator.flush();
+
+        Scan scan = new Scan();
+        scan.setStartRow(toBytes("Key0"));
+        scan.setStopRow(toBytes("Key10"));
+        scan.addFamily(family1);
+        scan.addFamily(family2);
+        scan.addFamily(family3);
+        ResultScanner scanner = hTable.getScanner(scan);
+        int count = 0;
+        for (Result r : scanner) {
+            count += r.raw().length;
+        }
+        Assert.assertEquals(0, count);
+
+        // test auto flush
+        long bufferSize = 45000L;
+        BufferedMutatorParams params = new BufferedMutatorParams(tableName);
+        params.writeBufferSize(bufferSize);
+        mutator = connection.getBufferedMutator(params);
+
+        while (true) {
+            for (int i = 0; i < rows; ++i) {
+                mutations.clear();
+                Put put = new Put(toBytes(keys.get(i)));
+                put.add(family1, family1_column1, family1_value);
+                put.add(family1, family1_column2, family1_value);
+                put.add(family1, family1_column3, family1_value);
+                put.add(family2, family2_column1, family2_value);
+                put.add(family3, family3_column1, family2_value);
+                put.add(family3, family3_column2, family3_value);
+                mutations.add(put);
+                if (i % 3 == 0) { // 0, 3, 6, 9
+                    Delete delete = new Delete(toBytes(keys.get(i)));
+                    delete.deleteFamily(family1);
+                    delete.deleteFamily(family2);
+                    mutations.add(delete);
+                }
+                mutator.mutate(mutations);
+            }
+
+            get = new Get(toBytes("Key0"));
+            result = hTable.get(get);
+            if (!result.isEmpty()) {
+                break;
+            }
+        }
+        get = new Get(toBytes("Key2"));
+        result = hTable.get(get);
+        Assert.assertEquals(6 , result.raw().length);
+        Assert.assertTrue(result.containsColumn(family1, family1_column1));
+        Assert.assertTrue(result.containsColumn(family1, family1_column2));
+        Assert.assertTrue(result.containsColumn(family1, family1_column3));
+        Assert.assertTrue(result.containsColumn(family2, family2_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column2));
+
+        get = new Get(toBytes("Key3"));
+        result = hTable.get(get);
+        if (result.containsColumn(family1, family1_column1) || result.containsColumn(family2, family2_column1)) {
+            mutator.flush();
+        }
+        get = new Get(toBytes("Key3"));
+        result = hTable.get(get);
+        Assert.assertEquals(2, result.raw().length);
+        Assert.assertFalse(result.containsColumn(family1, family1_column1));
+        Assert.assertFalse(result.containsColumn(family1, family1_column2));
+        Assert.assertFalse(result.containsColumn(family1, family1_column3));
+        Assert.assertFalse(result.containsColumn(family2, family2_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column2));
+
+        get = new Get(toBytes("Key9"));
+        result = hTable.get(get);
+        if (result.containsColumn(family1, family1_column1) || result.containsColumn(family2, family2_column1)) {
+            mutator.flush();
+        }
+        get = new Get(toBytes("Key9"));
+        result = hTable.get(get);
+        Assert.assertEquals(2, result.raw().length);
+        Assert.assertFalse(result.containsColumn(family1, family1_column1));
+        Assert.assertFalse(result.containsColumn(family1, family1_column2));
+        Assert.assertFalse(result.containsColumn(family1, family1_column3));
+        Assert.assertFalse(result.containsColumn(family2, family2_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column1));
+        Assert.assertTrue(result.containsColumn(family3, family3_column2));
+
+        // clean data
+        mutations.clear();
+        for (String key : keys) {
+            Delete delete = new Delete(toBytes(key));
+            mutations.add(delete);
+        }
+        mutator.mutate(mutations);
+        mutator.flush();
+
+        scan = new Scan();
+        scan.setStartRow(toBytes("Key0"));
+        scan.setStopRow(toBytes("Key10"));
+        scan.addFamily(family1);
+        scan.addFamily(family2);
+        scan.addFamily(family3);
+        scanner = hTable.getScanner(scan);
+        count = 0;
+        for (Result r : scanner) {
+            count += r.raw().length;
+        }
+        Assert.assertEquals(0, count);
     }
 
     @Test
@@ -611,12 +804,12 @@ public class OHTableMultiColumnFamilyTest {
 
     @Test
     public void testMultiColumnFamilyDelete() throws Exception {
-        String key1    = "scanKey1x";
-        String key2    = "scanKey2x";
-        String key3    = "scanKey3x";
-        String value1   = "value1";
-        String value2   = "value2";
-        String value3   = "value3";
+        String key1 = "scanKey1x";
+        String key2 = "scanKey2x";
+        String key3 = "scanKey3x";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
 
         byte[] family1 = "family_with_group1".getBytes();
         byte[] family2 = "family_with_group2".getBytes();
@@ -788,15 +981,13 @@ public class OHTableMultiColumnFamilyTest {
         long maxTimeStamp = System.currentTimeMillis();
 
         Put putKey1Fam1Column1MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column1MinTs.add(family1, family1_column1, minTimeStamp,
-                toBytes(value1));
+        putKey1Fam1Column1MinTs.add(family1, family1_column1, minTimeStamp, toBytes(value1));
 
         Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
         putKey3Fam1Column1Ts1.add(family1, family1_column1, timeStamp1, toBytes(value2));
 
         Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column2MinTs.add(family1, family1_column2, minTimeStamp,
-                toBytes(value1));
+        putKey1Fam1Column2MinTs.add(family1, family1_column2, minTimeStamp, toBytes(value1));
 
         Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
         putKey1Fam1Column2Ts3.add(family1, family1_column2, timeStamp3, toBytes(value2));
@@ -936,12 +1127,10 @@ public class OHTableMultiColumnFamilyTest {
         putKey3Fam1Column2Ts9.add(family1, family1_column2, timeStamp9, toBytes(value2));
 
         Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column3Ts10
-                .add(family2, family2_column3, timeStamp10, toBytes(value1));
+        putKey3Fam2Column3Ts10.add(family2, family2_column3, timeStamp10, toBytes(value1));
 
         Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column1Ts10
-                .add(family2, family2_column1, timeStamp10, toBytes(value2));
+        putKey3Fam2Column1Ts10.add(family2, family2_column1, timeStamp10, toBytes(value2));
 
         Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
         putKey3Fam1Column2Ts2.add(family1, family1_column2, timeStamp2, toBytes(value1));

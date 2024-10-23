@@ -198,8 +198,13 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -246,8 +251,13 @@ public class OHTable implements HTableInterface {
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -301,6 +311,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.cleanupPoolOnClose = false;
         }
+
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
@@ -311,8 +322,15 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(operationTimeout);
+
+        finishSetUp();
     }
 
     /**
