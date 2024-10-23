@@ -17,8 +17,10 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
@@ -146,6 +148,32 @@ public class OHTableMultiColumnFamilyTest {
         result = hTable.get(get);
         keyValues = result.raw();
         assertEquals(6, keyValues.length);
+
+        batchLsit.clear();
+        final long[] updateCounter = new long[] { 0L };
+        delete = new Delete(toBytes("Key5"));
+        delete.deleteColumns(family1, family1_column2);
+        delete.deleteColumns(family2, family2_column1);
+        delete.deleteFamily(family3);
+        batchLsit.add(delete);
+        for (int i = 0; i < rows; ++i) {
+            Put put = new Put(toBytes("Key" + i));
+            put.add(family1, family1_column1, family1_value);
+            put.add(family1, family1_column2, family1_value);
+            put.add(family1, family1_column3, family1_value);
+            put.add(family2, family2_column1, family2_value);
+            put.add(family2, family2_column2, family2_value);
+            put.add(family3, family3_column1, family3_value);
+            batchLsit.add(put);
+        }
+        hTable.batchCallback(batchLsit, new Batch.Callback<MutationResult>() {
+            @Override
+            public void update(byte[] region, byte[] row, MutationResult result) {
+                updateCounter[0]++;
+            }
+        });
+        assertEquals(11, updateCounter[0]);
+
     }
 
     @Test
