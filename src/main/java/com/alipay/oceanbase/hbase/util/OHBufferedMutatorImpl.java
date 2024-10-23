@@ -165,29 +165,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             if (execBuffer.isEmpty()) {
                 return;
             }
-            try {
-                ohTable.batch(execBuffer);
-            } catch (Exception ex) {
-                if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
-                    // retry one time
-                    LOGGER.debug(tableName + ": One or more of the operations have failed -"
-                            + " waiting for all operations to complete (successfully or not) and retries");
-                    RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
-                    execBuffer.clear();
-                    for (int i = 0; i < retryException.getNumExceptions(); ++i) {
-                        execBuffer.add((Mutation) retryException.getRow(i));
-                    }
-                    ohTable.batch(execBuffer);
-                } else {
-                    LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
-                    throw ex;
-                }
-            }
+            ohTable.batch(execBuffer);
         } catch (Exception ex) {
             LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
-                // retry one time
-                LOGGER.error(tableName + ": One or more of the operations have failed after retry.");
+                LOGGER.error(tableName + ": One or more of the operations have failed after retries.");
                 RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
                 // recollect mutations
                 execBuffer.clear();
