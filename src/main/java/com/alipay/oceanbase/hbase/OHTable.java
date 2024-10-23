@@ -750,6 +750,12 @@ public class OHTable implements Table {
 
             // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
             n++;
+            if (n % putWriteBufferCheck == 0 && currentWriteBufferSize > writeBufferSize) {
+                flushCommits();
+            }
+        }
+        if (autoFlush || currentWriteBufferSize > writeBufferSize) {
+            flushCommits();
         }
     }
 
@@ -1140,6 +1146,106 @@ public class OHTable implements Table {
     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
                                      Durability durability) throws IOException {
         return incrementColumnValue(row, family, qualifier, amount);
+    }
+
+    public void flushCommits() throws IOException {
+
+        try {
+            boolean[] resultSuccess = new boolean[writeBuffer.size()];
+            try {
+                Map<String, Pair<List<Integer>, List<Cell>>> familyMap = new HashMap<String, Pair<List<Integer>, List<Cell>>>();
+                for (int i = 0; i < writeBuffer.size(); i++) {
+                    Put aPut = writeBuffer.get(i);
+                    Map<byte[], List<Cell>> innerFamilyMap = aPut.getFamilyCellMap();
+                    if (innerFamilyMap.size() > 1) {
+                        // Bypass logic: directly construct BatchOperation for puts with family map size > 1
+                        try {
+                            BatchOperation batch = buildBatchOperation(this.tableNameString,
+                                    innerFamilyMap, false, null);
+                            BatchOperationResult results = batch.execute();
+
+                            boolean hasError = results.hasError();
+                            resultSuccess[i] = !hasError;
+                            if (hasError) {
+                                throw results.getFirstException();
+                            }
+                        } catch (Exception e) {
+                            logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
+                                    writeBuffer.size(), e);
+                            throw new IOException("put table " + tableNameString + " error codes "
+                                    + null + "auto flush " + autoFlush
+                                    + " current buffer size " + writeBuffer.size(), e);
+                        }
+                    } else {
+                        // Existing logic for puts with family map size = 1
+                        for (Map.Entry<byte[], List<Cell>> entry : innerFamilyMap.entrySet()) {
+                            String family = Bytes.toString(entry.getKey());
+                            Pair<List<Integer>, List<Cell>> keyValueWithIndex = familyMap
+                                    .get(family);
+                            if (keyValueWithIndex == null) {
+                                keyValueWithIndex = new Pair<List<Integer>, List<Cell>>(
+                                        new ArrayList<Integer>(), new ArrayList<Cell>());
+                                familyMap.put(family, keyValueWithIndex);
+                            }
+                            keyValueWithIndex.getFirst().add(i);
+                            keyValueWithIndex.getSecond().addAll(entry.getValue());
+                        }
+                    }
+                }
+                for (Map.Entry<String, Pair<List<Integer>, List<Cell>>> entry : familyMap
+                        .entrySet()) {
+                    List<Integer> errorCodeList = new ArrayList<Integer>(entry.getValue()
+                            .getSecond().size());
+                    try {
+                        String targetTableName = getTargetTableName(this.tableNameString,
+                                entry.getKey(), configuration);
+
+                        BatchOperation batch = buildBatchOperation(targetTableName, entry
+                                .getValue().getSecond(), false, null);
+                        BatchOperationResult results = batch.execute();
+
+                        errorCodeList = results.getErrorCodeList();
+                        boolean hasError = results.hasError();
+                        for (Integer index : entry.getValue().getFirst()) {
+                            resultSuccess[index] = !hasError;
+                        }
+                        if (hasError) {
+                            throw results.getFirstException();
+                        }
+                    } catch (Exception e) {
+                        logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList,
+                                autoFlush, writeBuffer.size(), e);
+                        throw new IOException("put table " + tableNameString + " error codes "
+                                + errorCodeList + "auto flush " + autoFlush
+                                + " current buffer size " + writeBuffer.size(), e);
+                    }
+
+                }
+
+            } finally {
+                // mutate list so that it is empty for complete success, or contains
+                // only failed records results are returned in the same order as the
+                // requests in list walk the list backwards, so we can remove from list
+                // without impacting the indexes of earlier members
+                for (int i = resultSuccess.length - 1; i >= 0; i--) {
+                    if (resultSuccess[i]) {
+                        // successful Puts are removed from the list here.
+                        writeBuffer.remove(i);
+                    }
+                }
+            }
+        } finally {
+            if (clearBufferOnFail) {
+                writeBuffer.clear();
+                currentWriteBufferSize = 0;
+            } else {
+                // the write buffer was adjusted by processBatchOfPuts
+                currentWriteBufferSize = 0;
+                for (Put aPut : writeBuffer) {
+                    currentWriteBufferSize += aPut.heapSize();
+                }
+            }
+        }
     }
 
     @Override

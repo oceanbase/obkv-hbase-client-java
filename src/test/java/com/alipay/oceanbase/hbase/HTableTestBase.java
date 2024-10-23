@@ -105,7 +105,7 @@ public abstract class HTableTestBase {
         }
 
         // test scan with empty family
-        Scan scan = new Scan();
+        Scan scan = new Scan(toBytes(key));
         ResultScanner scanner = hTable.getScanner(scan);
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
@@ -189,10 +189,8 @@ public abstract class HTableTestBase {
         try {
             for (int j = 0; j < 10; j++) {
                 put = new Put((key + "_" + j).getBytes());
-                kv = new KeyValue(toBytes(key), family.getBytes(), column1.getBytes(), timestamp + 2, toBytes(value));
-                put.add(kv);
-                kv = new KeyValue(toBytes(key), family.getBytes(), column2.getBytes(), timestamp + 2, toBytes(value));
-                put.add(kv);
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp + 2, toBytes(value));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp + 2, toBytes(value));
                 hTable.put(put);
             }
 
@@ -230,6 +228,7 @@ public abstract class HTableTestBase {
             // scan.setBatch(1);
 
             scan.setMaxVersions(9);
+            scanner = hTable.getScanner(scan);
             i = 0;
             count = 0;
             for (Result result : scanner) {
@@ -1041,7 +1040,7 @@ public abstract class HTableTestBase {
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
                 System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
                         Bytes.toString(CellUtil.cloneQualifier(keyValue)),
                         keyValue.getTimestamp(),
@@ -3204,13 +3203,6 @@ public abstract class HTableTestBase {
         // | zScanKey2 | column1 | -1729223352450 | value1 |
         // +-----------+---------+----------------+--------+
 
-        // test closestRowBefore
-        get = new Get("scanKey2x2".getBytes());
-        get.addFamily(family.getBytes());
-        get.setClosestRowBefore(true);
-        r = hTable.get(get);
-        assertEquals(key2, Bytes.toString(r.getRow()));
-
         // test exists
         LinkedList<Get> gets = new LinkedList<>();
         Get get1 = new Get(key1.getBytes());
@@ -5291,9 +5283,8 @@ public abstract class HTableTestBase {
     @Test
     public void testGetColumnFamilyNull() throws Exception {
         Get get = new Get(("key_c_f").getBytes());
-        expectedException.expect(NullPointerException.class);
         get.addFamily(null);
-        expectedException.expect(FeatureNotSupportedException.class);
+        expectedException.expect(IllegalArgumentException.class);
         expectedException.expectMessage("family is empty");
         hTable.get(get);
     }
