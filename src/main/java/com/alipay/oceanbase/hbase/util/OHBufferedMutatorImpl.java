@@ -18,10 +18,13 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -57,7 +60,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private final int                       maxKeyValueSize;
     private boolean                         closed                 = false;
     private final ExecutorService           pool;
-    private final int                       rpcTimeout;
+    private int                             rpcTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
@@ -122,7 +125,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         // check if every mutation's family is the same
         // check if mutations are the same type
         for (Mutation m : mutations) {
-            OHTable.checkFamilyViolation(m.getFamilyMap().keySet(), true);
+            OHTable.checkFamilyViolation(m.getFamilyCellMap().keySet(), true);
             validateInsUpAndDelete(m);
             Class<?> curType = m.getClass();
             // set the type of this BufferedMutator
@@ -187,7 +190,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                         break;
                     }
                     // for now, operations' family is the same
-                    byte[] family = execBuffer.getFirst().getFamilyMap().firstKey();
+                    byte[] family = execBuffer.getFirst().getFamilyCellMap().firstKey();
                     ObTableBatchOperation batch = buildObTableBatchOperation(execBuffer);
                     // table_name$cf_name
                     String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
@@ -206,7 +209,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                         while (!execBuffer.isEmpty()) {
                             // poll elements from execBuffer to recollect remaining operations
                             m = execBuffer.poll();
-                            byte[] family = m.getFamilyMap().firstKey();
+                            byte[] family = m.getFamilyCellMap().firstKey();
                             ObTableBatchOperation batch = buildObTableBatchOperation(Collections.singletonList(m));
                             String targetTableName = OHTable.getTargetTableName(tableNameString, Bytes.toString(family), conf);
                             request = OHTable.buildObTableBatchOperationRequest(batch, targetTableName);
@@ -287,10 +290,20 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return this.writeBufferSize;
     }
 
+    @Override
+    public void setRpcTimeout(int i) {
+        this.rpcTimeout = i;
+    }
+
+    @Override
+    public void setOperationTimeout(int i) {
+        throw new FeatureNotSupportedException("not supported yet'");
+    }
+
     private ObTableBatchOperation buildObTableBatchOperation(List<? extends Mutation> execBuffer) {
-        List<KeyValue> keyValueList = new LinkedList<>();
+        List<Cell> keyValueList = new LinkedList<>();
         for (Mutation mutation : execBuffer) {
-            for (Map.Entry<byte[], List<KeyValue>> entry : mutation.getFamilyMap().entrySet()) {
+            for (Map.Entry<byte[], List<Cell>> entry : mutation.getFamilyCellMap().entrySet()) {
                 keyValueList.addAll(entry.getValue());
             }
         }

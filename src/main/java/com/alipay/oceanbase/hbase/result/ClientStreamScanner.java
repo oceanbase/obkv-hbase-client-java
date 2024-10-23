@@ -25,6 +25,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQuer
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
@@ -96,7 +97,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
             byte[] sv = (byte[]) startRow.get(3).getValue();
 
             KeyValue startKeyValue = new KeyValue(sk, family, sq, st, sv);
-            List<KeyValue> keyValues = new ArrayList<KeyValue>();
+            List<Cell> keyValues = new ArrayList<Cell>();
             keyValues.add(startKeyValue);
             while (!streamResult.getCacheRows().isEmpty() && streamResult.next()) {
                 List<ObObj> row = streamResult.getRow();
@@ -120,7 +121,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
                     break;
                 }
             }
-            return new Result(keyValues);
+            return Result.create(keyValues);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00000"), streamResult.getTableName(), e);
             throw new IOException(String.format("get table %s stream next result error ",

@@ -110,12 +110,12 @@ public class OHConnectionImpl implements Connection {
     }
 
     @Override
-    public HTableInterface getTable(TableName tableName) throws IOException {
+    public Table getTable(TableName tableName) throws IOException {
         return getTable(tableName, getBatchPool());
     }
 
     @Override
-    public HTableInterface getTable(TableName tableName, ExecutorService pool) throws IOException {
+    public Table getTable(TableName tableName, ExecutorService pool) throws IOException {
         return new OHTable(tableName, this, connectionConfig, pool);
     }
 
@@ -176,6 +176,11 @@ public class OHConnectionImpl implements Connection {
     @Override
     public boolean isClosed() {
         return this.closed;
+    }
+
+    @Override
+    public TableBuilder getTableBuilder(TableName tableName, ExecutorService executorService) {
+        throw new FeatureNotSupportedException("not supported yet'");
     }
 
     @Override

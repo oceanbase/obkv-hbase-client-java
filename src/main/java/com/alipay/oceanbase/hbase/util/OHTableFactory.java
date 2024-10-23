@@ -21,8 +21,8 @@ import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTablePool;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HTableFactory;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
@@ -44,7 +44,7 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
  * For example, see {@link OHTablePool#setAutoFlush(String, boolean)}
  */
 @InterfaceAudience.Private
-public class OHTableFactory extends HTableFactory {
+public class OHTableFactory {
     private final ExecutorService threadPool;
     private final OHTablePool     tablePool;
 
@@ -61,8 +61,7 @@ public class OHTableFactory extends HTableFactory {
         this.tablePool = tablePool;
     }
 
-    @Override
-    public HTableInterface createHTableInterface(Configuration config, byte[] tableName) {
+    public Table createHTableInterface(Configuration config, byte[] tableName) {
         try {
             String tableNameStr = Bytes.toString(tableName);
             tableNameStr = tableNameStr.equals(this.tablePool.getOriginTableName()) ? tableNameStr
@@ -71,13 +70,6 @@ public class OHTableFactory extends HTableFactory {
             OHTable ht = new OHTable(adjustConfiguration(copyConfiguration(config), tableNameStr),
                 tableName, this.threadPool);
 
-            if (tablePool.getTableAttribute(tableNameStr, HBASE_HTABLE_POOL_AUTO_FLUSH) != null) {
-                ht.setAutoFlush(tablePool.getAutoFlush(tableNameStr),
-                    tablePool.getClearBufferOnFail(tableNameStr));
-            }
-            if (tablePool.getTableAttribute(tableNameStr, HBASE_HTABLE_POOL_CLEAR_BUFFER_ON_FAIL) != null) {
-                ht.setWriteBufferSize(tablePool.getWriteBufferSize(tableNameStr));
-            }
             if (tablePool.getTableAttribute(tableNameStr, HBASE_HTABLE_POOL_OPERATION_TIMEOUT) != null) {
                 ht.setOperationTimeout(tablePool.getOperationTimeout(tableNameStr));
             }
@@ -89,6 +81,10 @@ public class OHTableFactory extends HTableFactory {
         } catch (IOException ioe) {
             throw new RuntimeException(ioe);
         }
+    }
+
+    public void releaseHTableInterface(Table table) throws IOException {
+        table.close();
     }
 
     private Configuration adjustConfiguration(Configuration configuration, String tableName) {

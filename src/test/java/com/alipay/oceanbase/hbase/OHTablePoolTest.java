@@ -19,7 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.remoting.util.ConcurrentHashSet;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.PoolMap;
 import org.junit.After;
 import org.junit.Assert;
@@ -68,8 +68,8 @@ public class OHTablePoolTest extends HTableTestBase {
     public void test_current_get_close(final OHTablePool ohTablePool, int concurrency, int maxSize) {
         final CountDownLatch pre = new CountDownLatch(concurrency);
         final CountDownLatch suf = new CountDownLatch(concurrency);
-        final ConcurrentHashSet<HTableInterface> ohTableSet = new ConcurrentHashSet<HTableInterface>();
-        final ConcurrentHashSet<HTableInterface> pooledHTableSet = new ConcurrentHashSet<HTableInterface>();
+        final ConcurrentHashSet<Table> ohTableSet = new ConcurrentHashSet<Table>();
+        final ConcurrentHashSet<Table> pooledHTableSet = new ConcurrentHashSet<Table>();
         for (int i = 0; i < concurrency; i++) {
             new Thread(new Runnable() {
                 @Override
@@ -82,7 +82,7 @@ public class OHTablePoolTest extends HTableTestBase {
                     }
                     OHTablePool.PooledOHTable pooledOHTable = ((OHTablePool.PooledOHTable) ohTablePool
                         .getTable("test"));
-                    HTableInterface htable = pooledOHTable.getTable();
+                    Table htable = pooledOHTable.getTable();
                     ohTableSet.add(htable);
                     pooledHTableSet.add(pooledOHTable);
                     suf.countDown();
@@ -96,7 +96,7 @@ public class OHTablePoolTest extends HTableTestBase {
             //
         }
 
-        for (HTableInterface htable : pooledHTableSet) {
+        for (Table htable : pooledHTableSet) {
             try {
                 htable.close();
             } catch (IOException e) {

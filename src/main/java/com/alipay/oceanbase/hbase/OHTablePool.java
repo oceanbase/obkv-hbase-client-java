@@ -50,11 +50,11 @@ import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_
 public class OHTablePool implements Closeable {
 
     private String                                 originTabelName = null;
-    private final PoolMap<String, HTableInterface> tables;
+    private final PoolMap<String, Table>           tables;
     private final int                              maxSize;
     private final PoolMap.PoolType                 poolType;
     private final Configuration                    config;
-    private final HTableInterfaceFactory           tableFactory;
+    private final OHTableFactory                     tableFactory;
 
     // A map of table attributes used for the table created by this pool. The map
     // key is composed of Table_Name + SEPARATOR + Attribute_Name, and the value
@@ -89,7 +89,7 @@ public class OHTablePool implements Closeable {
      * @param tableFactory table factory
      */
     public OHTablePool(final Configuration config, final int maxSize,
-                       final HTableInterfaceFactory tableFactory) {
+                       final OHTableFactory tableFactory) {
         this(config, maxSize, tableFactory, PoolMap.PoolType.Reusable);
     }
 
@@ -121,12 +121,12 @@ public class OHTablePool implements Closeable {
      *                     {@link PoolMap.PoolType#ThreadLocal}
      */
     public OHTablePool(final Configuration config, final int maxSize,
-                       final HTableInterfaceFactory tableFactory, PoolMap.PoolType poolType) {
+                       final OHTableFactory tableFactory, PoolMap.PoolType poolType) {
         this(config, maxSize, null, null, poolType);
     }
 
     public OHTablePool(final Configuration config, final int maxSize,
-        final HTableInterfaceFactory tableFactory,
+        final OHTableFactory tableFactory,
         final ExecutorService createTableExecutor, PoolMap.PoolType poolType) {
         // Make a new configuration instance so I can safely cleanup when
         // done with the pool.
@@ -163,9 +163,9 @@ public class OHTablePool implements Closeable {
      * @return a reference to the specified table
      * @throws RuntimeException if there is a problem instantiating the HTable
      */
-    public HTableInterface getTable(String tableName) {
+    public Table getTable(String tableName) {
         // call the old getTable implementation renamed to findOrCreateTable
-        HTableInterface table = findOrCreateTable(tableName);
+        Table table = findOrCreateTable(tableName);
         // return a proxy table so when user closes the proxy, the actual table
         // will be returned to the pool
         if (table instanceof PooledOHTable) {
@@ -185,8 +185,8 @@ public class OHTablePool implements Closeable {
      * @return a reference to the specified table
      * @throws RuntimeException if there is a problem instantiating the HTable
      */
-    private HTableInterface findOrCreateTable(String tableName) {
-        HTableInterface table = tables.get(tableName);
+    private Table findOrCreateTable(String tableName) {
+        Table table = tables.get(tableName);
         if (table == null) {
             table = createHTable(tableName);
         }
@@ -202,7 +202,7 @@ public class OHTablePool implements Closeable {
      * @return a reference to the specified table
      * @throws RuntimeException if there is a problem instantiating the HTable
      */
-    public HTableInterface getTable(byte[] tableName) {
+    public Table getTable(byte[] tableName) {
         return getTable(Bytes.toString(tableName));
     }
 
@@ -214,7 +214,7 @@ public class OHTablePool implements Closeable {
      * @throws IOException if failed
      * @deprecated
      */
-    public void putTable(HTableInterface table) throws IOException {
+    public void putTable(Table table) throws IOException {
         // we need to be sure nobody puts a proxy implementation in the pool
         // but if the client code is not updated
         // and it will continue to call putTable() instead of calling close()
@@ -241,9 +241,9 @@ public class OHTablePool implements Closeable {
      *
      * @param table table
      */
-    private void returnTable(HTableInterface table) throws IOException {
+    private void returnTable(Table table) throws IOException {
         // this is the old putTable method renamed and made private
-        String tableName = Bytes.toString(table.getTableName());
+        String tableName = Bytes.toString(table.getName().getName());
         if (tables.size(tableName) >= maxSize) {
             // release table instance since we're not reusing it
             this.tables.remove(tableName, table);
@@ -253,7 +253,7 @@ public class OHTablePool implements Closeable {
         tables.put(tableName, table);
     }
 
-    protected HTableInterface createHTable(String tableName) {
+    protected Table createHTable(String tableName) {
         return this.tableFactory.createHTableInterface(config, Bytes.toBytes(tableName));
     }
 
@@ -269,9 +269,9 @@ public class OHTablePool implements Closeable {
      * @throws IOException if failed
      */
     public void closeTablePool(final String tableName) throws IOException {
-        Collection<HTableInterface> tables = this.tables.values(tableName);
+        Collection<Table> tables = this.tables.values(tableName);
         if (tables != null) {
-            for (HTableInterface table : tables) {
+            for (Table table : tables) {
                 this.tableFactory.releaseHTableInterface(table);
             }
         }
@@ -699,22 +699,17 @@ public class OHTablePool implements Closeable {
      * A proxy class that implements HTableInterface.close method to return the
      * wrapped table back to the table pool
      */
-    public class PooledOHTable implements HTableInterface {
+    public class PooledOHTable implements Table {
 
-        private HTableInterface table; // actual table implementation
+        private Table table; // actual table implementation
 
-        public PooledOHTable(HTableInterface table) {
+        public PooledOHTable(Table table) {
             this.table = table;
         }
 
         @Override
-        public byte[] getTableName() {
-            return table.getTableName();
-        }
-
-        @Override
         public TableName getName() {
-            throw new FeatureNotSupportedException("not supported yet'");
+            return table.getName();
         }
 
         @Override
@@ -728,6 +723,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public TableDescriptor getDescriptor() throws IOException {
+            return table.getDescriptor();
+        }
+
+        @Override
         public boolean exists(Get get) throws IOException {
             return table.exists(get);
         }
@@ -738,7 +738,7 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
-        public Boolean[] exists(List<Get> gets) throws IOException {
+        public boolean[] exists(List<Get> gets) throws IOException {
             return table.exists(gets);
         }
 
@@ -749,21 +749,9 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
-        public Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
-            return table.batch(actions);
-        }
-
-        @Override
         public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                       Batch.Callback<R> callback) throws IOException,
                                                                  InterruptedException {
-            throw new FeatureNotSupportedException("not supported yet'");
-        }
-
-        @Override
-        public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
-                                                                                                  throws IOException,
-                                                                                                  InterruptedException {
             throw new FeatureNotSupportedException("not supported yet'");
         }
 
@@ -775,12 +763,6 @@ public class OHTablePool implements Closeable {
         @Override
         public Result[] get(List<Get> gets) throws IOException {
             return table.get(gets);
-        }
-
-        @Override
-        @SuppressWarnings("deprecation")
-        public Result getRowOrBefore(byte[] row, byte[] family) throws IOException {
-            return table.getRowOrBefore(row, family);
         }
 
         @Override
@@ -861,22 +843,6 @@ public class OHTablePool implements Closeable {
             return table.incrementColumnValue(row, family, qualifier, amount, durability);
         }
 
-        @Override
-        public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
-                                         boolean writeToWAL) throws IOException {
-            return table.incrementColumnValue(row, family, qualifier, amount, writeToWAL);
-        }
-
-        @Override
-        public boolean isAutoFlush() {
-            return table.isAutoFlush();
-        }
-
-        @Override
-        public void flushCommits() throws IOException {
-            table.flushCommits();
-        }
-
         /**
          * Returns the actual table back to the pool
          *
@@ -921,7 +887,7 @@ public class OHTablePool implements Closeable {
          *
          * @return wrapped htable
          */
-        HTableInterface getWrappedTable() {
+        Table getWrappedTable() {
             return table;
         }
 
@@ -933,31 +899,6 @@ public class OHTablePool implements Closeable {
         @Override
         public Result append(Append append) throws IOException {
             return table.append(append);
-        }
-
-        @Override
-        public void setAutoFlush(boolean autoFlush) {
-            table.setAutoFlush(autoFlush);
-        }
-
-        @Override
-        public void setAutoFlush(boolean autoFlush, boolean clearBufferOnFail) {
-            table.setAutoFlush(autoFlush, clearBufferOnFail);
-        }
-
-        @Override
-        public void setAutoFlushTo(boolean autoFlush) {
-            table.setAutoFlushTo(autoFlush);
-        }
-
-        @Override
-        public long getWriteBufferSize() {
-            return table.getWriteBufferSize();
-        }
-
-        @Override
-        public void setWriteBufferSize(long writeBufferSize) throws IOException {
-            table.setWriteBufferSize(writeBufferSize);
         }
 
         @Override
@@ -1010,7 +951,7 @@ public class OHTablePool implements Closeable {
             return table.getRpcTimeout();
         }
 
-        public HTableInterface getTable() {
+        public Table getTable() {
             return table;
         }
 

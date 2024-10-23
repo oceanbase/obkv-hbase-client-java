@@ -38,7 +38,7 @@ public class OHTableHotkeyThrottleUtil extends Thread {
         put, get, scan
     }
 
-    protected HTableInterface   hTable;
+    protected Table             hTable;
     TestType                    testType;
     OperationType               operationType;
 
@@ -213,7 +213,7 @@ public class OHTableHotkeyThrottleUtil extends Thread {
             ++unitOperationTime;
             Put put = new Put(toBytes(key));
             long timestamp = System.currentTimeMillis();
-            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+            put.addColumn(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
             hTable.put(put);
             ++passNum;
         } catch (Exception e) {
