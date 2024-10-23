@@ -9,11 +9,11 @@ import java.util.List;
 
 public class BatchError {
     private final List<Throwable> throwables = new ArrayList<Throwable>();
-    private final List<Row> actions = new ArrayList<Row>();
-    private final List<String> addresses = new ArrayList<String>();
+    private final List<Row>       actions    = new ArrayList<Row>();
+    private final List<String>    addresses  = new ArrayList<String>();
 
     public synchronized void add(Throwable ex, Row row, ServerName serverName) {
-        if (row == null){
+        if (row == null) {
             throw new IllegalArgumentException("row cannot be null. location=" + serverName);
         }
 
@@ -27,9 +27,8 @@ public class BatchError {
     }
 
     public synchronized RetriesExhaustedWithDetailsException makeException() {
-        return new RetriesExhaustedWithDetailsException(
-                new ArrayList<Throwable>(throwables),
-                new ArrayList<Row>(actions), new ArrayList<String>(addresses));
+        return new RetriesExhaustedWithDetailsException(new ArrayList<Throwable>(throwables),
+            new ArrayList<Row>(actions), new ArrayList<String>(addresses));
     }
 
     public synchronized void clear() {

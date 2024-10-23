@@ -1563,6 +1563,11 @@ public class OHTable implements Table {
                         ROW_KEY_COLUMNS,
                         new Object[] { CellUtil.cloneRow(kv), isTableGroup?CellUtil.cloneQualifier(kv):null, -kv.getTimestamp() },
                         null, null);
+            case DeleteFamilyVersion:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), isTableGroup ? CellUtil.cloneQualifier(kv) : null, kv.getTimestamp() },
+                        null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -1785,6 +1790,7 @@ public class OHTable implements Table {
         DeleteAll,
         DeleteColumn,
         DeleteFamily,
+        DeleteFamilyVersion,
     }
 
     public static OHOpType getDeleteType(Cell.Type type) {
