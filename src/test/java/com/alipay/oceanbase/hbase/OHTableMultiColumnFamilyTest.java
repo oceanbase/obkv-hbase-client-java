@@ -17,18 +17,17 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
@@ -48,6 +47,139 @@ public class OHTableMultiColumnFamilyTest {
     @After
     public void finish() throws IOException {
         hTable.close();
+    }
+
+    @Test
+    public void testMultiColumnFamilyBatch() throws Exception {
+        byte[] family1 = "family_with_group1".getBytes();
+        byte[] family2 = "family_with_group2".getBytes();
+        byte[] family3 = "family_with_group3".getBytes();
+
+        byte[] family1_column1 = "family1_column1".getBytes();
+        byte[] family1_column2 = "family1_column2".getBytes();
+        byte[] family1_column3 = "family1_column3".getBytes();
+        byte[] family2_column1 = "family2_column1".getBytes();
+        byte[] family2_column2 = "family2_column2".getBytes();
+        byte[] family3_column1 = "family3_column1".getBytes();
+        byte[] family1_value = "VVV1".getBytes();
+        byte[] family2_value = "VVV2".getBytes();
+        byte[] family3_value = "VVV3".getBytes();
+
+        int rows = 10;
+        List<Row> batchLsit = new LinkedList<>();
+        for (int i = 0; i < rows; ++i) {
+            Put put = new Put(toBytes("Key" + i));
+            Delete delete = new Delete(toBytes("Key" + i));
+            batchLsit.add(delete);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
+            batchLsit.add(put);
+        }
+
+        // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
+        Delete delete = new Delete(toBytes("Key1"));
+        delete.addColumns(family1, family1_column1);
+        delete.addColumns(family2, family2_column1);
+        batchLsit.add(delete);
+        Object[] results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
+        // f1c2 f1c3 f2c2 f3c1
+        Get get = new Get(toBytes("Key1"));
+        Result result = hTable.get(get);
+        Cell[] keyValues = result.rawCells();
+        assertEquals(4, keyValues.length);
+        assertFalse(result.containsColumn(family1, family1_column1));
+        assertFalse(result.containsColumn(family2, family2_column1));
+
+        assertTrue(result.containsColumn(family1, family1_column2));
+        assertArrayEquals(result.getValue(family1, family1_column2), family1_value);
+        assertTrue(result.containsColumn(family1, family1_column3));
+        assertArrayEquals(result.getValue(family1, family1_column3), family1_value);
+        assertTrue(result.containsColumn(family2, family2_column2));
+        assertArrayEquals(result.getValue(family2, family2_column2), family2_value);
+        assertTrue(result.containsColumn(family3, family3_column1));
+        assertArrayEquals(result.getValue(family3, family3_column1), family3_value);
+
+        // f1c1 f2c1 f2c2
+        delete = new Delete(toBytes("Key2"));
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family1, family1_column3);
+        delete.addColumns(family3, family3_column1);
+        batchLsit.add(delete);
+        // null
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
+        get = new Get(toBytes("Key2"));
+        result = hTable.get(get);
+        keyValues = result.rawCells();
+        assertEquals(3, keyValues.length);
+        batchLsit.clear();
+        for (int i = 0; i < rows; ++i) {
+            Put put = new Put(toBytes("Key" + i));
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
+            batchLsit.add(put);
+        }
+
+        delete = new Delete(toBytes("Key3"));
+        delete.addColumn(family1, family1_column2);
+        delete.addColumn(family2, family2_column1);
+        batchLsit.add(delete);
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
+        get = new Get(toBytes("Key3"));
+        result = hTable.get(get);
+        keyValues = result.rawCells();
+        assertEquals(6, keyValues.length);
+
+        batchLsit.clear();
+        delete = new Delete(toBytes("Key4"));
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family2, family2_column1);
+        delete.addFamily(family3);
+        batchLsit.add(delete);
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
+        get = new Get(toBytes("Key4"));
+        get.setMaxVersions(10);
+        result = hTable.get(get);
+        keyValues = result.rawCells();
+        assertEquals(6, keyValues.length);
+
+        batchLsit.clear();
+        final long[] updateCounter = new long[] { 0L };
+        delete = new Delete(toBytes("Key5"));
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family2, family2_column1);
+        delete.addFamily(family3);
+        batchLsit.add(delete);
+        for (int i = 0; i < rows; ++i) {
+            Put put = new Put(toBytes("Key" + i));
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
+            batchLsit.add(put);
+        }
+        results = new Object[batchLsit.size()];
+        hTable.batchCallback(batchLsit, results, new Batch.Callback<MutationResult>() {
+            @Override
+            public void update(byte[] region, byte[] row, MutationResult result) {
+                updateCounter[0]++;
+            }
+        });
+        assertEquals(11, updateCounter[0]);
+
     }
 
     @Test
@@ -486,7 +618,6 @@ public class OHTableMultiColumnFamilyTest {
                 assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
             }
         }
-        System.out.println(Arrays.toString(result2.rawCells()));
         assertEquals(3, keyValues.length);
 
         //f2c1 f2c2
@@ -528,6 +659,8 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
+            Delete delete = new Delete(toBytes("Key" + i));
+            hTable.delete(delete);
             put.addColumn(family1, family1_column1, family1_value);
             put.addColumn(family1, family1_column2, family1_value);
             put.addColumn(family1, family1_column3, family1_value);
