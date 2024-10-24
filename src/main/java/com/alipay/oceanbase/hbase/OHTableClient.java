@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class OHTableClient implements HTableInterface, Lifecycle {
+public class OHTableClient implements Table, Lifecycle {
     private byte[]              tableName;
     private String              tableNameString;
     private ReentrantLock       lock        = new ReentrantLock();
@@ -141,36 +141,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public void setAutoFlush(boolean autoFlush) {
-        checkStatus();
-        ohTable.setAutoFlush(autoFlush);
-    }
-
-    @Override
-    public void setAutoFlush(boolean autoFlush, boolean clearBufferOnFail) {
-        checkStatus();
-        ohTable.setAutoFlush(autoFlush, clearBufferOnFail);
-    }
-
-    @Override
-    public void setAutoFlushTo(boolean autoFlush) {
-        checkStatus();
-        ohTable.setAutoFlushTo(autoFlush);
-    }
-
-    @Override
-    public long getWriteBufferSize() {
-        checkStatus();
-        return ohTable.getWriteBufferSize();
-    }
-
-    @Override
-    public void setWriteBufferSize(long writeBufferSize) throws IOException {
-        checkStatus();
-        ohTable.setWriteBufferSize(writeBufferSize);
-    }
-
-    @Override
     public <R extends Message> Map<byte[], R> batchCoprocessorService(Descriptors.MethodDescriptor methodDescriptor,
                                                                       Message request,
                                                                       byte[] startKey,
@@ -228,11 +198,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public byte[] getTableName() {
-        return tableName;
-    }
-
-    @Override
     public TableName getName() {
         return ohTable.getName();
     }
@@ -251,6 +216,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
+    public TableDescriptor getDescriptor() throws IOException {
+        return null;
+    }
+
+    @Override
     public boolean exists(Get get) throws IOException {
         checkStatus();
         return ohTable.exists(get);
@@ -263,7 +233,7 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     }
 
     @Override
-    public Boolean[] exists(List<Get> gets) throws IOException {
+    public boolean[] exists(List<Get> gets) throws IOException {
         checkStatus();
         return ohTable.exists(gets);
     }
@@ -276,27 +246,12 @@ public class OHTableClient implements HTableInterface, Lifecycle {
         ohTable.batch(actions, results);
     }
 
-    // Not support.
-    @Override
-    public Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
-        checkStatus();
-        return ohTable.batch(actions);
-    }
-
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
         checkStatus();
         ohTable.batchCallback(actions, results, callback);
-    }
-
-    @Override
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
-                                                                                              throws IOException,
-                                                                                              InterruptedException {
-        checkStatus();
-        return ohTable.batchCallback(actions, callback);
     }
 
     @Override
@@ -309,13 +264,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     public Result[] get(List<Get> gets) throws IOException {
         checkStatus();
         return ohTable.get(gets);
-    }
-
-    // Not support.
-    @Override
-    public Result getRowOrBefore(byte[] row, byte[] family) throws IOException {
-        checkStatus();
-        return ohTable.getRowOrBefore(row, family);
     }
 
     @Override
@@ -421,25 +369,6 @@ public class OHTableClient implements HTableInterface, Lifecycle {
                                      Durability durability) throws IOException {
         checkStatus();
         return ohTable.incrementColumnValue(row, family, qualifier, amount, durability);
-    }
-
-    @Override
-    public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount,
-                                     boolean writeToWAL) throws IOException {
-        checkStatus();
-        return ohTable.incrementColumnValue(row, family, qualifier, amount, writeToWAL);
-    }
-
-    @Override
-    public boolean isAutoFlush() {
-        checkStatus();
-        return ohTable.isAutoFlush();
-    }
-
-    @Override
-    public void flushCommits() throws IOException {
-        checkStatus();
-        ohTable.flushCommits();
     }
 
     public String getTableNameString() {

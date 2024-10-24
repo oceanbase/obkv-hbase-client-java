@@ -64,12 +64,12 @@ public class OHTableClientTestLoadTest extends HTableTestBase {
         String key = "existKey";
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "false");
         Delete delete = new Delete(key.getBytes());
-        delete.deleteColumns("testload".getBytes(), column.getBytes());
+        delete.addColumns("testload".getBytes(), column.getBytes());
         hTable.delete(delete);
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
         try {
             delete = new Delete(key.getBytes());
-            delete.deleteColumns("testload".getBytes(), column.getBytes());
+            delete.addColumns("testload".getBytes(), column.getBytes());
             hTable.delete(delete);
         } catch (IOException e) {
             Throwable t = e;
@@ -86,7 +86,7 @@ public class OHTableClientTestLoadTest extends HTableTestBase {
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_SUFFIX, "_a");
         try {
             delete = new Delete(key.getBytes());
-            delete.deleteColumns("testload".getBytes(), column.getBytes());
+            delete.addColumns("testload".getBytes(), column.getBytes());
             hTable.delete(delete);
         } catch (IOException e) {
             Throwable t = e;

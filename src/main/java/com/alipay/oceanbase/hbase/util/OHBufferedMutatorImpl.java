@@ -19,8 +19,13 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.google.common.annotations.VisibleForTesting;
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.slf4j.Logger;
@@ -140,9 +145,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         if (mt instanceof Put) {
             // family empty check is in validatePut
             HTable.validatePut((Put) mt, maxKeyValueSize);
-            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
+            OHTable.checkFamilyViolation(mt.getFamilyCellMap().keySet(), true);
         } else {
-            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
+            OHTable.checkFamilyViolation(mt.getFamilyCellMap().keySet(), false);
         }
     }
 

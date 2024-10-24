@@ -51,18 +51,10 @@ public class OHTableClientTest extends HTableTestBase {
         hTable2.init();
         hTable2.getConfiguration().set("rs.list.acquire.read.timeout", "10000");
 
-        assertTrue(hTable2.isAutoFlush());
-        hTable2.setAutoFlush(false);
-        assertFalse(hTable2.isAutoFlush());
-        hTable2.setAutoFlush(true, true);
-        assertTrue(hTable2.isAutoFlush());
-        hTable2.setWriteBufferSize(10000000L);
-        assertEquals(10000000L, hTable2.getWriteBufferSize());
         assertEquals("test", hTable2.getTableNameString());
         //        assertEquals("n1:test", hTable2.getTableNameString());
-        assertEquals("test", new String(hTable2.getTableName()));
+        assertEquals("test", new String(hTable2.getName().getName()));
         //        assertEquals("n1:test", new String(hTable2.getTableName()));
-        hTable2.flushCommits();
         hTable2.close();
         assertTrue(true);
     }

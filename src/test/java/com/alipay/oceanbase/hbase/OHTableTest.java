@@ -21,7 +21,7 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,7 +68,7 @@ public class OHTableTest extends HTableTestBase {
         SofaThreadPoolExecutor executor1 = new SofaThreadPoolExecutor(1, 1, 1000, SECONDS,
             new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool", TABLE_HBASE_LOGGER_SPACE);
         executor1.allowCoreThreadTimeOut(true);
-        HTableInterface hTable1 = new OHTable(c, "test".getBytes(), executor1);
+        Table hTable1 = new OHTable(c, "test".getBytes(), executor1);
 
         try {
             hTable1.getTableDescriptor();

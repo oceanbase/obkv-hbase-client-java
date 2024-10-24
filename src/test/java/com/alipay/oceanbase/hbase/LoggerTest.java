@@ -19,7 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Append;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Scan;
 import org.junit.Before;
@@ -40,7 +40,7 @@ import static org.junit.Assert.fail;
 @PrepareForTest(OHTable.class)
 @PowerMockIgnore({ "javax.crypto.*" })
 public class LoggerTest {
-    HTableInterface hTableMock;
+    Table hTableMock;
 
     @Before
     public void setup() throws IOException {

@@ -19,7 +19,8 @@ package com.alipay.oceanbase.hbase;
 
 import org.apache.hadoop.conf.Configuration;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
@@ -38,7 +39,7 @@ public class OHTableMultiColumnFamilyTest {
     @Rule
     public ExpectedException  expectedException = ExpectedException.none();
 
-    protected HTableInterface hTable;
+    protected Table hTable;
 
     @Before
     public void before() throws Exception {
@@ -82,12 +83,12 @@ public class OHTableMultiColumnFamilyTest {
             Delete delete = new Delete(toBytes(key));
             mutations.add(delete);
             Put put = new Put(toBytes(key));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             mutations.add(put);
         }
         mutator.mutate(mutations);
@@ -98,14 +99,14 @@ public class OHTableMultiColumnFamilyTest {
         get.addFamily(family1);
         get.addFamily(family2);
         Result result = hTable.get(get);
-        Assert.assertEquals(5, result.raw().length);
+        Assert.assertEquals(5, result.rawCells().length);
 
         mutations.clear();
         for (int i = 0; i < rows; ++i) {
             if (i % 5 == 0) { // 0, 5
                 Delete delete = new Delete(toBytes("Key" + i));
-                delete.deleteFamily(family2);
-                delete.deleteFamily(family3);
+                delete.addFamily(family2);
+                delete.addFamily(family3);
                 mutations.add(delete);
             }
         }
@@ -114,14 +115,14 @@ public class OHTableMultiColumnFamilyTest {
 
         get = new Get(toBytes("Key0"));
         result = hTable.get(get);
-        Assert.assertEquals(3, result.raw().length);
+        Assert.assertEquals(3, result.rawCells().length);
         Assert.assertFalse(result.containsColumn(family2, family2_column1));
         Assert.assertFalse(result.containsColumn(family2, family2_column2));
         Assert.assertFalse(result.containsColumn(family3, family3_column1));
 
         get = new Get(toBytes("Key5"));
         result = hTable.get(get);
-        Assert.assertEquals(3, result.raw().length);
+        Assert.assertEquals(3, result.rawCells().length);
         Assert.assertFalse(result.containsColumn(family2, family2_column1));
         Assert.assertFalse(result.containsColumn(family2, family2_column2));
         Assert.assertFalse(result.containsColumn(family3, family3_column1));
@@ -143,7 +144,7 @@ public class OHTableMultiColumnFamilyTest {
         ResultScanner scanner = hTable.getScanner(scan);
         int count = 0;
         for (Result r : scanner) {
-            count += r.raw().length;
+            count += r.rawCells().length;
         }
         Assert.assertEquals(0, count);
 
@@ -157,17 +158,17 @@ public class OHTableMultiColumnFamilyTest {
             for (int i = 0; i < rows; ++i) {
                 mutations.clear();
                 Put put = new Put(toBytes(keys.get(i)));
-                put.add(family1, family1_column1, family1_value);
-                put.add(family1, family1_column2, family1_value);
-                put.add(family1, family1_column3, family1_value);
-                put.add(family2, family2_column1, family2_value);
-                put.add(family3, family3_column1, family2_value);
-                put.add(family3, family3_column2, family3_value);
+                put.addColumn(family1, family1_column1, family1_value);
+                put.addColumn(family1, family1_column2, family1_value);
+                put.addColumn(family1, family1_column3, family1_value);
+                put.addColumn(family2, family2_column1, family2_value);
+                put.addColumn(family3, family3_column1, family2_value);
+                put.addColumn(family3, family3_column2, family3_value);
                 mutations.add(put);
                 if (i % 3 == 0) { // 0, 3, 6, 9
                     Delete delete = new Delete(toBytes(keys.get(i)));
-                    delete.deleteFamily(family1);
-                    delete.deleteFamily(family2);
+                    delete.addFamily(family1);
+                    delete.addFamily(family2);
                     mutations.add(delete);
                 }
                 mutator.mutate(mutations);
@@ -181,7 +182,7 @@ public class OHTableMultiColumnFamilyTest {
         }
         get = new Get(toBytes("Key2"));
         result = hTable.get(get);
-        Assert.assertEquals(6 , result.raw().length);
+        Assert.assertEquals(6 , result.rawCells().length);
         Assert.assertTrue(result.containsColumn(family1, family1_column1));
         Assert.assertTrue(result.containsColumn(family1, family1_column2));
         Assert.assertTrue(result.containsColumn(family1, family1_column3));
@@ -196,7 +197,7 @@ public class OHTableMultiColumnFamilyTest {
         }
         get = new Get(toBytes("Key3"));
         result = hTable.get(get);
-        Assert.assertEquals(2, result.raw().length);
+        Assert.assertEquals(2, result.rawCells().length);
         Assert.assertFalse(result.containsColumn(family1, family1_column1));
         Assert.assertFalse(result.containsColumn(family1, family1_column2));
         Assert.assertFalse(result.containsColumn(family1, family1_column3));
@@ -211,7 +212,7 @@ public class OHTableMultiColumnFamilyTest {
         }
         get = new Get(toBytes("Key9"));
         result = hTable.get(get);
-        Assert.assertEquals(2, result.raw().length);
+        Assert.assertEquals(2, result.rawCells().length);
         Assert.assertFalse(result.containsColumn(family1, family1_column1));
         Assert.assertFalse(result.containsColumn(family1, family1_column2));
         Assert.assertFalse(result.containsColumn(family1, family1_column3));
@@ -237,7 +238,7 @@ public class OHTableMultiColumnFamilyTest {
         scanner = hTable.getScanner(scan);
         count = 0;
         for (Result r : scanner) {
-            count += r.raw().length;
+            count += r.rawCells().length;
         }
         Assert.assertEquals(0, count);
     }
@@ -264,25 +265,26 @@ public class OHTableMultiColumnFamilyTest {
             Put put = new Put(toBytes("Key" + i));
             Delete delete = new Delete(toBytes("Key" + i));
             batchLsit.add(delete);
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
 
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
         Delete delete = new Delete(toBytes("Key1"));
-        delete.deleteColumns(family1, family1_column1);
-        delete.deleteColumns(family2, family2_column1);
+        delete.addColumns(family1, family1_column1);
+        delete.addColumns(family2, family2_column1);
         batchLsit.add(delete);
-        hTable.batch(batchLsit);
+        Object[] results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
         // f1c2 f1c3 f2c2 f3c1
         Get get = new Get(toBytes("Key1"));
         Result result = hTable.get(get);
-        KeyValue[] keyValues = result.raw();
+        Cell[] keyValues = result.rawCells();
         assertEquals(4, keyValues.length);
         assertFalse(result.containsColumn(family1, family1_column1));
         assertFalse(result.containsColumn(family2, family2_column1));
@@ -298,69 +300,73 @@ public class OHTableMultiColumnFamilyTest {
 
         // f1c1 f2c1 f2c2
         delete = new Delete(toBytes("Key2"));
-        delete.deleteColumns(family1, family1_column2);
-        delete.deleteColumns(family1, family1_column3);
-        delete.deleteColumns(family3, family3_column1);
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family1, family1_column3);
+        delete.addColumns(family3, family3_column1);
         batchLsit.add(delete);
         // null
-        hTable.batch(batchLsit);
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
         get = new Get(toBytes("Key2"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(3, keyValues.length);
         batchLsit.clear();
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
 
         delete = new Delete(toBytes("Key3"));
-        delete.deleteColumn(family1, family1_column2);
-        delete.deleteColumn(family2, family2_column1);
+        delete.addColumn(family1, family1_column2);
+        delete.addColumn(family2, family2_column1);
         batchLsit.add(delete);
-        hTable.batch(batchLsit);
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
         get = new Get(toBytes("Key3"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(6, keyValues.length);
 
         batchLsit.clear();
         delete = new Delete(toBytes("Key4"));
-        delete.deleteColumns(family1, family1_column2);
-        delete.deleteColumns(family2, family2_column1);
-        delete.deleteFamily(family3);
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family2, family2_column1);
+        delete.addFamily(family3);
         batchLsit.add(delete);
-        hTable.batch(batchLsit);
+        results = new Object[batchLsit.size()];
+        hTable.batch(batchLsit, results);
         get = new Get(toBytes("Key4"));
         get.setMaxVersions(10);
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(6, keyValues.length);
 
         batchLsit.clear();
         final long[] updateCounter = new long[] { 0L };
         delete = new Delete(toBytes("Key5"));
-        delete.deleteColumns(family1, family1_column2);
-        delete.deleteColumns(family2, family2_column1);
-        delete.deleteFamily(family3);
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family2, family2_column1);
+        delete.addFamily(family3);
         batchLsit.add(delete);
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
-        hTable.batchCallback(batchLsit, new Batch.Callback<MutationResult>() {
+        results = new Object[batchLsit.size()];
+        hTable.batchCallback(batchLsit, results, new Batch.Callback<MutationResult>() {
             @Override
             public void update(byte[] region, byte[] row, MutationResult result) {
                 updateCounter[0]++;
@@ -398,15 +404,14 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
-        hTable.flushCommits();
 
         Scan scan = new Scan();
         scan.setStartRow(toBytes("Key"));
@@ -415,14 +420,14 @@ public class OHTableMultiColumnFamilyTest {
         int count = 0;
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             count++;
@@ -466,7 +471,6 @@ public class OHTableMultiColumnFamilyTest {
             append.add(family3, family3_column1, family3_value);
             hTable.append(append);
         }
-        hTable.flushCommits();
 
         Scan scan = new Scan();
         scan.setStartRow(toBytes("Key"));
@@ -475,14 +479,14 @@ public class OHTableMultiColumnFamilyTest {
         int count = 0;
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             count++;
@@ -518,12 +522,12 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
 
@@ -534,14 +538,14 @@ public class OHTableMultiColumnFamilyTest {
         ResultScanner scanner2 = hTable.getScanner(scan);
 
         for (Result result : scanner2) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
         }
@@ -575,12 +579,12 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
 
@@ -592,14 +596,14 @@ public class OHTableMultiColumnFamilyTest {
         ResultScanner scanner = hTable.getScanner(scan);
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             assertEquals(2, keyValues.length);
@@ -616,14 +620,14 @@ public class OHTableMultiColumnFamilyTest {
         scanner = hTable.getScanner(scan);
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             assertEquals(5, keyValues.length);
@@ -638,14 +642,14 @@ public class OHTableMultiColumnFamilyTest {
         scanner = hTable.getScanner(scan);
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             assertEquals(5, keyValues.length);
@@ -660,14 +664,14 @@ public class OHTableMultiColumnFamilyTest {
         scanner = hTable.getScanner(scan);
 
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             // f1c1 f1c2 f1c3 f3c1
@@ -704,12 +708,12 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
 
@@ -723,14 +727,14 @@ public class OHTableMultiColumnFamilyTest {
         // Key1, Key10, Key11, Key12, Key13, Key14, Key15, Key16, Key17, Key18, Key19
         int count = 0;
         for (Result result : scanner) {
-            KeyValue[] keyValues = result.raw();
+            Cell[] keyValues = result.rawCells();
             long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
                 assertEquals(timestamp, keyValues[i].getTimestamp());
-                byte[] qualifier = keyValues[i].getQualifier();
+                byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
-                    assertEquals(expectedValue, keyValues[i].getValue());
+                    assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
                 }
             }
             assertEquals(6, keyValues.length);
@@ -767,28 +771,27 @@ public class OHTableMultiColumnFamilyTest {
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
-        hTable.flushCommits();
 
         // get with empty family
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
         Get get = new Get(toBytes("Key1"));
         Result result = hTable.get(get);
-        KeyValue[] keyValues = result.raw();
+        Cell[] keyValues = result.rawCells();
         long timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
             assertEquals(timestamp, keyValues[i].getTimestamp());
-            byte[] qualifier = keyValues[i].getQualifier();
+            byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
-                assertEquals(expectedValue, keyValues[i].getValue());
+                assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
             }
         }
         assertEquals(6, keyValues.length);
@@ -799,16 +802,17 @@ public class OHTableMultiColumnFamilyTest {
         get2.addColumn(family2, family2_column1);
         get2.addColumn(family2, family2_column2);
         Result result2 = hTable.get(get2);
-        keyValues = result2.raw();
+        keyValues = result2.rawCells();
         timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
             assertEquals(timestamp, keyValues[i].getTimestamp());
-            byte[] qualifier = keyValues[i].getQualifier();
+            byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
-                assertEquals(expectedValue, keyValues[i].getValue());
+                assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
             }
         }
+        System.out.println(Arrays.toString(result2.rawCells()));
         assertEquals(3, keyValues.length);
 
         //f2c1 f2c2
@@ -817,14 +821,14 @@ public class OHTableMultiColumnFamilyTest {
         get3.addColumn(family2, family2_column1);
         get3.addColumn(family2, family2_column2);
         Result result3 = hTable.get(get3);
-        keyValues = result3.raw();
+        keyValues = result3.rawCells();
         timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
             assertEquals(timestamp, keyValues[i].getTimestamp());
-            byte[] qualifier = keyValues[i].getQualifier();
+            byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
-                assertEquals(expectedValue, keyValues[i].getValue());
+                assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
             }
         }
         assertEquals(5, keyValues.length);
@@ -860,24 +864,24 @@ public class OHTableMultiColumnFamilyTest {
             Put put = new Put(toBytes("Key" + i));
             Delete delete = new Delete(toBytes("Key" + i));
             hTable.delete(delete);
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
 
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
         Delete delete = new Delete(toBytes("Key1"));
-        delete.deleteColumns(family1, family1_column1);
-        delete.deleteColumns(family2, family2_column1);
+        delete.addColumns(family1, family1_column1);
+        delete.addColumns(family2, family2_column1);
         hTable.delete(delete);
         // f1c2 f1c3 f2c2 f3c1
         Get get = new Get(toBytes("Key1"));
         Result result = hTable.get(get);
-        KeyValue[] keyValues = result.raw();
+        Cell[] keyValues = result.rawCells();
         assertEquals(4, keyValues.length);
         assertFalse(result.containsColumn(family1, family1_column1));
         assertFalse(result.containsColumn(family2, family2_column1));
@@ -893,24 +897,24 @@ public class OHTableMultiColumnFamilyTest {
 
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
         delete = new Delete(toBytes("Key2"));
-        delete.deleteFamily(family1);
-        delete.deleteFamily(family2);
+        delete.addFamily(family1);
+        delete.addFamily(family2);
         // f3c1
         hTable.delete(delete);
         get = new Get(toBytes("Key2"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(1, keyValues.length);
 
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
         delete = new Delete(toBytes("Key3"));
-        delete.deleteFamily(family1);
-        delete.deleteColumns(family2, family2_column1);
+        delete.addFamily(family1);
+        delete.addColumns(family2, family2_column1);
         hTable.delete(delete);
         // f2c2 f3c1
         get = new Get(toBytes("Key3"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(2, keyValues.length);
 
         // f1c1 f1c2 f1c3 f2c1 f2c2 f3c1
@@ -919,39 +923,39 @@ public class OHTableMultiColumnFamilyTest {
         // null
         get = new Get(toBytes("Key4"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(0, keyValues.length);
 
         // f1c1 f2c1 f2c2
         delete = new Delete(toBytes("Key5"));
-        delete.deleteColumns(family1, family1_column2);
-        delete.deleteColumns(family1, family1_column3);
-        delete.deleteColumns(family3, family3_column1);
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family1, family1_column3);
+        delete.addColumns(family3, family3_column1);
         hTable.delete(delete);
         // null
         get = new Get(toBytes("Key5"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(3, keyValues.length);
 
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             hTable.put(put);
         }
 
         delete = new Delete(toBytes("Key6"));
-        delete.deleteColumn(family1, family1_column2);
-        delete.deleteColumn(family2, family2_column1);
+        delete.addColumn(family1, family1_column2);
+        delete.addColumn(family2, family2_column1);
         hTable.delete(delete);
         get = new Get(toBytes("Key6"));
         result = hTable.get(get);
-        keyValues = result.raw();
+        keyValues = result.rawCells();
         assertEquals(6, keyValues.length);
 
         long lastTimestamp = result.getColumnCells(family1, family1_column1).get(0).getTimestamp();
@@ -969,14 +973,14 @@ public class OHTableMultiColumnFamilyTest {
 
         // delete previous data
         Delete deleteKey1Family = new Delete(toBytes(key1));
-        deleteKey1Family.deleteFamily(family1);
-        deleteKey1Family.deleteFamily(family2);
+        deleteKey1Family.addFamily(family1);
+        deleteKey1Family.addFamily(family2);
         Delete deleteKey2Family = new Delete(toBytes(key2));
-        deleteKey2Family.deleteFamily(family1);
-        deleteKey2Family.deleteFamily(family2);
+        deleteKey2Family.addFamily(family1);
+        deleteKey2Family.addFamily(family2);
         Delete deleteKey3Family = new Delete(toBytes(key3));
-        deleteKey3Family.deleteFamily(family1);
-        deleteKey3Family.deleteFamily(family2);
+        deleteKey3Family.addFamily(family1);
+        deleteKey3Family.addFamily(family2);
 
         hTable.delete(deleteKey1Family);
         hTable.delete(deleteKey2Family);
@@ -1009,31 +1013,31 @@ public class OHTableMultiColumnFamilyTest {
         long maxTimeStamp = System.currentTimeMillis();
 
         Put putKey1Fam1Column1MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column1MinTs.add(family1, family1_column1, minTimeStamp, toBytes(value1));
+        putKey1Fam1Column1MinTs.addColumn(family1, family1_column1, minTimeStamp, toBytes(value1));
 
         Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column1Ts1.add(family1, family1_column1, timeStamp1, toBytes(value2));
+        putKey3Fam1Column1Ts1.addColumn(family1, family1_column1, timeStamp1, toBytes(value2));
 
         Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column2MinTs.add(family1, family1_column2, minTimeStamp, toBytes(value1));
+        putKey1Fam1Column2MinTs.addColumn(family1, family1_column2, minTimeStamp, toBytes(value1));
 
         Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts3.add(family1, family1_column2, timeStamp3, toBytes(value2));
+        putKey1Fam1Column2Ts3.addColumn(family1, family1_column2, timeStamp3, toBytes(value2));
 
         Put putKey2Fam1Column2Ts3 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts3.add(family1, family1_column2, timeStamp3, toBytes(value2));
+        putKey2Fam1Column2Ts3.addColumn(family1, family1_column2, timeStamp3, toBytes(value2));
 
         Put putKey2Fam1Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts1.add(family1, family1_column3, timeStamp1, toBytes(value2));
+        putKey2Fam1Column3Ts1.addColumn(family1, family1_column3, timeStamp1, toBytes(value2));
 
         Put putKey3Fam1Column3Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column3Ts1.add(family1, family1_column3, timeStamp1, toBytes(value2));
+        putKey3Fam1Column3Ts1.addColumn(family1, family1_column3, timeStamp1, toBytes(value2));
 
         Put putKey3Fam1Column2Ts6 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts6.add(family1, family1_column2, timeStamp6, toBytes(value1));
+        putKey3Fam1Column2Ts6.addColumn(family1, family1_column2, timeStamp6, toBytes(value1));
 
         Put putKey2Fam1Column3Ts6 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts6.add(family1, family1_column3, timeStamp3, toBytes(value1));
+        putKey2Fam1Column3Ts6.addColumn(family1, family1_column3, timeStamp3, toBytes(value1));
 
         hTable.put(putKey1Fam1Column1MinTs);
         hTable.put(putKey3Fam1Column1Ts1);
@@ -1051,24 +1055,24 @@ public class OHTableMultiColumnFamilyTest {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         Result r = hTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key3));
         get.addFamily(family1);
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = hTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key2));
         get.addFamily(family1);
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = hTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         Delete delKey1MinTs = new Delete(toBytes(key1));
-        delKey1MinTs.deleteFamilyVersion(family1, minTimeStamp);
+        delKey1MinTs.addFamilyVersion(family1, minTimeStamp);
         hTable.delete(delKey1MinTs);
 
         get = new Get(toBytes(key1));
@@ -1076,10 +1080,10 @@ public class OHTableMultiColumnFamilyTest {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         r = hTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts1 = new Delete(toBytes(key3));
-        delKey3Ts1.deleteFamilyVersion(family1, timeStamp1);
+        delKey3Ts1.addFamilyVersion(family1, timeStamp1);
         hTable.delete(delKey3Ts1);
 
         get = new Get(toBytes(key3));
@@ -1087,10 +1091,10 @@ public class OHTableMultiColumnFamilyTest {
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = hTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey2Ts3 = new Delete(toBytes(key2));
-        delKey2Ts3.deleteFamilyVersion(family1, timeStamp3);
+        delKey2Ts3.addFamilyVersion(family1, timeStamp3);
         hTable.delete(delKey2Ts3);
 
         get = new Get(toBytes(key2));
@@ -1098,7 +1102,7 @@ public class OHTableMultiColumnFamilyTest {
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = hTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Scan scan = new Scan();
         scan.setStartRow(toBytes(key1));
@@ -1108,10 +1112,10 @@ public class OHTableMultiColumnFamilyTest {
         ResultScanner scanner = hTable.getScanner(scan);
         int key1Cnt = 0, key2Cnt = 0, key3Cnt = 0;
         for (Result res : scanner) {
-            for (KeyValue kv : res.raw()) {
-                if (key1.equals(Bytes.toString(kv.getRow()))) {
+            for (Cell kv : res.rawCells()) {
+                if (key1.equals(Bytes.toString(CellUtil.cloneRow(kv)))) {
                     ++key1Cnt;
-                } else if (key2.equals(Bytes.toString(kv.getRow()))) {
+                } else if (key2.equals(Bytes.toString(CellUtil.cloneRow(kv)))) {
                     ++key2Cnt;
                 } else {
                     ++key3Cnt;
@@ -1128,40 +1132,40 @@ public class OHTableMultiColumnFamilyTest {
 
         // test DeleteFamilyVersion multiple cf
         Put putKey1Fam1Column3Ts6 = new Put(toBytes(key1));
-        putKey1Fam1Column3Ts6.add(family1, family1_column3, timeStamp6, toBytes(value3));
+        putKey1Fam1Column3Ts6.addColumn(family1, family1_column3, timeStamp6, toBytes(value3));
 
         Put putKey1Fam2Column2Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column2Ts2.add(family2, family2_column2, timeStamp2, toBytes(value1));
+        putKey1Fam2Column2Ts2.addColumn(family2, family2_column2, timeStamp2, toBytes(value1));
 
         Put putKey1Fam2Column3Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column3Ts2.add(family2, family2_column3, timeStamp2, toBytes(value1));
+        putKey1Fam2Column3Ts2.addColumn(family2, family2_column3, timeStamp2, toBytes(value1));
 
         Put putKey1Fam1Column2Ts1 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts1.add(family1, family1_column2, timeStamp1, toBytes(value2));
+        putKey1Fam1Column2Ts1.addColumn(family1, family1_column2, timeStamp1, toBytes(value2));
 
         Put putKey2Fam1Column2Ts8 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts8.add(family1, family1_column2, timeStamp8, toBytes(value2));
+        putKey2Fam1Column2Ts8.addColumn(family1, family1_column2, timeStamp8, toBytes(value2));
 
         Put putKey2Fam2Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam2Column3Ts1.add(family2, family2_column3, timeStamp3, toBytes(value3));
+        putKey2Fam2Column3Ts1.addColumn(family2, family2_column3, timeStamp3, toBytes(value3));
 
         Put putKey2Fam1Column1Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column1Ts1.add(family1, family1_column1, timeStamp8, toBytes(value1));
+        putKey2Fam1Column1Ts1.addColumn(family1, family1_column1, timeStamp8, toBytes(value1));
 
         Put putKey2Fam2Column1Ts3 = new Put(toBytes(key2));
-        putKey2Fam2Column1Ts3.add(family2, family2_column1, timeStamp3, toBytes(value2));
+        putKey2Fam2Column1Ts3.addColumn(family2, family2_column1, timeStamp3, toBytes(value2));
 
         Put putKey3Fam1Column2Ts9 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts9.add(family1, family1_column2, timeStamp9, toBytes(value2));
+        putKey3Fam1Column2Ts9.addColumn(family1, family1_column2, timeStamp9, toBytes(value2));
 
         Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column3Ts10.add(family2, family2_column3, timeStamp10, toBytes(value1));
+        putKey3Fam2Column3Ts10.addColumn(family2, family2_column3, timeStamp10, toBytes(value1));
 
         Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column1Ts10.add(family2, family2_column1, timeStamp10, toBytes(value2));
+        putKey3Fam2Column1Ts10.addColumn(family2, family2_column1, timeStamp10, toBytes(value2));
 
         Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts2.add(family1, family1_column2, timeStamp2, toBytes(value1));
+        putKey3Fam1Column2Ts2.addColumn(family1, family1_column2, timeStamp2, toBytes(value1));
 
         hTable.put(putKey1Fam1Column3Ts6);
         hTable.put(putKey1Fam2Column2Ts2);
@@ -1181,25 +1185,25 @@ public class OHTableMultiColumnFamilyTest {
         getKey1.addFamily(family2);
         getKey1.setMaxVersions(10);
         r = hTable.get(getKey1);
-        Assert.assertEquals(4, r.raw().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey2 = new Get(toBytes(key2));
         getKey2.addFamily(family1);
         getKey2.addFamily(family2);
         getKey2.setMaxVersions(10);
         r = hTable.get(getKey2);
-        Assert.assertEquals(4, r.raw().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey3 = new Get(toBytes(key3));
         getKey3.addFamily(family1);
         getKey3.addFamily(family2);
         getKey3.setMaxVersions(10);
         r = hTable.get(getKey3);
-        Assert.assertEquals(4, r.raw().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Delete delKey1Ts_6_2 = new Delete(toBytes(key1));
-        delKey1Ts_6_2.deleteFamilyVersion(family1, timeStamp6);
-        delKey1Ts_6_2.deleteFamilyVersion(family2, timeStamp2);
+        delKey1Ts_6_2.addFamilyVersion(family1, timeStamp6);
+        delKey1Ts_6_2.addFamilyVersion(family2, timeStamp2);
         hTable.delete(delKey1Ts_6_2);
 
         getKey1 = new Get(toBytes(key1));
@@ -1207,14 +1211,14 @@ public class OHTableMultiColumnFamilyTest {
         getKey1.addFamily(family2);
         getKey1.setMaxVersions(10);
         r = hTable.get(getKey1);
-        Assert.assertEquals(1, r.raw().length);
-        for (KeyValue kv : r.raw()) {
+        Assert.assertEquals(1, r.rawCells().length);
+        for (Cell kv : r.rawCells()) {
             Assert.assertEquals(timeStamp1, kv.getTimestamp());
         }
 
         Delete delKey2Ts_8_3 = new Delete(toBytes(key2));
-        delKey2Ts_8_3.deleteFamilyVersion(family1, timeStamp8);
-        delKey2Ts_8_3.deleteFamilyVersion(family2, timeStamp3);
+        delKey2Ts_8_3.addFamilyVersion(family1, timeStamp8);
+        delKey2Ts_8_3.addFamilyVersion(family2, timeStamp3);
         hTable.delete(delKey2Ts_8_3);
 
         getKey2 = new Get(toBytes(key2));
@@ -1222,11 +1226,11 @@ public class OHTableMultiColumnFamilyTest {
         getKey2.addFamily(family2);
         getKey2.setMaxVersions(10);
         r = hTable.get(getKey2);
-        Assert.assertEquals(0, r.raw().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts_2_10 = new Delete(toBytes(key3));
-        delKey3Ts_2_10.deleteFamilyVersion(family1, timeStamp2);
-        delKey3Ts_2_10.deleteFamilyVersion(family2, timeStamp10);
+        delKey3Ts_2_10.addFamilyVersion(family1, timeStamp2);
+        delKey3Ts_2_10.addFamilyVersion(family2, timeStamp10);
         hTable.delete(delKey3Ts_2_10);
 
         getKey3 = new Get(toBytes(key3));
@@ -1234,8 +1238,8 @@ public class OHTableMultiColumnFamilyTest {
         getKey3.addFamily(family2);
         getKey3.setMaxVersions(10);
         r = hTable.get(getKey3);
-        Assert.assertEquals(1, r.raw().length);
-        for (KeyValue kv : r.raw()) {
+        Assert.assertEquals(1, r.rawCells().length);
+        for (Cell kv : r.rawCells()) {
             Assert.assertEquals(timeStamp9, kv.getTimestamp());
         }
 
@@ -1248,7 +1252,7 @@ public class OHTableMultiColumnFamilyTest {
         scanner = hTable.getScanner(scan);
         int ts1Cnt = 0, ts9Cnt = 0;
         for (Result res : scanner) {
-            for (KeyValue kv : res.raw()) {
+            for (Cell kv : res.rawCells()) {
                 if (kv.getTimestamp() == timeStamp1) {
                     ++ts1Cnt;
                 } else if (kv.getTimestamp() == timeStamp9) {
