@@ -157,21 +157,22 @@ public class OHTableMultiColumnFamilyTest {
         batchLsit.clear();
         final long[] updateCounter = new long[] { 0L };
         delete = new Delete(toBytes("Key5"));
-        delete.deleteColumns(family1, family1_column2);
-        delete.deleteColumns(family2, family2_column1);
-        delete.deleteFamily(family3);
+        delete.addColumns(family1, family1_column2);
+        delete.addColumns(family2, family2_column1);
+        delete.addFamily(family3);
         batchLsit.add(delete);
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));
-            put.add(family1, family1_column1, family1_value);
-            put.add(family1, family1_column2, family1_value);
-            put.add(family1, family1_column3, family1_value);
-            put.add(family2, family2_column1, family2_value);
-            put.add(family2, family2_column2, family2_value);
-            put.add(family3, family3_column1, family3_value);
+            put.addColumn(family1, family1_column1, family1_value);
+            put.addColumn(family1, family1_column2, family1_value);
+            put.addColumn(family1, family1_column3, family1_value);
+            put.addColumn(family2, family2_column1, family2_value);
+            put.addColumn(family2, family2_column2, family2_value);
+            put.addColumn(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
-        hTable.batchCallback(batchLsit, new Batch.Callback<MutationResult>() {
+        results = new Object[batchLsit.size()];
+        hTable.batchCallback(batchLsit, results, new Batch.Callback<MutationResult>() {
             @Override
             public void update(byte[] region, byte[] row, MutationResult result) {
                 updateCounter[0]++;
