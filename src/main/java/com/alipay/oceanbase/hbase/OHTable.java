@@ -544,15 +544,26 @@ public class OHTable implements HTableInterface {
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
-                                                             InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+            InterruptedException {
+        try {
+            batch(actions, results);
+        } finally {
+            if (results != null) {
+                for (int i = 0; i < results.length; i++) {
+                    if (!(results[i] instanceof ObTableException)) {
+                        callback.update(null, actions.get(i).getRow(), (R) results[i]);
+                    }
+                }
+            }
+        }
     }
 
     @Override
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
-                                                                                              throws IOException,
-                                                                                              InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+    public <R> Object[] batchCallback(
+            final List<? extends Row> actions, final Batch.Callback<R> callback) throws IOException, InterruptedException {
+        Object[] results = new Object[actions.size()];
+        batchCallback(actions, results, callback);
+        return results;
     }
 
     public static int compareByteArray(byte[] bt1, byte[] bt2) {
