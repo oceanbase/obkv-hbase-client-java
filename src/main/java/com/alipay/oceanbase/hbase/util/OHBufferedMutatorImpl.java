@@ -54,6 +54,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private final int                       maxKeyValueSize;
     private boolean                         closed                 = false;
     private final ExecutorService           pool;
+    private int rpcTimeout;
+    private int operationTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
@@ -66,6 +68,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
         this.pool = params.getPool();
+        this.rpcTimeout = connectionConfig.getRpcTimeout();
+        this.operationTimeout = connectionConfig.getOperationTimeout();
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
@@ -229,5 +233,15 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     @Override
     public long getWriteBufferSize() {
         return this.writeBufferSize;
+    }
+
+    public void setRpcTimeout(int rpcTimeout) {
+        this.rpcTimeout = rpcTimeout;
+        this.ohTable.setRpcTimeout(rpcTimeout);
+    }
+
+    public void setOperationTimeout(int operationTimeout) {
+        this.operationTimeout = operationTimeout;
+        this.ohTable.setOperationTimeout(operationTimeout);
     }
 }
