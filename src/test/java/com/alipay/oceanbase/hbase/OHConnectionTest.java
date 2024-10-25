@@ -261,12 +261,6 @@ public class OHConnectionTest {
             bufferMutator.mutate(put3);
             bufferMutator.flush();
             r = hTable.get(get);
-//            for (Cell c : r.rawCells()) {
-//                System.out.println("2. Key: " + Bytes.toString(CellUtil.cloneRow(c)) +
-//                        ", Qualifier: " + Bytes.toString(CellUtil.cloneQualifier(c)) +
-//                        ", Time: " + c.getTimestamp() +
-//                        ", Value: " + Bytes.toString(CellUtil.cloneValue(c)));
-//            }
             Assert.assertEquals(3, r.rawCells().length);
 
             // test Delete
