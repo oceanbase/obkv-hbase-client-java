@@ -54,8 +54,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private final int                       maxKeyValueSize;
     private boolean                         closed                 = false;
     private final ExecutorService           pool;
-    private int rpcTimeout;
-    private int operationTimeout;
+    private int                             rpcTimeout;
+    private int                             operationTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
