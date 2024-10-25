@@ -116,7 +116,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
         long toAddSize = 0;
         for (Mutation m : mutations) {
-            validateInsUpAndDelete(m);
+            validateOperation(m);
             toAddSize += m.heapSize();
         }
 
@@ -133,7 +133,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * Check whether the mutation is Put or Delete in 1.x
      * @param mt - mutation operation
      */
-    private void validateInsUpAndDelete(Mutation mt) throws IllegalArgumentException {
+    private void validateOperation(Mutation mt) throws IllegalArgumentException {
+        if (mt == null) {
+            throw new IllegalArgumentException("Mutation operation cannot be null");
+        }
         if (!(mt instanceof Put) && !(mt instanceof Delete)) {
             throw new IllegalArgumentException("Only support for Put and Delete for now.");
         }
