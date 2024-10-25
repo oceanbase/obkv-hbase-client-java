@@ -1811,6 +1811,8 @@ public class OHTable implements Table {
                 return OHOpType.DeleteColumn;
             case DeleteFamily:
                 return OHOpType.DeleteFamily;
+            case DeleteFamilyVersion:
+                return OHOpType.DeleteFamilyVersion;
             default:
                 throw new IllegalArgumentException("illegal mutation type " + type);
         }
