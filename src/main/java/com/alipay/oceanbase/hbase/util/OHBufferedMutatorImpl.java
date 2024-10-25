@@ -35,27 +35,26 @@ import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
-    private static final Logger             LOGGER                 = TableHBaseLoggerFactory
-                                                                       .getLogger(OHBufferedMutatorImpl.class);
+    private static final Logger           LOGGER                 = TableHBaseLoggerFactory
+                                                                     .getLogger(OHBufferedMutatorImpl.class);
 
-    private final ExceptionListener         listener;
+    private final ExceptionListener       listener;
 
-    private final OHTable                   ohTable;
-    private final TableName                 tableName;
-    private volatile Configuration          conf;
-    private final OHConnectionConfiguration connectionConfig;
+    private final OHTable                 ohTable;
+    private final TableName               tableName;
+    private volatile Configuration        conf;
 
     @VisibleForTesting
-    final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
+    final ConcurrentLinkedQueue<Mutation> asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
     @VisibleForTesting
-    AtomicLong                              currentAsyncBufferSize = new AtomicLong(0);
+    AtomicLong                            currentAsyncBufferSize = new AtomicLong(0);
 
-    private final long                      writeBufferSize;
-    private final int                       maxKeyValueSize;
-    private boolean                         closed                 = false;
-    private final ExecutorService           pool;
-    private int                             rpcTimeout;
-    private int                             operationTimeout;
+    private long                          writeBufferSize;
+    private final int                     maxKeyValueSize;
+    private boolean                       closed                 = false;
+    private final ExecutorService         pool;
+    private int                           rpcTimeout;
+    private int                           operationTimeout;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
@@ -65,8 +64,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         // init params in OHBufferedMutatorImpl
         this.tableName = params.getTableName();
         this.conf = ohConnection.getConfiguration();
-        this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
+
+        OHConnectionConfiguration connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.pool = params.getPool();
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
@@ -223,6 +223,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
+    @Deprecated
+    public void setWriteBufferSize(long writeBufferSize) throws IOException {
+        this.writeBufferSize = writeBufferSize;
+        if (currentAsyncBufferSize.get() > writeBufferSize) {
+            flush();
+        }
+    }
+
     /**
      * Force to commit all operations
      * do not care whether the pool is shut down or this BufferedMutator is closed
@@ -245,5 +253,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
         this.ohTable.setOperationTimeout(operationTimeout);
+    }
+
+    @Deprecated
+    public List<Row> getWriteBuffer() {
+        return Arrays.asList(asyncWriteBuffer.toArray(new Row[0]));
     }
 }
