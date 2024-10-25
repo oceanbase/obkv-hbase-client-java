@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import org.apache.hadoop.conf.Configuration;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import org.apache.hadoop.hbase.Cell;
@@ -220,6 +221,69 @@ public class OHTableMultiColumnFamilyTest {
         Assert.assertTrue(result.containsColumn(family3, family3_column1));
         Assert.assertTrue(result.containsColumn(family3, family3_column2));
 
+        mutations.clear();
+        for (String key : keys) {
+            Delete delete = new Delete(toBytes(key));
+            mutations.add(delete);
+        }
+        mutator.mutate(mutations);
+        mutator.flush();
+
+        scan = new Scan();
+        scan.setStartRow(toBytes("Key0"));
+        scan.setStopRow(toBytes("Key10"));
+        scan.addFamily(family1);
+        scan.addFamily(family2);
+        scan.addFamily(family3);
+        scanner = hTable.getScanner(scan);
+        count = 0;
+        for (Result r : scanner) {
+            count += r.rawCells().length;
+        }
+        Assert.assertEquals(0, count);
+
+        // test periodic flush
+        params.setWriteBufferPeriodicFlushTimeoutMs(100);
+        mutator = connection.getBufferedMutator(params);
+        while (true) {
+            for (int i = 0; i < rows; ++i) {
+                mutations.clear();
+                Put put = new Put(toBytes(keys.get(i)));
+                put.addColumn(family1, family1_column1, family1_value);
+                put.addColumn(family1, family1_column2, family1_value);
+                put.addColumn(family1, family1_column3, family1_value);
+                put.addColumn(family2, family2_column1, family2_value);
+                put.addColumn(family3, family3_column1, family2_value);
+                put.addColumn(family3, family3_column2, family3_value);
+                mutations.add(put);
+                if (i % 3 == 0) { // 0, 3, 6, 9
+                    Delete delete = new Delete(toBytes(keys.get(i)));
+                    delete.addFamily(family1);
+                    delete.addFamily(family2);
+                    mutations.add(delete);
+                }
+                mutator.mutate(mutations);
+            }
+
+            get = new Get(toBytes("Key0"));
+            result = hTable.get(get);
+            if (!result.isEmpty()) {
+                break;
+            }
+        }
+        get = new Get(toBytes("Key2"));
+        result = hTable.get(get);
+        count = result.rawCells().length;
+        Assert.assertTrue(count > 0);
+        // test timer periodic flush
+        int lastUndealtCount = ((OHBufferedMutatorImpl) mutator).size();
+        Thread.sleep(1000);
+        int currentUndealtCount = ((OHBufferedMutatorImpl) mutator).size();
+        Assert.assertNotEquals(lastUndealtCount, currentUndealtCount);
+        result = hTable.get(get);
+        int newCount = result.rawCells().length;
+        Assert.assertNotEquals(count, newCount);
+
         // clean data
         mutations.clear();
         for (String key : keys) {
@@ -228,6 +292,7 @@ public class OHTableMultiColumnFamilyTest {
         }
         mutator.mutate(mutations);
         mutator.flush();
+        mutator.close();
 
         scan = new Scan();
         scan.setStartRow(toBytes("Key0"));

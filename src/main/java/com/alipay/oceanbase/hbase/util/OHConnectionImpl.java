@@ -129,6 +129,7 @@ public class OHConnectionImpl implements Connection {
         if (params.getTableName() == null) {
             throw new IllegalArgumentException("TableName cannot be null.");
         }
+        // do not check whether the pool is null, cause now the bufferedMutator will take over the control
         if (params.getWriteBufferSize() == BUFFERED_PARAM_UNSET) {
             params.writeBufferSize(connectionConfig.getWriteBufferSize());
         }

@@ -167,7 +167,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     /**
-     * Check whether the mutation is Put or Delete in 1.x
+     * Check whether the mutation is Put or Delete in 2.x
      * @param mt - mutation operation
      */
     private void validateInsUpAndDelete(Mutation mt) throws IllegalArgumentException {
@@ -183,6 +183,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
+    /**
+     * triggered to do periodic flush if reach the time limit
+     * */
     public void timeTriggerForWriteBufferPeriodicFlush() {
         if (currentAsyncBufferSize.get() == 0) {
             return;
@@ -200,6 +203,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
+    /**
+     * set time for periodic flush timer
+     * @param timeoutMs control when to flush from collecting first mutation
+     * @param timerTickMs control time interval to trigger the timer
+     * */
     @Override
     public synchronized void setWriteBufferPeriodicFlush(long timeoutMs, long timerTickMs) {
         long originalTimeoutMs = this.writeBufferPeriodicFlushTimeoutMs.get();
@@ -297,6 +305,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
+    /**
+     * reset the time parameters and cancel the timer (if exists)
+     * */
     @Override
     public void disableWriteBufferPeriodicFlush() {
         setWriteBufferPeriodicFlush(0, MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
@@ -331,7 +342,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     /**
      * Force to commit all operations
-     * do not care whether the pool is shut down or this BufferedMutator is closed
      */
     @Override
     public void flush() throws IOException {
@@ -343,8 +353,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * Count the mutations which haven't been processed.
      */
     @VisibleForTesting
-    int size() {
+    public int size() {
         return undealtMutationCount.get();
+    }
+
+    @VisibleForTesting
+    public ExecutorService getPool() {
+        return pool;
     }
 
     @Override
