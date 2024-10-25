@@ -837,6 +837,7 @@ public class OHConnectionTest {
 
             // test auto flush
             Get get = new Get(toBytes(key));
+            get.setMaxVersions();
             get.addFamily(toBytes(family));
             Result r = hTable.get(get);
             count = r.rawCells().length;

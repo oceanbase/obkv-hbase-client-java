@@ -310,7 +310,6 @@ public class OHTable implements Table {
         } else {
             this.cleanupPoolOnClose = false;
         }
-
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
@@ -533,12 +532,6 @@ public class OHTable implements Table {
         return getTargetTableName(tableNameString, Bytes.toString(family), configuration);
     }
 
-    public Object[] batch(List<? extends Row> actions) throws IOException {
-        Object[] results = new Object[actions.size()];
-        batch(actions, results);
-        return results;
-    }
-
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
@@ -554,13 +547,6 @@ public class OHTable implements Table {
                 }
             }
         }
-    }
-
-    public <R> Object[] batchCallback(
-            final List<? extends Row> actions, final Batch.Callback<R> callback) throws IOException, InterruptedException {
-        Object[] results = new Object[actions.size()];
-        batchCallback(actions, results, callback);
-        return results;
     }
 
     public static int compareByteArray(byte[] bt1, byte[] bt2) {
@@ -650,7 +636,7 @@ public class OHTable implements Table {
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
             obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
             public Result call() throws IOException {
-                List<Cell> keyValueList = new ArrayList<Cell>();
+                List<Cell> keyValueList = new ArrayList<>();
                 byte[] family = new byte[] {};
                 ObTableClientQueryAsyncStreamResult clientQueryStreamResult;
                 ObTableQueryAsyncRequest request;
@@ -927,7 +913,9 @@ public class OHTable implements Table {
     private void innerDelete(Delete delete) throws IOException {
         checkArgument(delete.getRow() != null, "row is null");
         try {
-            batch(Collections.singletonList(delete));
+            List<Delete> actions = Collections.singletonList(delete);
+            Object[] results = new Object[actions.size()];
+            batch(actions, results);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
             throw new IOException("delete  table " + tableNameString + "error" , e);
@@ -1568,29 +1556,6 @@ public class OHTable implements Table {
         return batch;
     }
 
-    private ObTableBatchOperation buildObTableBatchOperation(Map<byte[], List<Cell>> familyMap,
-                                                             boolean putToAppend,
-                                                             List<byte[]> qualifiers) {
-        ObTableBatchOperation batch = new ObTableBatchOperation();
-        for (Map.Entry<byte[], List<Cell>> entry : familyMap.entrySet()) {
-            byte[] family = entry.getKey();
-            List<Cell> keyValueList = entry.getValue();
-            for (Cell kv : keyValueList) {
-                if (qualifiers != null) {
-                    qualifiers
-                        .add((Bytes.toString(family) + "." + Bytes.toString(CellUtil.cloneQualifier(kv)))
-                            .getBytes());
-                }
-                KeyValue new_kv = modifyQualifier(kv,
-                    (Bytes.toString(family) + "." + Bytes.toString(CellUtil.cloneQualifier(kv))).getBytes());
-                batch.addTableOperation(buildObTableOperation(new_kv, putToAppend));
-            }
-        }
-        batch.setSameType(true);
-        batch.setSamePropertiesNames(true);
-        return batch;
-    }
-
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(Cell kv,
                                                                      OHOpType operationType, boolean isTableGroup) {
         switch (operationType) {
@@ -1601,9 +1566,9 @@ public class OHTable implements Table {
                         new Object[] { CellUtil.cloneValue(kv) });
             case APPEND:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(APPEND,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
-                        new Object[] { CellUtil.cloneValue(kv) });
+                    ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { CellUtil.cloneValue(kv) });
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
                         ROW_KEY_COLUMNS,
@@ -1636,9 +1601,9 @@ public class OHTable implements Table {
 
     private KeyValue modifyQualifier(Cell original, byte[] newQualifier) {
         // Extract existing components
-        byte[] row = original.getRowArray();
-        byte[] family = original.getFamilyArray();
-        byte[] value = original.getValueArray();
+        byte[] row = CellUtil.cloneRow(original);
+        byte[] family = CellUtil.cloneFamily(original);
+        byte[] value = CellUtil.cloneValue(original);
         long timestamp = original.getTimestamp();
         KeyValue.Type type = KeyValue.Type.codeToType(original.getType().getCode());
         // Create a new KeyValue with the modified qualifier  

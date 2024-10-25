@@ -272,6 +272,7 @@ public class OHTableMultiColumnFamilyTest {
             }
         }
         get = new Get(toBytes("Key2"));
+        get.setMaxVersions();
         result = hTable.get(get);
         count = result.rawCells().length;
         Assert.assertTrue(count > 0);
@@ -877,7 +878,6 @@ public class OHTableMultiColumnFamilyTest {
                 assertEquals(expectedValue, CellUtil.cloneValue(keyValues[i]));
             }
         }
-        System.out.println(Arrays.toString(result2.rawCells()));
         assertEquals(3, keyValues.length);
 
         //f2c1 f2c2

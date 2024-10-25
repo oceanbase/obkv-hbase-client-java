@@ -273,7 +273,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             if (execBuffer.isEmpty()) {
                 return;
             }
-            ohTable.batch(execBuffer);
+            Object[] results = new Object[execBuffer.size()];
+            ohTable.batch(execBuffer, results);
             // if commit all successfully, clean execBuffer
             execBuffer.clear();
         } catch (Exception ex) {
