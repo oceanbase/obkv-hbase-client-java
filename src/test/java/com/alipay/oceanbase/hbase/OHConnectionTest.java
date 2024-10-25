@@ -697,7 +697,7 @@ public class OHConnectionTest {
             ohBufferMutator = connection.getBufferedMutator(params);
 
             // BufferedMutator is not concurrently safe
-            for (int i = 0; i < 10; ++i) {
+            for (int i = 0; i < 50; ++i) {
                 final int taskId = i;
                 final BufferedMutator thrBufferMutator = ohBufferMutator;
                 executorService.submit(() -> {
@@ -747,7 +747,7 @@ public class OHConnectionTest {
                 get.addFamily(toBytes(family));
                 Result r = hTable.get(get);
                 count = r.rawCells().length;
-                Assert.assertEquals(40, count);
+                Assert.assertEquals(200, count);
                 Delete delete = new Delete(toBytes(key));
                 delete.addFamily(toBytes(family));
                 hTable.delete(delete);

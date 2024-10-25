@@ -148,7 +148,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         long toAddSize = 0;
         int toAddCount = 0;
         for (Mutation m : mutations) {
-            validateInsUpAndDelete(m);
+            validateOperation(m);
             toAddSize += m.heapSize();
             ++toAddCount;
         }
@@ -170,10 +170,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     /**
-     * Check whether the mutation is Put or Delete in 2.x
+     * Check mutations in 2.x
      * @param mt - mutation operation
      */
-    private void validateInsUpAndDelete(Mutation mt) throws IllegalArgumentException {
+    private void validateOperation(Mutation mt) throws IllegalArgumentException {
+        if (mt == null) {
+            throw new IllegalArgumentException("Mutation operation cannot be null.");
+        }
         if (!(mt instanceof Put) && !(mt instanceof Delete)) {
             throw new IllegalArgumentException("Only support for Put and Delete for now.");
         }
@@ -261,15 +264,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                     currentAsyncBufferSize.addAndGet(-size);
                     ++dealtCount;
                 }
-                if (currentAsyncBufferSize.get() > 0) {
-                    while (!execBuffer.isEmpty()) {
-                        m = execBuffer.getFirst();
-                        long size = m.heapSize();
-                        currentAsyncBufferSize.addAndGet(size);
-                        asyncWriteBuffer.add(m);
-                    }
-                    throw new IllegalStateException("Fetch error null value during execute");
-                }
                 undealtMutationCount.addAndGet(-dealtCount);
             }
 
@@ -353,6 +347,33 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         execute(true);
     }
 
+    @Override
+    public long getWriteBufferPeriodicFlushTimeoutMs() {
+        return writeBufferPeriodicFlushTimeoutMs.get();
+    }
+
+    @Override
+    public long getWriteBufferPeriodicFlushTimerTickMs() {
+        return writeBufferPeriodicFlushTimerTickMs.get();
+    }
+
+    @Override
+    public long getWriteBufferSize() {
+        return this.writeBufferSize;
+    }
+
+    @Override
+    public void setRpcTimeout(int rpcTimeout) {
+        this.rpcTimeout.set(rpcTimeout);
+        this.ohTable.setRpcTimeout(rpcTimeout);
+    }
+
+    @Override
+    public void setOperationTimeout(int operationTimeout) {
+        this.operationTimeout.set(operationTimeout);
+        this.ohTable.setOperationTimeout(operationTimeout);
+    }
+
     /**
      * Count the mutations which haven't been processed.
      */
@@ -366,18 +387,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         return pool;
     }
 
-    @Override
-    public long getWriteBufferSize() {
-        return this.writeBufferSize;
-    }
-
-    public void setRpcTimeout(int rpcTimeout) {
-        this.rpcTimeout.set(rpcTimeout);
-        this.ohTable.setRpcTimeout(rpcTimeout);
-    }
-
-    public void setOperationTimeout(int operationTimeout) {
-        this.operationTimeout.set(operationTimeout);
-        this.ohTable.setOperationTimeout(operationTimeout);
+    @VisibleForTesting
+    protected long getExecutedWriteBufferPeriodicFlushes() {
+        return executedWriteBufferPeriodicFlushes.get();
     }
 }
