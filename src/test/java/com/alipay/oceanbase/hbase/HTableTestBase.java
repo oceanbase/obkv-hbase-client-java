@@ -68,7 +68,8 @@ public abstract class HTableTestBase {
         long timestamp = System.currentTimeMillis();
         // put data
         Put put = new Put(toBytes(key));
-        KeyValue kv = new KeyValue(toBytes(key), "family_group".getBytes(), column1.getBytes(), timestamp, toBytes(value + "1"));
+        KeyValue kv = new KeyValue(toBytes(key), "family_group".getBytes(), column1.getBytes(),
+            timestamp, toBytes(value + "1"));
         put.add(kv);
         hTable.put(put);
         // test get with empty family
@@ -113,8 +114,9 @@ public abstract class HTableTestBase {
                 Assert.assertEquals(column1, Bytes.toString(CellUtil.cloneQualifier(keyValue)));
                 Assert.assertEquals(timestamp, keyValue.getTimestamp());
                 Assert.assertEquals(value + "1", Bytes.toString(CellUtil.cloneValue(keyValue)));
-                System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue)) + " family :"
-                                   + new String(CellUtil.cloneFamily(keyValue)) + " columnQualifier:"
+                System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
+                                   + " family :" + new String(CellUtil.cloneFamily(keyValue))
+                                   + " columnQualifier:"
                                    + new String(CellUtil.cloneQualifier(keyValue)) + " timestamp:"
                                    + keyValue.getTimestamp() + " value:"
                                    + new String(CellUtil.cloneValue(keyValue)));
@@ -138,7 +140,8 @@ public abstract class HTableTestBase {
         hTable.delete(delete);
 
         Put put = new Put(toBytes(key));
-        KeyValue kv = new KeyValue(toBytes(key), family.getBytes(), column1.getBytes(), timestamp, toBytes(value));
+        KeyValue kv = new KeyValue(toBytes(key), family.getBytes(), column1.getBytes(), timestamp,
+            toBytes(value));
         put.add(kv);
         hTable.put(put);
         Get get = new Get(toBytes(key));
@@ -147,7 +150,8 @@ public abstract class HTableTestBase {
         Assert.assertEquals(1, r.rawCells().length);
 
         for (Cell keyValue : r.rawCells()) {
-            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue)) + " columnQualifier:"
+            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
+                               + " columnQualifier:"
                                + new String(CellUtil.cloneQualifier(keyValue)) + " timestamp:"
                                + keyValue.getTimestamp() + " value:"
                                + new String(CellUtil.cloneValue(keyValue)));
@@ -158,7 +162,8 @@ public abstract class HTableTestBase {
         }
 
         put = new Put(toBytes(key));
-        kv = new KeyValue(toBytes(key), family.getBytes(), column1.getBytes(), timestamp + 1, toBytes(value));
+        kv = new KeyValue(toBytes(key), family.getBytes(), column1.getBytes(), timestamp + 1,
+            toBytes(value));
         put.add(kv);
         hTable.put(put);
         get = new Get(toBytes(key));
@@ -176,7 +181,8 @@ public abstract class HTableTestBase {
         hTable.delete(delete);
 
         for (Cell keyValue : r.rawCells()) {
-            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue)) + " columnQualifier:"
+            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
+                               + " columnQualifier:"
                                + new String(CellUtil.cloneQualifier(keyValue)) + " timestamp:"
                                + keyValue.getTimestamp() + " value:"
                                + new String(CellUtil.cloneValue(keyValue)));
@@ -207,12 +213,15 @@ public abstract class HTableTestBase {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
-                                       + " columnQualifier:" + new String(CellUtil.cloneQualifier(keyValue))
+                                       + " columnQualifier:"
+                                       + new String(CellUtil.cloneQualifier(keyValue))
                                        + " timestamp:" + keyValue.getTimestamp() + " value:"
                                        + new String(CellUtil.cloneValue(keyValue)));
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
@@ -235,12 +244,15 @@ public abstract class HTableTestBase {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
-                                       + " columnQualifier:" + new String(CellUtil.cloneQualifier(keyValue))
+                                       + " columnQualifier:"
+                                       + new String(CellUtil.cloneQualifier(keyValue))
                                        + " timestamp:" + keyValue.getTimestamp() + " value:"
                                        + new String(CellUtil.cloneValue(keyValue)));
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
                         countAdd = false;
@@ -279,7 +291,8 @@ public abstract class HTableTestBase {
             System.arraycopy(keyBytes, 0, rowkey, 0, keyBytes.length);
             System.arraycopy(currentBytes, 0, rowkey, keyBytes.length, currentBytes.length);
             Put put = new Put(rowkey);
-            KeyValue kv = new KeyValue(rowkey, "family1".getBytes(), column1.getBytes(), toBytes(value));
+            KeyValue kv = new KeyValue(rowkey, "family1".getBytes(), column1.getBytes(),
+                toBytes(value));
             put.add(kv);
             kv = new KeyValue(rowkey, "family1".getBytes(), column2.getBytes(), toBytes(value));
             put.add(kv);
@@ -909,7 +922,8 @@ public abstract class HTableTestBase {
 
         long timestamp = System.currentTimeMillis();
         putKey1Column1Value1 = new Put(toBytes(key1));
-        putKey1Column1Value1.addColumn(toBytes(family), toBytes(column1), timestamp, toBytes(value1));
+        putKey1Column1Value1.addColumn(toBytes(family), toBytes(column1), timestamp,
+            toBytes(value1));
 
         putKey1Column1Value2 = new Put(toBytes(key1));
         putKey1Column1Value2.addColumn(toBytes(family), toBytes(column1), toBytes(value2));
@@ -921,7 +935,8 @@ public abstract class HTableTestBase {
         putKey1Column2Value1.addColumn(toBytes(family), toBytes(column2), toBytes(value1));
 
         putKey2Column1Value1 = new Put(toBytes(key2));
-        putKey2Column1Value1.addColumn(toBytes(family), toBytes(column1), timestamp, toBytes(value1));
+        putKey2Column1Value1.addColumn(toBytes(family), toBytes(column1), timestamp,
+            toBytes(value1));
 
         putKey2Column1Value2 = new Put(toBytes(key2));
         putKey2Column1Value2.addColumn(toBytes(family), toBytes(column1), toBytes(value2));
@@ -1299,13 +1314,13 @@ public abstract class HTableTestBase {
         int res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 res_count += 1;
             }
         }
@@ -1322,13 +1337,13 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 res_count += 1;
             }
         }
@@ -1345,13 +1360,13 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 res_count += 1;
             }
         }
@@ -1370,13 +1385,13 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 res_count += 1;
             }
         }
@@ -1395,13 +1410,13 @@ public abstract class HTableTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 res_count += 1;
             }
         }
@@ -1476,13 +1491,13 @@ public abstract class HTableTestBase {
         int res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                         Bytes.toString(result.getRow()),
                         Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
                 Assert.assertArrayEquals(key2.getBytes(), CellUtil.cloneRow(keyValue));
                 res_count += 1;
             }
@@ -2644,7 +2659,8 @@ public abstract class HTableTestBase {
         get.setFilter(filterList);
         r = hTable.get(get);
         Assert.assertEquals(2, r.rawCells().length);
-        Assert.assertFalse(Bytes.equals(CellUtil.cloneQualifier(r.rawCells()[0]), CellUtil.cloneQualifier(r.rawCells()[1])));
+        Assert.assertFalse(Bytes.equals(CellUtil.cloneQualifier(r.rawCells()[0]),
+            CellUtil.cloneQualifier(r.rawCells()[1])));
 
         filterList = new FilterList();
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
@@ -5077,8 +5093,9 @@ public abstract class HTableTestBase {
         r = hTable.get(get);
         for (Cell kv : r.rawCells()) {
             System.out.println("K = [" + Bytes.toString(CellUtil.cloneRow(kv)) + "] Q =["
-                               + Bytes.toString(CellUtil.cloneQualifier(kv)) + "] T = [" + kv.getTimestamp()
-                               + "] V = [" + Bytes.toString(CellUtil.cloneValue(kv)) + "]");
+                               + Bytes.toString(CellUtil.cloneQualifier(kv)) + "] T = ["
+                               + kv.getTimestamp() + "] V = ["
+                               + Bytes.toString(CellUtil.cloneValue(kv)) + "]");
         }
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(r.rawCells()[0])));
@@ -5306,8 +5323,8 @@ public abstract class HTableTestBase {
         Result result = hTable.get(get);
         Assert.assertEquals("", 1, result.rawCells().length);
         Assert.assertEquals("", 0, result.rawCells()[0].getQualifierLength());
-        Assert
-            .assertArrayEquals("", "value1_qualifier_null".getBytes(), CellUtil.cloneValue(result.rawCells()[0]));
+        Assert.assertArrayEquals("", "value1_qualifier_null".getBytes(),
+            CellUtil.cloneValue(result.rawCells()[0]));
 
         put = new Put(("key_c_q_empty").getBytes());
         put.addColumn("family1".getBytes(), "".getBytes(), "value1_qualifier_empty".getBytes());
@@ -5360,14 +5377,20 @@ public abstract class HTableTestBase {
         get.setMaxVersions(1);
         Result result = hTable.get(get);
         Assert.assertEquals("", 2, result.rawCells().length);
-        Assert.assertEquals("", 1, result
-            .getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).size());
-        Assert.assertEquals("", 1, result
-            .getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).size());
-        Assert.assertArrayEquals("", "column1_value1_ttl_column".getBytes(),
-            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).get(0)));
-        Assert.assertArrayEquals("", "column2_value1_ttl_column".getBytes(),
-            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).get(0)));
+        Assert.assertEquals("", 1,
+            result.getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).size());
+        Assert.assertEquals("", 1,
+            result.getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).size());
+        Assert.assertArrayEquals(
+            "",
+            "column1_value1_ttl_column".getBytes(),
+            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(),
+                ("column1").getBytes()).get(0)));
+        Assert.assertArrayEquals(
+            "",
+            "column2_value1_ttl_column".getBytes(),
+            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(),
+                ("column2").getBytes()).get(0)));
 
         //过期之后不能再查出数据
         Thread.sleep(4 * 1000L);
@@ -5388,14 +5411,20 @@ public abstract class HTableTestBase {
         get.setMaxVersions(1);
         Result result = hTable.get(get);
         Assert.assertEquals("", 2, result.rawCells().length);
-        Assert.assertEquals("", 1, result
-            .getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).size());
-        Assert.assertEquals("", 1, result
-            .getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).size());
-        Assert.assertArrayEquals("", "column1_value_ttl_family".getBytes(),
-            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).get(0)));
-        Assert.assertArrayEquals("", "column2_value_ttl_family".getBytes(),
-            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).get(0)));
+        Assert.assertEquals("", 1,
+            result.getColumnCells("family_ttl".getBytes(), ("column1").getBytes()).size());
+        Assert.assertEquals("", 1,
+            result.getColumnCells("family_ttl".getBytes(), ("column2").getBytes()).size());
+        Assert.assertArrayEquals(
+            "",
+            "column1_value_ttl_family".getBytes(),
+            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(),
+                ("column1").getBytes()).get(0)));
+        Assert.assertArrayEquals(
+            "",
+            "column2_value_ttl_family".getBytes(),
+            CellUtil.cloneValue(result.getColumnCells("family_ttl".getBytes(),
+                ("column2").getBytes()).get(0)));
 
         //过期之后不能再查出数据
         Thread.sleep(4 * 1000L);

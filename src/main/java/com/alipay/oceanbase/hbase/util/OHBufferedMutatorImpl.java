@@ -37,35 +37,40 @@ import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
-    private static final Logger             LOGGER                 = TableHBaseLoggerFactory
-                                                                       .getLogger(OHBufferedMutatorImpl.class);
+    private static final Logger                   LOGGER                              = TableHBaseLoggerFactory
+                                                                                          .getLogger(OHBufferedMutatorImpl.class);
 
-    private final ExceptionListener         listener;
+    private final ExceptionListener               listener;
 
-    private final OHTable                   ohTable;
-    private final TableName                 tableName;
-    private volatile Configuration          conf;
-    private final OHConnectionConfiguration connectionConfig;
+    private final OHTable                         ohTable;
+    private final TableName                       tableName;
+    private volatile Configuration                conf;
+    private final OHConnectionConfiguration       connectionConfig;
 
-    private final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
-    private final AtomicLong                        currentAsyncBufferSize = new AtomicLong(0);
+    private final ConcurrentLinkedQueue<Mutation> asyncWriteBuffer                    = new ConcurrentLinkedQueue<Mutation>();
+    private final AtomicLong                      currentAsyncBufferSize              = new AtomicLong(
+                                                                                          0);
 
-    private final AtomicLong firstRecordInBufferTimestamp = new AtomicLong(0);
-    private final AtomicLong executedWriteBufferPeriodicFlushes = new AtomicLong(0);
+    private final AtomicLong                      firstRecordInBufferTimestamp        = new AtomicLong(
+                                                                                          0);
+    private final AtomicLong                      executedWriteBufferPeriodicFlushes  = new AtomicLong(
+                                                                                          0);
 
-    private final AtomicLong writeBufferPeriodicFlushTimeoutMs = new AtomicLong(0);
-    private final AtomicLong writeBufferPeriodicFlushTimerTickMs =
-            new AtomicLong(MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
-    private Timer writeBufferPeriodicFlushTimer = null;
+    private final AtomicLong                      writeBufferPeriodicFlushTimeoutMs   = new AtomicLong(
+                                                                                          0);
+    private final AtomicLong                      writeBufferPeriodicFlushTimerTickMs = new AtomicLong(
+                                                                                          MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
+    private Timer                                 writeBufferPeriodicFlushTimer       = null;
 
-    private final long                      writeBufferSize;
-    private final int                       maxKeyValueSize;
-    private final ExecutorService           pool;
-    private final AtomicInteger undealtMutationCount = new AtomicInteger(0);
-    private final AtomicInteger rpcTimeout;
-    private final AtomicInteger operationTimeout;
-    private final boolean cleanipPoolOnClose;
-    private volatile boolean                         closed                 = false;
+    private final long                            writeBufferSize;
+    private final int                             maxKeyValueSize;
+    private final ExecutorService                 pool;
+    private final AtomicInteger                   undealtMutationCount                = new AtomicInteger(
+                                                                                          0);
+    private final AtomicInteger                   rpcTimeout;
+    private final AtomicInteger                   operationTimeout;
+    private final boolean                         cleanipPoolOnClose;
+    private volatile boolean                      closed                              = false;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
@@ -85,20 +90,18 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             this.cleanipPoolOnClose = false;
         }
         this.rpcTimeout = new AtomicInteger(
-                params.getRpcTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
-                params.getRpcTimeout() : connectionConfig.getRpcTimeout()
-        );
+            params.getRpcTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+                .getRpcTimeout() : connectionConfig.getRpcTimeout());
         this.operationTimeout = new AtomicInteger(
-                params.getOperationTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
-                params.getOperationTimeout() : connectionConfig.getOperationTimeout()
-        );
+            params.getOperationTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+                .getOperationTimeout() : connectionConfig.getOperationTimeout());
 
-        long newPeriodicFlushTimeoutMs =
-                params.getWriteBufferPeriodicFlushTimeoutMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
-                params.getWriteBufferPeriodicFlushTimeoutMs() : connectionConfig.getWriteBufferPeriodicFlushTimeoutMs();
-        long newPeriodicFlushTimeIntervalMs =
-                params.getWriteBufferPeriodicFlushTimerTickMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
-                params.getWriteBufferPeriodicFlushTimerTickMs() : connectionConfig.getWriteBufferPeriodicFlushTimerTickMs();
+        long newPeriodicFlushTimeoutMs = params.getWriteBufferPeriodicFlushTimeoutMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+            .getWriteBufferPeriodicFlushTimeoutMs() : connectionConfig
+            .getWriteBufferPeriodicFlushTimeoutMs();
+        long newPeriodicFlushTimeIntervalMs = params.getWriteBufferPeriodicFlushTimerTickMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+            .getWriteBufferPeriodicFlushTimerTickMs() : connectionConfig
+            .getWriteBufferPeriodicFlushTimerTickMs();
         this.setWriteBufferPeriodicFlush(newPeriodicFlushTimeoutMs, newPeriodicFlushTimeIntervalMs);
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
@@ -199,7 +202,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             executedWriteBufferPeriodicFlushes.incrementAndGet();
             flush();
         } catch (Exception e) {
-            LOGGER.error("Errors occur during timeTriggerForWriteBufferPeriodicFlush: { " + e.getMessage() + " }");
+            LOGGER.error("Errors occur during timeTriggerForWriteBufferPeriodicFlush: { "
+                         + e.getMessage() + " }");
         }
     }
 
@@ -214,20 +218,19 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         long originalTimeTickMs = this.writeBufferPeriodicFlushTimerTickMs.get();
 
         writeBufferPeriodicFlushTimeoutMs.set(Math.max(0, timeoutMs));
-        writeBufferPeriodicFlushTimerTickMs.set(
-                Math.max(MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS, timerTickMs));
+        writeBufferPeriodicFlushTimerTickMs.set(Math.max(
+            MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS, timerTickMs));
 
         // if time parameters are updated, stop the old timer
-        if (writeBufferPeriodicFlushTimeoutMs.get() != originalTimeoutMs ||
-            writeBufferPeriodicFlushTimerTickMs.get() != originalTimeTickMs) {
+        if (writeBufferPeriodicFlushTimeoutMs.get() != originalTimeoutMs
+            || writeBufferPeriodicFlushTimerTickMs.get() != originalTimeTickMs) {
             if (writeBufferPeriodicFlushTimer != null) {
                 writeBufferPeriodicFlushTimer.cancel();
                 writeBufferPeriodicFlushTimer = null;
             }
         }
 
-        if (writeBufferPeriodicFlushTimer == null &&
-            writeBufferPeriodicFlushTimeoutMs.get() > 0) {
+        if (writeBufferPeriodicFlushTimer == null && writeBufferPeriodicFlushTimeoutMs.get() > 0) {
             writeBufferPeriodicFlushTimer = new Timer(true);
             writeBufferPeriodicFlushTimer.schedule(new TimerTask() {
                 @Override
@@ -235,7 +238,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                     OHBufferedMutatorImpl.this.timeTriggerForWriteBufferPeriodicFlush();
                 }
             }, this.writeBufferPeriodicFlushTimerTickMs.get(),
-               this.writeBufferPeriodicFlushTimerTickMs.get());
+                this.writeBufferPeriodicFlushTimerTickMs.get());
         }
     }
 
@@ -319,7 +322,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         if (closed) {
             return;
         }
-        // reset timeout, timeInterval and Timer
+        // reset timeout, timeTick and Timer
         disableWriteBufferPeriodicFlush();
         try {
             execute(true);
@@ -330,7 +333,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 try {
                     if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
                         LOGGER
-                                .warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                            .warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
                     }
                 } catch (InterruptedException e) {
                     LOGGER.warn("waitForTermination interrupted");

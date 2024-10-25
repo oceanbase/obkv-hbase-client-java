@@ -38,9 +38,9 @@ import static org.junit.Assert.*;
 
 public class OHTableMultiColumnFamilyTest {
     @Rule
-    public ExpectedException  expectedException = ExpectedException.none();
+    public ExpectedException expectedException = ExpectedException.none();
 
-    protected Table hTable;
+    protected Table          hTable;
 
     @Before
     public void before() throws Exception {
@@ -281,6 +281,8 @@ public class OHTableMultiColumnFamilyTest {
         Thread.sleep(1000);
         int currentUndealtCount = ((OHBufferedMutatorImpl) mutator).size();
         Assert.assertNotEquals(lastUndealtCount, currentUndealtCount);
+        // after periodic flush, all mutations will be committed
+        Assert.assertEquals(0, currentUndealtCount);
         result = hTable.get(get);
         int newCount = result.rawCells().length;
         Assert.assertNotEquals(count, newCount);

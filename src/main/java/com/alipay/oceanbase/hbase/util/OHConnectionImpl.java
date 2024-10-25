@@ -56,8 +56,7 @@ public class OHConnectionImpl implements Connection {
 
     private final OHConnectionConfiguration connectionConfig;
 
-    OHConnectionImpl(Configuration conf, ExecutorService pool,
-                     final User user) throws IOException {
+    OHConnectionImpl(Configuration conf, ExecutorService pool, final User user) throws IOException {
         this.conf = conf;
         this.batchPool = pool;
         this.connectionConfig = new OHConnectionConfiguration(conf);

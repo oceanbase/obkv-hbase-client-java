@@ -198,7 +198,7 @@ public class OHTable implements Table {
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -251,7 +251,7 @@ public class OHTable implements Table {
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -321,7 +321,7 @@ public class OHTable implements Table {
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
@@ -535,7 +535,7 @@ public class OHTable implements Table {
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
-            InterruptedException {
+                                                             InterruptedException {
         try {
             batch(actions, results);
         } finally {
@@ -560,8 +560,8 @@ public class OHTable implements Table {
     }
 
     private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
-                                     List<Cell> keyValueList, boolean isTableGroup,
-                                     byte[] family) throws Exception {
+                                     List<Cell> keyValueList, boolean isTableGroup, byte[] family)
+                                                                                                  throws Exception {
         byte[][] familyAndQualifier = new byte[2][];
         KeyValue kv = null;
         while (clientQueryStreamResult.next()) {
@@ -849,7 +849,8 @@ public class OHTable implements Table {
                     throw new IllegalArgumentException("family is empty");
                 }
                 for (Cell kv : entry.getValue()) {
-                    if (kv.getRowLength() + kv.getValueLength() + kv.getQualifierLength() + Bytes.toBytes(kv.getTimestamp()).length + kv.getFamilyLength() > maxKeyValueSize) {
+                    if (kv.getRowLength() + kv.getValueLength() + kv.getQualifierLength()
+                        + Bytes.toBytes(kv.getTimestamp()).length + kv.getFamilyLength() > maxKeyValueSize) {
                         throw new IllegalArgumentException("KeyValue size too large");
                     }
                 }
@@ -918,7 +919,7 @@ public class OHTable implements Table {
             batch(actions, results);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
-            throw new IOException("delete  table " + tableNameString + "error" , e);
+            throw new IOException("delete  table " + tableNameString + "error", e);
         }
     }
 
@@ -1557,43 +1558,53 @@ public class OHTable implements Table {
     }
 
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(Cell kv,
-                                                                     OHOpType operationType, boolean isTableGroup) {
+                                                                     OHOpType operationType,
+                                                                     boolean isTableGroup) {
         switch (operationType) {
             case INSERT_OR_UPDATE:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(INSERT_OR_UPDATE,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
-                        new Object[] { CellUtil.cloneValue(kv) });
-            case APPEND:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(APPEND,
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    INSERT_OR_UPDATE,
                     ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, V_COLUMNS,
+                    new Object[] { CellUtil.cloneValue(kv) });
+            case APPEND:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    APPEND,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, V_COLUMNS,
                     new Object[] { CellUtil.cloneValue(kv) });
             case Delete:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() },
-                        null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    DEL,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, null, null);
             case DeleteAll:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() },
-                        null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() }, null, null);
             case DeleteColumn:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), -kv.getTimestamp() },
-                        null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    DEL,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            -kv.getTimestamp() }, null, null);
             case DeleteFamily:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                return com.alipay.oceanbase.rpc.mutation.Mutation
+                    .getInstance(
+                        DEL,
                         ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), isTableGroup?CellUtil.cloneQualifier(kv):null, -kv.getTimestamp() },
-                        null, null);
+                        new Object[] { CellUtil.cloneRow(kv),
+                                isTableGroup ? CellUtil.cloneQualifier(kv) : null,
+                                -kv.getTimestamp() }, null, null);
             case DeleteFamilyVersion:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                        ROW_KEY_COLUMNS,
-                        new Object[] { CellUtil.cloneRow(kv), isTableGroup ? CellUtil.cloneQualifier(kv) : null, kv.getTimestamp() },
-                        null, null);
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    DEL,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { CellUtil.cloneRow(kv),
+                            isTableGroup ? CellUtil.cloneQualifier(kv) : null, kv.getTimestamp() },
+                    null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -1607,8 +1618,7 @@ public class OHTable implements Table {
         long timestamp = original.getTimestamp();
         KeyValue.Type type = KeyValue.Type.codeToType(original.getType().getCode());
         // Create a new KeyValue with the modified qualifier  
-        return new KeyValue(row, family, newQualifier, timestamp, type,
-            value);
+        return new KeyValue(row, family, newQualifier, timestamp, type, value);
     }
 
     private BatchOperation buildBatchOperation(String tableName, List<? extends Row> actions, boolean isTableGroup, List<Integer> resultMapSingleOp) {
@@ -1684,18 +1694,24 @@ public class OHTable implements Table {
                 } else {
                     operationType = INSERT_OR_UPDATE;
                 }
-                return getInstance(operationType,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
+                return getInstance(
+                    operationType,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, V_COLUMNS,
                     new Object[] { CellUtil.cloneValue(kv) });
             case Delete:
-                return getInstance(DEL,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, null, null);
+                return getInstance(
+                    DEL,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, null, null);
             case DeleteColumn:
-                return getInstance(DEL,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), -kv.getTimestamp() }, null, null);
+                return getInstance(
+                    DEL,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            -kv.getTimestamp() }, null, null);
             case DeleteFamily:
-                return getInstance(DEL, new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() },
-                    null, null);
+                return getInstance(DEL,
+                    new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + kvType);
         }
@@ -1810,13 +1826,7 @@ public class OHTable implements Table {
     }
 
     public static enum OHOpType {
-        INSERT_OR_UPDATE,
-        APPEND,
-        Delete,
-        DeleteAll,
-        DeleteColumn,
-        DeleteFamily,
-        DeleteFamilyVersion,
+        INSERT_OR_UPDATE, APPEND, Delete, DeleteAll, DeleteColumn, DeleteFamily, DeleteFamilyVersion,
     }
 
     public static OHOpType getDeleteType(Cell.Type type) {

@@ -49,19 +49,19 @@ import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_
 
 public class OHTablePool implements Closeable {
 
-    private String                                 originTabelName = null;
-    private final PoolMap<String, Table>           tables;
-    private final int                              maxSize;
-    private final PoolMap.PoolType                 poolType;
-    private final Configuration                    config;
-    private final OHTableFactory                     tableFactory;
+    private String                            originTabelName = null;
+    private final PoolMap<String, Table>      tables;
+    private final int                         maxSize;
+    private final PoolMap.PoolType            poolType;
+    private final Configuration               config;
+    private final OHTableFactory              tableFactory;
 
     // A map of table attributes used for the table created by this pool. The map
     // key is composed of Table_Name + SEPARATOR + Attribute_Name, and the value
     // is byte value of attribute.
-    private ConcurrentHashMap<String, byte[]>      tableAttributes;
+    private ConcurrentHashMap<String, byte[]> tableAttributes;
 
-    private ConcurrentHashMap<String, Object>      tableExtendAttributes;
+    private ConcurrentHashMap<String, Object> tableExtendAttributes;
 
     /**
      * Default Constructor. Default HBaseConfiguration and no limit on pool size.

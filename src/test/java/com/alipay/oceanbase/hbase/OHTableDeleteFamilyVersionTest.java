@@ -16,7 +16,7 @@ public class OHTableDeleteFamilyVersionTest {
     @Rule
     public ExpectedException    expectedException = ExpectedException.none();
 
-    protected Table   hTable;
+    protected Table             hTable;
     private static final String key1              = "scanKey1x";
     private static final String key2              = "scanKey2x";
     private static final String key3              = "scanKey3x";
@@ -93,29 +93,36 @@ public class OHTableDeleteFamilyVersionTest {
             toBytes(value1));
 
         Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp1, toBytes(value2));
+        putKey3Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp1,
+            toBytes(value2));
 
         Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
         putKey1Fam1Column2MinTs.addColumn(toBytes(family1), toBytes(column2), minTimeStamp,
             toBytes(value1));
 
         Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
+        putKey1Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3,
+            toBytes(value2));
 
         Put putKey2Fam1Column2Ts3 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
+        putKey2Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3,
+            toBytes(value2));
 
         Put putKey2Fam1Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
+        putKey2Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1,
+            toBytes(value2));
 
         Put putKey3Fam1Column3Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
+        putKey3Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts6 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts6.addColumn(toBytes(family1), toBytes(column2), timeStamp6, toBytes(value1));
+        putKey3Fam1Column2Ts6.addColumn(toBytes(family1), toBytes(column2), timeStamp6,
+            toBytes(value1));
 
         Put putKey2Fam1Column3Ts6 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts6.addColumn(toBytes(family1), toBytes(column3), timeStamp3, toBytes(value1));
+        putKey2Fam1Column3Ts6.addColumn(toBytes(family1), toBytes(column3), timeStamp3,
+            toBytes(value1));
 
         tryPut(hTable, putKey1Fam1Column1MinTs);
         tryPut(hTable, putKey3Fam1Column1Ts1);
@@ -210,42 +217,52 @@ public class OHTableDeleteFamilyVersionTest {
 
         // test DeleteFamilyVersion multiple cf
         Put putKey1Fam1Column3Ts6 = new Put(toBytes(key1));
-        putKey1Fam1Column3Ts6.addColumn(toBytes(family1), toBytes(column3), timeStamp6, toBytes(value3));
+        putKey1Fam1Column3Ts6.addColumn(toBytes(family1), toBytes(column3), timeStamp6,
+            toBytes(value3));
 
         Put putKey1Fam2Column2Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column2Ts2.addColumn(toBytes(family2), toBytes(column2), timeStamp2, toBytes(value1));
+        putKey1Fam2Column2Ts2.addColumn(toBytes(family2), toBytes(column2), timeStamp2,
+            toBytes(value1));
 
         Put putKey1Fam2Column3Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column3Ts2.addColumn(toBytes(family2), toBytes(column3), timeStamp2, toBytes(value1));
+        putKey1Fam2Column3Ts2.addColumn(toBytes(family2), toBytes(column3), timeStamp2,
+            toBytes(value1));
 
         Put putKey1Fam1Column2Ts1 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts1.addColumn(toBytes(family1), toBytes(column2), timeStamp1, toBytes(value2));
+        putKey1Fam1Column2Ts1.addColumn(toBytes(family1), toBytes(column2), timeStamp1,
+            toBytes(value2));
 
         Put putKey2Fam1Column2Ts8 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts8.addColumn(toBytes(family1), toBytes(column2), timeStamp8, toBytes(value2));
+        putKey2Fam1Column2Ts8.addColumn(toBytes(family1), toBytes(column2), timeStamp8,
+            toBytes(value2));
 
         Put putKey2Fam2Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam2Column3Ts1.addColumn(toBytes(family2), toBytes(column3), timeStamp3, toBytes(value3));
+        putKey2Fam2Column3Ts1.addColumn(toBytes(family2), toBytes(column3), timeStamp3,
+            toBytes(value3));
 
         Put putKey2Fam1Column1Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp8, toBytes(value1));
+        putKey2Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp8,
+            toBytes(value1));
 
         Put putKey2Fam2Column1Ts3 = new Put(toBytes(key2));
-        putKey2Fam2Column1Ts3.addColumn(toBytes(family2), toBytes(column1), timeStamp3, toBytes(value2));
+        putKey2Fam2Column1Ts3.addColumn(toBytes(family2), toBytes(column1), timeStamp3,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts9 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts9.addColumn(toBytes(family1), toBytes(column2), timeStamp9, toBytes(value2));
+        putKey3Fam1Column2Ts9.addColumn(toBytes(family1), toBytes(column2), timeStamp9,
+            toBytes(value2));
 
         Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column3Ts10
-            .addColumn(toBytes(family2), toBytes(column3), timeStamp10, toBytes(value1));
+        putKey3Fam2Column3Ts10.addColumn(toBytes(family2), toBytes(column3), timeStamp10,
+            toBytes(value1));
 
         Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column1Ts10
-            .addColumn(toBytes(family2), toBytes(column1), timeStamp10, toBytes(value2));
+        putKey3Fam2Column1Ts10.addColumn(toBytes(family2), toBytes(column1), timeStamp10,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts2.addColumn(toBytes(family1), toBytes(column2), timeStamp2, toBytes(value1));
+        putKey3Fam1Column2Ts2.addColumn(toBytes(family1), toBytes(column2), timeStamp2,
+            toBytes(value1));
 
         tryPut(hTable, putKey1Fam1Column3Ts6);
         tryPut(hTable, putKey1Fam2Column2Ts2);
