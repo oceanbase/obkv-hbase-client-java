@@ -18,16 +18,12 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
-import com.google.common.annotations.VisibleForTesting;
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
+import org.apache.hbase.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -35,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
@@ -50,17 +47,25 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private volatile Configuration          conf;
     private final OHConnectionConfiguration connectionConfig;
 
-    @VisibleForTesting
-    final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
-    @VisibleForTesting
-    AtomicLong                              currentAsyncBufferSize = new AtomicLong(0);
+    private final ConcurrentLinkedQueue<Mutation>   asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
+    private final AtomicLong                        currentAsyncBufferSize = new AtomicLong(0);
+
+    private final AtomicLong firstRecordInBufferTimestamp = new AtomicLong(0);
+    private final AtomicLong executedWriteBufferPeriodicFlushes = new AtomicLong(0);
+
+    private final AtomicLong writeBufferPeriodicFlushTimeoutMs = new AtomicLong(0);
+    private final AtomicLong writeBufferPeriodicFlushTimerTickMs =
+            new AtomicLong(MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
+    private Timer writeBufferPeriodicFlushTimer = null;
 
     private final long                      writeBufferSize;
     private final int                       maxKeyValueSize;
-    private boolean                         closed                 = false;
     private final ExecutorService           pool;
-    private int rpcTimeout;
-    private int operationTimeout;
+    private final AtomicInteger undealtMutationCount = new AtomicInteger(0);
+    private final AtomicInteger rpcTimeout;
+    private final AtomicInteger operationTimeout;
+    private final boolean cleanipPoolOnClose;
+    private volatile boolean                         closed                 = false;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
                                                                                              throws IOException {
@@ -72,9 +77,29 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.conf = ohConnection.getConfiguration();
         this.connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.listener = params.getListener();
-        this.pool = params.getPool();
-        this.rpcTimeout = connectionConfig.getRpcTimeout();
-        this.operationTimeout = connectionConfig.getOperationTimeout();
+        if (params.getPool() == null) { // need to verify necessity
+            this.pool = HTable.getDefaultExecutor(conf);
+            this.cleanipPoolOnClose = true;
+        } else {
+            this.pool = params.getPool();
+            this.cleanipPoolOnClose = false;
+        }
+        this.rpcTimeout = new AtomicInteger(
+                params.getRpcTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
+                params.getRpcTimeout() : connectionConfig.getRpcTimeout()
+        );
+        this.operationTimeout = new AtomicInteger(
+                params.getOperationTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
+                params.getOperationTimeout() : connectionConfig.getOperationTimeout()
+        );
+
+        long newPeriodicFlushTimeoutMs =
+                params.getWriteBufferPeriodicFlushTimeoutMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
+                params.getWriteBufferPeriodicFlushTimeoutMs() : connectionConfig.getWriteBufferPeriodicFlushTimeoutMs();
+        long newPeriodicFlushTimeIntervalMs =
+                params.getWriteBufferPeriodicFlushTimerTickMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ?
+                params.getWriteBufferPeriodicFlushTimerTickMs() : connectionConfig.getWriteBufferPeriodicFlushTimerTickMs();
+        this.setWriteBufferPeriodicFlush(newPeriodicFlushTimeoutMs, newPeriodicFlushTimeIntervalMs);
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
@@ -112,26 +137,33 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     @Override
     public void mutate(List<? extends Mutation> mutations) throws IOException {
-        if (closed) {
-            throw new IllegalStateException("Cannot put when the BufferedMutator is closed.");
-        }
+        checkClose();
         if (mutations.isEmpty()) {
             return;
         }
 
         long toAddSize = 0;
+        int toAddCount = 0;
         for (Mutation m : mutations) {
             validateInsUpAndDelete(m);
             toAddSize += m.heapSize();
+            ++toAddCount;
         }
 
+        if (currentAsyncBufferSize.get() == 0) {
+            firstRecordInBufferTimestamp.set(System.currentTimeMillis());
+        }
+        undealtMutationCount.addAndGet(toAddCount);
         currentAsyncBufferSize.addAndGet(toAddSize);
         asyncWriteBuffer.addAll(mutations);
 
-        if (currentAsyncBufferSize.get() > writeBufferSize) {
-            execute(false);
-        }
+        execute(false);
+    }
 
+    private void checkClose() {
+        if (closed) {
+            throw new IllegalStateException("Cannot put when the BufferedMutator is closed.");
+        }
     }
 
     /**
@@ -151,36 +183,97 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
+    public void timeTriggerForWriteBufferPeriodicFlush() {
+        if (currentAsyncBufferSize.get() == 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (firstRecordInBufferTimestamp.get() + writeBufferPeriodicFlushTimeoutMs.get() > now) {
+            // too soon to execute
+            return;
+        }
+        try {
+            executedWriteBufferPeriodicFlushes.incrementAndGet();
+            flush();
+        } catch (Exception e) {
+            LOGGER.error("Errors occur during timeTriggerForWriteBufferPeriodicFlush: { " + e.getMessage() + " }");
+        }
+    }
+
+    @Override
+    public synchronized void setWriteBufferPeriodicFlush(long timeoutMs, long timerTickMs) {
+        long originalTimeoutMs = this.writeBufferPeriodicFlushTimeoutMs.get();
+        long originalTimeTickMs = this.writeBufferPeriodicFlushTimerTickMs.get();
+
+        writeBufferPeriodicFlushTimeoutMs.set(Math.max(0, timeoutMs));
+        writeBufferPeriodicFlushTimerTickMs.set(
+                Math.max(MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS, timerTickMs));
+
+        // if time parameters are updated, stop the old timer
+        if (writeBufferPeriodicFlushTimeoutMs.get() != originalTimeoutMs ||
+            writeBufferPeriodicFlushTimerTickMs.get() != originalTimeTickMs) {
+            if (writeBufferPeriodicFlushTimer != null) {
+                writeBufferPeriodicFlushTimer.cancel();
+                writeBufferPeriodicFlushTimer = null;
+            }
+        }
+
+        if (writeBufferPeriodicFlushTimer == null &&
+            writeBufferPeriodicFlushTimeoutMs.get() > 0) {
+            writeBufferPeriodicFlushTimer = new Timer(true);
+            writeBufferPeriodicFlushTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    OHBufferedMutatorImpl.this.timeTriggerForWriteBufferPeriodicFlush();
+                }
+            }, this.writeBufferPeriodicFlushTimerTickMs.get(),
+               this.writeBufferPeriodicFlushTimerTickMs.get());
+        }
+    }
+
     /**
      * Send the operations in the buffer to the servers. Does not wait for the server's answer. If
      * there is an error, either throw the error, or use the listener to deal with the error.
      *
-     * @param flushAll - if true, sends all the writes and wait for all of them to finish before
-     *        returning.
+     * @param flushAll - if true, force to commit all mutations in asyncWriteBuffer; else to commit only if
+     * larger than writeBufferSize
      */
     private void execute(boolean flushAll) throws IOException {
         LinkedList<Mutation> execBuffer = new LinkedList<>();
-        long dequeuedSize = 0L;
         try {
-            Mutation m;
-            while ((writeBufferSize <= 0 || dequeuedSize < (writeBufferSize * 2) || flushAll)
-                && (m = asyncWriteBuffer.poll()) != null) {
-                execBuffer.add(m);
-                long size = m.heapSize();
-                currentAsyncBufferSize.addAndGet(-size);
-                dequeuedSize += size;
+            if (flushAll || currentAsyncBufferSize.get() > writeBufferSize) {
+                Mutation m;
+                int dealtCount = 0;
+                while ((m = asyncWriteBuffer.poll())!= null) {
+                    execBuffer.add(m);
+                    long size = m.heapSize();
+                    currentAsyncBufferSize.addAndGet(-size);
+                    ++dealtCount;
+                }
+                if (currentAsyncBufferSize.get() > 0) {
+                    while (!execBuffer.isEmpty()) {
+                        m = execBuffer.getFirst();
+                        long size = m.heapSize();
+                        currentAsyncBufferSize.addAndGet(size);
+                        asyncWriteBuffer.add(m);
+                    }
+                    throw new IllegalStateException("Fetch error null value during execute");
+                }
+                undealtMutationCount.addAndGet(-dealtCount);
             }
 
             if (execBuffer.isEmpty()) {
                 return;
             }
             ohTable.batch(execBuffer);
+            // if commit all successfully, clean execBuffer
+            execBuffer.clear();
         } catch (Exception ex) {
             LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
                 LOGGER.error(tableName + ": One or more of the operations have failed after retries.");
                 RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
-                // recollect mutations
+                // recollect failed mutations
                 execBuffer.clear();
                 for (int i = 0; i < retryException.getNumExceptions(); ++i) {
                     execBuffer.add((Mutation) retryException.getRow(i));
@@ -199,8 +292,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 long size = mutation.heapSize();
                 currentAsyncBufferSize.addAndGet(size);
                 asyncWriteBuffer.add(mutation);
+                undealtMutationCount.incrementAndGet();
             }
         }
+    }
+
+    @Override
+    public void disableWriteBufferPeriodicFlush() {
+        setWriteBufferPeriodicFlush(0, MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
     }
 
     @Override
@@ -208,19 +307,23 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         if (closed) {
             return;
         }
+        // reset timeout, timeInterval and Timer
+        disableWriteBufferPeriodicFlush();
         try {
             execute(true);
         } finally {
-            // the pool in ObTableClient will be shut down too
-            this.pool.shutdown();
-            try {
-                if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
-                    LOGGER
-                        .warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+            if (cleanipPoolOnClose) {
+                // the pool in ObTableClient will be shut down too
+                this.pool.shutdown();
+                try {
+                    if (!pool.awaitTermination(600, TimeUnit.SECONDS)) {
+                        LOGGER
+                                .warn("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                    }
+                } catch (InterruptedException e) {
+                    LOGGER.warn("waitForTermination interrupted");
+                    Thread.currentThread().interrupt();
                 }
-            } catch (InterruptedException e) {
-                LOGGER.warn("waitForTermination interrupted");
-                Thread.currentThread().interrupt();
             }
             closed = true;
         }
@@ -232,7 +335,16 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     @Override
     public void flush() throws IOException {
+        checkClose();
         execute(true);
+    }
+
+    /**
+     * Count the mutations which haven't been processed.
+     */
+    @VisibleForTesting
+    int size() {
+        return undealtMutationCount.get();
     }
 
     @Override
@@ -241,12 +353,12 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     public void setRpcTimeout(int rpcTimeout) {
-        this.rpcTimeout = rpcTimeout;
+        this.rpcTimeout.set(rpcTimeout);
         this.ohTable.setRpcTimeout(rpcTimeout);
     }
 
     public void setOperationTimeout(int operationTimeout) {
-        this.operationTimeout = operationTimeout;
+        this.operationTimeout.set(operationTimeout);
         this.ohTable.setOperationTimeout(operationTimeout);
     }
 }

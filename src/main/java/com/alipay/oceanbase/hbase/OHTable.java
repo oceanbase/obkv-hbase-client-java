@@ -36,7 +36,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -1593,45 +1592,43 @@ public class OHTable implements Table {
     }
 
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(Cell kv,
-                                                                     ObTableOperationType operationType, boolean isTableGroup) {
-        Cell.Type kvType = kv.getType();
+                                                                     OHOpType operationType, boolean isTableGroup) {
         switch (operationType) {
             case INSERT_OR_UPDATE:
-            case APPEND:
-                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
-                    ROW_KEY_COLUMNS,
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(INSERT_OR_UPDATE,
+                        ROW_KEY_COLUMNS,
                         new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
                         new Object[] { CellUtil.cloneValue(kv) });
-            case DEL:
-                switch (kvType) {
-                    case Delete:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() },
-                                null, null);
-//                    case Maximum:
-//                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-//                                ROW_KEY_COLUMNS,
-//                                new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() },
-//                                null, null);
-                    case DeleteColumn:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), -kv.getTimestamp() },
-                                null, null);
-                    case DeleteFamily:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { CellUtil.cloneRow(kv), isTableGroup ? CellUtil.cloneQualifier(kv) : null, -kv.getTimestamp() },
-                                null, null);
-                    case DeleteFamilyVersion:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { CellUtil.cloneRow(kv), isTableGroup ? CellUtil.cloneQualifier(kv) : null, kv.getTimestamp() },
-                                null, null);
-                    default:
-                        throw new IllegalArgumentException("illegal mutation type " + kvType);
-                }
+            case APPEND:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(APPEND,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() }, V_COLUMNS,
+                        new Object[] { CellUtil.cloneValue(kv) });
+            case Delete:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), kv.getTimestamp() },
+                        null, null);
+            case DeleteAll:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() },
+                        null, null);
+            case DeleteColumn:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv), -kv.getTimestamp() },
+                        null, null);
+            case DeleteFamily:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), isTableGroup?CellUtil.cloneQualifier(kv):null, -kv.getTimestamp() },
+                        null, null);
+            case DeleteFamilyVersion:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
+                        ROW_KEY_COLUMNS,
+                        new Object[] { CellUtil.cloneRow(kv), isTableGroup ? CellUtil.cloneQualifier(kv) : null, kv.getTimestamp() },
+                        null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -1674,9 +1671,9 @@ public class OHTable implements Table {
                             if(isTableGroup){
                                 KeyValue new_kv = modifyQualifier(kv,(Bytes.toString(family) + "." + Bytes.toString(CellUtil.cloneQualifier(kv)))
                                     .getBytes());
-                                batch.addOperation(buildMutation(new_kv, INSERT_OR_UPDATE, isTableGroup));
+                                batch.addOperation(buildMutation(new_kv, OHOpType.INSERT_OR_UPDATE, isTableGroup));
                             } else {
-                                batch.addOperation(buildMutation(kv, INSERT_OR_UPDATE, isTableGroup));
+                                batch.addOperation(buildMutation(kv, OHOpType.INSERT_OR_UPDATE, isTableGroup));
                             }
                         }
                     }
@@ -1684,9 +1681,8 @@ public class OHTable implements Table {
                     Delete delete = (Delete) row;
                     if (delete.isEmpty()) {
                         singleOpResultNum++;
-                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                            KeyValue.Type.Maximum);
-                        batch.addOperation(buildMutation(kv, DEL, isTableGroup));
+                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp());
+                        batch.addOperation(buildMutation(kv, OHOpType.DeleteAll, isTableGroup));
                     } else {
                         for (Map.Entry<byte[], List<Cell>> entry : delete.getFamilyCellMap()
                             .entrySet()) {
@@ -1698,9 +1694,9 @@ public class OHTable implements Table {
                                 if(isTableGroup){
                                     KeyValue new_kv = modifyQualifier(kv,(Bytes.toString(family) + "." + Bytes.toString(CellUtil.cloneQualifier(kv)))
                                             .getBytes());
-                                    batch.addOperation(buildMutation(new_kv, DEL, true));
+                                    batch.addOperation(buildMutation(new_kv, getDeleteType(new_kv.getType()), true));
                                 } else {
-                                    batch.addOperation(buildMutation(kv, DEL, false));
+                                    batch.addOperation(buildMutation(kv, getDeleteType(kv.getType()), false));
                                 }
                             }
                         }
@@ -1846,5 +1842,30 @@ public class OHTable implements Table {
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
         return new Pair<>(getStartKeys(), getEndKeys());
+    }
+
+    public static enum OHOpType {
+        INSERT_OR_UPDATE,
+        APPEND,
+        Delete,
+        DeleteAll,
+        DeleteColumn,
+        DeleteFamily,
+        DeleteFamilyVersion,
+    }
+
+    public static OHOpType getDeleteType(Cell.Type type) {
+        switch (type) {
+            case Delete:
+                return OHOpType.Delete;
+            case DeleteColumn:
+                return OHOpType.DeleteColumn;
+            case DeleteFamily:
+                return OHOpType.DeleteFamily;
+            case DeleteFamilyVersion:
+                return OHOpType.DeleteFamilyVersion;
+            default:
+                throw new IllegalArgumentException("illegal mutation type " + type);
+        }
     }
 }
