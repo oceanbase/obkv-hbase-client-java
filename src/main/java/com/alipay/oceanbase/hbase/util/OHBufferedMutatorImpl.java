@@ -170,6 +170,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 return;
             }
             ohTable.batch(execBuffer);
+            // if commit all successfully, clean execBuffer
+            execBuffer.clear();
         } catch (Exception ex) {
             LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
