@@ -54,7 +54,7 @@ public class OHTableMultiColumnFamilyTest {
     }
 
     @Test
-    public void testMulfiColumnFamilyBufferedMutator() throws Exception {
+    public void testMultiColumnFamilyBufferedMutator() throws Exception {
         byte[] family1 = "family_with_group1".getBytes();
         byte[] family2 = "family_with_group2".getBytes();
         byte[] family3 = "family_with_group3".getBytes();
