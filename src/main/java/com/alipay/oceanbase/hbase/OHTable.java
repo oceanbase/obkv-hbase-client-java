@@ -1558,14 +1558,16 @@ public class OHTable implements HTableInterface {
                                            boolean includeStart, byte[] stop, boolean includeStop,
                                            boolean isReversed) {
         ObNewRange obNewRange = new ObNewRange();
-
+        ObBorderFlag obBorderFlag = new ObBorderFlag();
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
                 ObObj.getMin()));
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
+            obBorderFlag.setInclusiveStart();
         } else {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
+            obBorderFlag.unsetInclusiveStart();
         }
 
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
@@ -1573,10 +1575,13 @@ public class OHTable implements HTableInterface {
                 ObObj.getMax()));
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
+            obBorderFlag.setInclusiveEnd();
         } else {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), ObObj.getMin()));
+            obBorderFlag.unsetInclusiveEnd();
         }
         ObTableQuery obTableQuery = new ObTableQuery();
+        obNewRange.setBorderFlag(obBorderFlag);
         if (isReversed) {
             obTableQuery.setScanOrder(ObScanOrder.Reverse);
         }
