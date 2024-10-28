@@ -56,6 +56,7 @@ import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.slf4j.Logger;
+import org.tukaani.xz.check.Check;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -64,6 +65,7 @@ import java.util.concurrent.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
+import static com.alipay.oceanbase.hbase.util.Preconditions.checkNotNull;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
@@ -964,7 +966,7 @@ public class OHTable implements Table {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(put);
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), put, tableNameString, e);
             throw new IOException("checkAndPut type table:" + tableNameString + " e.msg:"
@@ -1020,7 +1022,7 @@ public class OHTable implements Table {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(delete);
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), delete, tableNameString, e);
             throw new IOException("checkAndDelete type table:" + tableNameString + " e.msg:"
@@ -1033,7 +1035,7 @@ public class OHTable implements Table {
                                   CompareFilter.CompareOp compareOp, byte[] value,
                                   RowMutations rowMutations) throws IOException {
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
             throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
@@ -1041,18 +1043,21 @@ public class OHTable implements Table {
         }
     }
 
+    @Override
+    public CheckAndMutateBuilder checkAndMutate(byte[]row , byte[] family) {
+        return new ObCheckAndMutateBuilderImpl(row, family);
+    }
+
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value,
-                                     RowMutations rowMutations) throws Exception {
+                                     TimeRange timeRange, RowMutations rowMutations) throws Exception {
             checkArgument(row != null, "row is null");
             checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
             checkArgument(Bytes.equals(row, rowMutations.getRow()),
-                "mutation row is not equal check row");
-
+                    "mutation row is not equal check row");
             checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
-
             byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
 
-            ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
+            ObHTableFilter filter = buildObHTableFilter(filterString, timeRange, 1, qualifier);
             List<Mutation> mutations = rowMutations.getMutations();
             List<Cell> keyValueList = new LinkedList<>();
             // only one family operation is allowed
@@ -1903,6 +1908,112 @@ public class OHTable implements Table {
                 return OHOpType.DeleteFamilyVersion;
             default:
                 throw new IllegalArgumentException("illegal mutation type " + type);
+        }
+    }
+
+    private class ObCheckAndMutateBuilderImpl implements CheckAndMutateBuilder {
+        private final byte[] row;
+        private final byte[] family;
+        private byte[] qualifier;
+        private byte[] value;
+        private TimeRange timeRange;
+        private CompareOperator cmpOp;
+
+        ObCheckAndMutateBuilderImpl(byte[] row, byte[] family) {
+            this.row = checkNotNull(row, "The provided row is null.");
+            this.family = checkNotNull(family, "The provided family is null.");
+        }
+
+        @Override
+        public CheckAndMutateBuilder qualifier(byte[] qualifier) {
+            this.qualifier = checkNotNull(qualifier, "The provided qualifier is null. You could" +
+                    " use an empty byte array, or do not call this method if you want a null qualifier.");
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder timeRange(TimeRange timeRange) {
+            this.timeRange = timeRange;
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder ifNotExists() {
+            this.cmpOp = CompareOperator.EQUAL;
+            this.value = null;
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder ifMatches(CompareOperator cmpOp, byte[] value) {
+            this.cmpOp = checkNotNull(cmpOp, "The provided cmpOp is null.");
+            this.value = checkNotNull(value , "The provided value is null.");
+            return this;
+        }
+
+        @Override
+        public boolean thenPut(Put put) throws IOException {
+            checkCmpOp();
+            RowMutations rowMutations = new RowMutations(row);
+            rowMutations.add(put);
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
+                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+        @Override
+        public boolean thenDelete(Delete delete) throws IOException {
+            checkCmpOp();
+            RowMutations rowMutations = new RowMutations(row);
+            rowMutations.add(delete);
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
+                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+        @Override
+        public boolean thenMutate(RowMutations mutation) throws IOException {
+            checkCmpOp();
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, mutation);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
+                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+
+        private void checkCmpOp() {
+            checkNotNull(this.cmpOp, "The compare condition is null. Please use"
+                    + " ifNotExists/ifEquals/ifMatches before executing the request");
+        }
+
+        private CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
+            switch (cmpOp) {
+                case LESS:
+                    return CompareFilter.CompareOp.LESS;
+                case LESS_OR_EQUAL:
+                    return CompareFilter.CompareOp.LESS_OR_EQUAL;
+                case EQUAL:
+                    return CompareFilter.CompareOp.EQUAL;
+                case NOT_EQUAL:
+                    return CompareFilter.CompareOp.NOT_EQUAL;
+                case GREATER_OR_EQUAL:
+                    return CompareFilter.CompareOp.GREATER_OR_EQUAL;
+                case GREATER:
+                    return CompareFilter.CompareOp.GREATER;
+                default:
+                    return CompareFilter.CompareOp.NO_OP;
+            }
         }
     }
 }
