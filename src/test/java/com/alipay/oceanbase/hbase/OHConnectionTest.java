@@ -86,9 +86,15 @@ public class OHConnectionTest {
             new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
         pool.allowCoreThreadTimeOut(true);
         builder = connection.getTableBuilder(tableName, pool);
-        builder.setOperationTimeout(1500000);
         builder.setRpcTimeout(40000);
+        builder.setReadRpcTimeout(30000);
+        builder.setWriteRpcTimeout(50000);
+        builder.setOperationTimeout(1500000);
         hTable = builder.build();
+        Assert.assertEquals(40000, hTable.getRpcTimeout());
+        Assert.assertEquals(30000, hTable.getReadRpcTimeout());
+        Assert.assertEquals(50000, hTable.getWriteRpcTimeout());
+        Assert.assertEquals(1500000, hTable.getOperationTimeout());
         testBasic();
 
         hTable.close();

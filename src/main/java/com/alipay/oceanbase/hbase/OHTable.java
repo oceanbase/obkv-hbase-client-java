@@ -427,11 +427,15 @@ public class OHTable implements Table {
             HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
             HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
             HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
-        this.rpcTimeout = configuration.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
-            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-        this.operationTimeout = this.configuration.getInt(
+        this.rpcTimeout = this.rpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
+            HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.rpcTimeout;
+        this.readRpcTimeout = this.readRpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_READ_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.readRpcTimeout;
+        this.writeRpcTimeout = this.writeRpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_WRITE_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.writeRpcTimeout;
+        this.operationTimeout = this.operationTimeout <= 0 ? this.configuration.getInt(
             HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
-            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT) : this.operationTimeout;
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -1375,6 +1379,16 @@ public class OHTable implements Table {
     @Override
     public int getRpcTimeout() {
         return this.rpcTimeout;
+    }
+
+    @Override
+    public int getReadRpcTimeout() {
+        return this.readRpcTimeout;
+    }
+
+    @Override
+    public int getWriteRpcTimeout() {
+        return this.writeRpcTimeout;
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {

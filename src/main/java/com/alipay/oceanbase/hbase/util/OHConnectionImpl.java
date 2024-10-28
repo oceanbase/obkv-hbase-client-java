@@ -181,7 +181,8 @@ public class OHConnectionImpl implements Connection {
             @Override
             public Table build() {
                 try {
-                    return new OHTable(OHConnectionImpl.this, this, connectionConfig, pool);
+                    return new OHTable(OHConnectionImpl.this, this,
+                        OHConnectionImpl.this.connectionConfig, pool);
                 } catch (Exception e) {
                     LOGGER.error("Fail to build new OHTable", e);
                     throw new RuntimeException(e);
