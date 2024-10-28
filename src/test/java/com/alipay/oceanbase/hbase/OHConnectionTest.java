@@ -68,6 +68,44 @@ public class OHConnectionTest {
         testBasic();
     }
 
+    @Test
+    public void testGetTableByTableBuilder() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
+        connection = ConnectionFactory.createConnection(conf);
+        TableName tableName = TableName.valueOf("test");
+        TableBuilder builder = connection.getTableBuilder(tableName, null);
+        // build a OHTable with default params
+        hTable = builder.build();
+        testBasic();
+
+        // set params for TableBuilder
+        long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS,
+            new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+        pool.allowCoreThreadTimeOut(true);
+        builder = connection.getTableBuilder(tableName, pool);
+        builder.setOperationTimeout(1500000);
+        builder.setRpcTimeout(40000);
+        hTable = builder.build();
+        testBasic();
+
+        hTable.close();
+        Assert.assertFalse(pool.isShutdown());
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                System.out
+                    .println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
+            }
+        } catch (InterruptedException e) {
+            System.out.println("waitForTermination interrupted");
+            Thread.currentThread().interrupt();
+        }
+        Assert.assertTrue(pool.isShutdown());
+    }
+
     private void testBasic() throws Exception {
         String key = "putKey";
         String column1 = "putColumn1";
@@ -637,8 +675,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");
@@ -768,8 +806,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");
@@ -891,8 +929,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");

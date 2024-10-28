@@ -105,6 +105,16 @@ public class OHTable implements Table {
     private int                  rpcTimeout;
 
     /**
+     * timeout for each read rpc request
+     */
+    private int                  readRpcTimeout;
+
+    /**
+     * timeout for each write rpc request
+     */
+    private int                  writeRpcTimeout;
+
+    /**
      * if the <code>Get</code> executing pool is specified by user cleanupPoolOnClose will be false ,
      * which means that user is responsible for the pool
      */
@@ -292,7 +302,7 @@ public class OHTable implements Table {
     public OHTable(TableName tableName, Connection connection,
                    OHConnectionConfiguration connectionConfig, ExecutorService executePool)
                                                                                            throws IOException {
-        checkArgument(connection.getConfiguration() != null, "configuration is null.");
+        checkArgument(connection != null, "connection is null.");
         checkArgument(tableName != null, "tableName is null.");
         checkArgument(connection.getConfiguration() != null, "configuration is null.");
         checkArgument(tableName.getName() != null, "tableNameString is null.");
@@ -311,6 +321,8 @@ public class OHTable implements Table {
             this.cleanupPoolOnClose = false;
         }
         this.rpcTimeout = connectionConfig.getRpcTimeout();
+        this.readRpcTimeout = connectionConfig.getReadRpcTimeout();
+        this.writeRpcTimeout = connectionConfig.getWriteRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
@@ -320,6 +332,50 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+            this.tableNameString, connectionConfig));
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(operationTimeout);
+
+        finishSetUp();
+    }
+
+    public OHTable(Connection connection, ObTableBuilderBase builder,
+                   OHConnectionConfiguration connectionConfig, ExecutorService executePool)
+                                                                                           throws IOException {
+        checkArgument(connection != null, "connection is null.");
+        checkArgument(connection.getConfiguration() != null, "configuration is null.");
+        checkArgument(builder != null, "builder is null");
+        checkArgument(connectionConfig != null, "connectionConfig is null.");
+        TableName builderTableName = builder.getTableName();
+        this.tableName = builderTableName.getName();
+        this.tableNameString = builderTableName.getNameAsString();
+        this.configuration = connection.getConfiguration();
+        this.executePool = executePool;
+        if (executePool == null) {
+            int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
+                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
+            long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
+                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+            this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+            this.cleanupPoolOnClose = true;
+        } else {
+            this.cleanupPoolOnClose = false;
+        }
+        this.rpcTimeout = builder.getRpcTimeout();
+        this.readRpcTimeout = builder.getReadRpcTimeout();
+        this.writeRpcTimeout = builder.getWriteRpcTimeout();
+        this.operationTimeout = builder.getOperationTimeout();
+        this.operationExecuteInPool = this.configuration.getBoolean(
+            HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
+            (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
+        this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
+        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
+            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
+        this.writeBufferSize = connectionConfig.getWriteBufferSize();
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
             HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
@@ -388,7 +444,7 @@ public class OHTable implements Table {
 
     private OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
                                                               OHConnectionConfiguration ohConnectionConf)
-                                                                                                         throws IOException {
+                                                                                                         throws IllegalArgumentException {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
             if (params.length != 2) {

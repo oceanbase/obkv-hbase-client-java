@@ -176,8 +176,18 @@ public class OHConnectionImpl implements Connection {
     }
 
     @Override
-    public TableBuilder getTableBuilder(TableName tableName, ExecutorService executorService) {
-        throw new FeatureNotSupportedException("not supported yet'");
+    public TableBuilder getTableBuilder(TableName tableName, ExecutorService pool) {
+        return new ObTableBuilderBase(tableName, connectionConfig) {
+            @Override
+            public Table build() {
+                try {
+                    return new OHTable(OHConnectionImpl.this, this, connectionConfig, pool);
+                } catch (Exception e) {
+                    LOGGER.error("Fail to build new OHTable", e);
+                    throw new RuntimeException(e);
+                }
+            }
+        };
     }
 
     @Override
