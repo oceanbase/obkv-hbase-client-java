@@ -637,8 +637,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");
@@ -768,8 +768,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");
@@ -891,8 +891,8 @@ public class OHConnectionTest {
                     Assert.assertFalse(bufferPool.isShutdown());
                     bufferPool.shutdown();
                     try {
-                        if (!bufferPool.awaitTermination(600, TimeUnit.SECONDS)) {
-                            System.out.println("close() failed to terminate pool after 10 minutes. Abandoning pool.");
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
                         }
                     } catch (InterruptedException e) {
                         System.out.println("waitForTermination interrupted");
