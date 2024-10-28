@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.filter;
 
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
@@ -75,6 +76,8 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (FuzzyRowFilter) filter);
         } else if (filter instanceof TimestampsFilter) {
             toParseableByteArray(byteStream, (TimestampsFilter) filter);
+        } else if (filter instanceof ColumnValueFilter) {
+            toParseableByteArray(byteStream, (ColumnValueFilter) filter);
         } else if (filter instanceof MultiRowRangeFilter) {
             toParseableByteArray(byteStream, (MultiRowRangeFilter) filter);
         } else if (filter instanceof InclusiveStopFilter) {
@@ -93,6 +96,28 @@ public class HBaseFilterUtils {
     }
 
     public static byte[] toParseableByteArray(CompareFilter.CompareOp op) {
+        if (op == null) {
+            throw new IllegalArgumentException("Compare operator is null");
+        }
+        switch (op) {
+            case LESS:
+                return ParseConstants.LESS_THAN_ARRAY;
+            case LESS_OR_EQUAL:
+                return ParseConstants.LESS_THAN_OR_EQUAL_TO_ARRAY;
+            case EQUAL:
+                return ParseConstants.EQUAL_TO_ARRAY;
+            case NOT_EQUAL:
+                return ParseConstants.NOT_EQUAL_TO_ARRAY;
+            case GREATER_OR_EQUAL:
+                return ParseConstants.GREATER_THAN_OR_EQUAL_TO_ARRAY;
+            case GREATER:
+                return ParseConstants.GREATER_THAN_ARRAY;
+            default:
+                throw new IllegalArgumentException("Invalid compare operator: " + op);
+        }
+    }
+
+    public static byte[] toParseableByteArray(CompareOperator op) {
         if (op == null) {
             throw new IllegalArgumentException("Compare operator is null");
         }
@@ -326,6 +351,21 @@ public class HBaseFilterUtils {
             byteStream.write(',');
         }
         byteStream.write(Boolean.toString(canHint).getBytes());
+        byteStream.write(')');
+    }
+
+    // ColumnValueFilter('cf','q')
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, ColumnValueFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        byteStream.write("'".getBytes());
+        byteStream.write(filter.getFamily());
+        byteStream.write("','".getBytes());
+        byteStream.write(filter.getQualifier());
+        byteStream.write("',".getBytes());
+        byteStream.write(toParseableByteArray(filter.getCompareOperator()));
+        byteStream.write(',');
+        toParseableByteArray(byteStream, filter.getComparator());
         byteStream.write(')');
     }
 

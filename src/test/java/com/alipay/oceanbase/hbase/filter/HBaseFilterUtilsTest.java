@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase.filter;
 
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
@@ -205,6 +206,14 @@ public class HBaseFilterUtilsTest {
         FuzzyRowFilter filter = new FuzzyRowFilter(fuzzyKey);
         System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
         Assert.assertArrayEquals("FuzzyRowFilter('abc','101','ddd','010')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+    }
+
+    @Test
+    public void testColumnValueFilter() throws IOException {
+        ColumnValueFilter filter = new ColumnValueFilter(Bytes.toBytes("cf"), Bytes.toBytes("q"), CompareOperator.EQUAL, Bytes.toBytes("v"));
+        System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
+        Assert.assertArrayEquals("ColumnValueFilter('cf','q',=,'binary:v')".getBytes(),
+                HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test

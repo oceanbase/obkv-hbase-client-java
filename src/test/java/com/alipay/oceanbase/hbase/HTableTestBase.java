@@ -18,10 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -1794,6 +1791,198 @@ public abstract class HTableTestBase {
         }
         Assert.assertEquals(res_count, 10);
         scanner.close();
+    }
+
+    @Test
+    public void testColumnValueFilter() throws Exception {
+        String key1 = "abab";
+        String key2 = "abcc";
+        String column1 = "c1";
+        String column2 = "c2";
+        String column3 = "c3";
+        String column4 = "c4";
+        String column5 = "c5";
+        String value1 = "value1";
+        String value2 = "value2";
+        String value3 = "value3";
+        String family = "family1";
+        Delete deleteKey1Family = new Delete(toBytes(key1));
+        deleteKey1Family.addFamily(toBytes(family));
+
+        Delete deleteKey2Family = new Delete(toBytes(key2));
+        deleteKey2Family.addFamily(toBytes(family));
+
+        hTable.delete(deleteKey1Family);
+        hTable.delete(deleteKey2Family);
+
+        try {
+            Put putKey1Column1Value1 = new Put(toBytes(key1));
+            putKey1Column1Value1.addColumn(toBytes(family), toBytes(column1), toBytes(value1));
+
+            Put putKey1Column1Value2 = new Put(toBytes(key1));
+            putKey1Column1Value2.addColumn(toBytes(family), toBytes(column1), toBytes(value2));
+
+            Put putKey1Column2Value2 = new Put(toBytes(key1));
+            putKey1Column2Value2.addColumn(toBytes(family), toBytes(column2), toBytes(value2));
+
+            Put putKey1Column2Value1 = new Put(toBytes(key1));
+            putKey1Column2Value1.addColumn(toBytes(family), toBytes(column2), toBytes(value1));
+
+            Put putKey1Column3Value1 = new Put(toBytes(key1));
+            putKey1Column3Value1.addColumn(toBytes(family), toBytes(column3), toBytes(value1));
+
+            Put putKey1Column4Value1 = new Put(toBytes(key1));
+            putKey1Column4Value1.addColumn(toBytes(family), toBytes(column4), toBytes(value1));
+
+            Put putKey1Column5Value1 = new Put(toBytes(key1));
+            putKey1Column5Value1.addColumn(toBytes(family), toBytes(column5), toBytes(value1));
+
+            Put putKey2Column1Value1 = new Put(toBytes(key2));
+            putKey2Column1Value1.addColumn(toBytes(family), toBytes(column1), toBytes(value1));
+
+            Put putKey2Column1Value2 = new Put(toBytes(key2));
+            putKey2Column1Value2.addColumn(toBytes(family), toBytes(column1), toBytes(value2));
+
+            Put putKey2Column2Value2 = new Put(toBytes(key2));
+            putKey2Column2Value2.addColumn(toBytes(family), toBytes(column2), toBytes(value2));
+
+            Put putKey2Column2Value1 = new Put(toBytes(key2));
+            putKey2Column2Value1.addColumn(toBytes(family), toBytes(column2), toBytes(value1));
+
+            hTable.delete(deleteKey1Family);
+            hTable.delete(deleteKey2Family);
+            tryPut(hTable, putKey1Column1Value1);
+            tryPut(hTable, putKey1Column1Value2);
+            tryPut(hTable, putKey1Column1Value1);
+            tryPut(hTable, putKey1Column2Value1);
+            tryPut(hTable, putKey1Column2Value2);
+            tryPut(hTable, putKey1Column2Value1);
+            tryPut(hTable, putKey1Column2Value2);
+            tryPut(hTable, putKey1Column3Value1);
+            tryPut(hTable, putKey1Column4Value1);
+            tryPut(hTable, putKey1Column5Value1);
+            tryPut(hTable, putKey2Column2Value1);
+            tryPut(hTable, putKey2Column2Value2);
+
+            Scan scan;
+            scan = new Scan();
+            scan.addFamily(family.getBytes());
+            scan.setMaxVersions(10);
+            ColumnValueFilter filter = new ColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(column2), CompareOperator.EQUAL, Bytes.toBytes(value1));
+            scan.setFilter(filter);
+            ResultScanner scanner = hTable.getScanner(scan);
+
+            int res_count = 0;
+            for (Result result : scanner) {
+                for (Cell keyValue : result.rawCells()) {
+                    System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)),
+                            keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue))
+                    );
+                    res_count += 1;
+                }
+            }
+            Assert.assertEquals(res_count, 3);
+            scanner.close();
+
+            scan = new Scan();
+            scan.addFamily(family.getBytes());
+            scan.setMaxVersions(10);
+            filter = new ColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(column2), CompareOperator.EQUAL, new BinaryPrefixComparator(Bytes.toBytes("value")));
+            scan.setFilter(filter);
+            scanner = hTable.getScanner(scan);
+
+            res_count = 0;
+            for (Result result : scanner) {
+                for (Cell keyValue : result.rawCells()) {
+                    System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)),
+                            keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue))
+                    );
+                    res_count += 1;
+                }
+            }
+            Assert.assertEquals(res_count, 6);
+            scanner.close();
+
+            scan = new Scan();
+            scan.addFamily(family.getBytes());
+            scan.setMaxVersions(10);
+            filter = new ColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(column2), CompareOperator.GREATER, Bytes.toBytes(value1));
+            scan.setFilter(filter);
+            scanner = hTable.getScanner(scan);
+
+            res_count = 0;
+            for (Result result : scanner) {
+                for (Cell keyValue : result.rawCells()) {
+                    System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)),
+                            keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue))
+                    );
+                    res_count += 1;
+                }
+            }
+            Assert.assertEquals(res_count, 3);
+            scanner.close();
+
+            scan = new Scan();
+            scan.addFamily(family.getBytes());
+            scan.setMaxVersions(10);
+            filter = new ColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(column1), CompareOperator.NOT_EQUAL, Bytes.toBytes(value1));
+            scan.setFilter(filter);
+            scanner = hTable.getScanner(scan);
+
+            res_count = 0;
+            for (Result result : scanner) {
+                for (Cell keyValue : result.rawCells()) {
+                    System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)),
+                            keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue))
+                    );
+                    res_count += 1;
+                }
+            }
+            Assert.assertEquals(res_count, 1);
+            scanner.close();
+
+            scan = new Scan();
+            scan.addFamily(family.getBytes());
+            scan.setMaxVersions(10);
+            filter = new ColumnValueFilter(Bytes.toBytes("ff"), Bytes.toBytes(column1), CompareOperator.NOT_EQUAL, Bytes.toBytes(value1));
+            scan.setFilter(filter);
+            scanner = hTable.getScanner(scan);
+
+            res_count = 0;
+            for (Result result : scanner) {
+                for (Cell keyValue : result.rawCells()) {
+                    System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)),
+                            keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue))
+                    );
+                    res_count += 1;
+                }
+            }
+            Assert.assertEquals(res_count, 0);
+            scanner.close();
+        } finally {
+            hTable.delete(deleteKey1Family);
+            hTable.delete(deleteKey2Family);
+        }
     }
 
     @Test
