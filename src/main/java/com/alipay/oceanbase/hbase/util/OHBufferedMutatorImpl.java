@@ -165,7 +165,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     private void checkClose() {
         if (closed) {
-            throw new IllegalStateException("Cannot put when the BufferedMutator is closed.");
+            throw new IllegalStateException("The BufferedMutator is closed.");
         }
     }
 
