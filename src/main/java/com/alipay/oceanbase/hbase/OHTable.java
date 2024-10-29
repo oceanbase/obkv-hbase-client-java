@@ -36,7 +36,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -198,8 +197,13 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -246,8 +250,13 @@ public class OHTable implements Table {
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -311,8 +320,15 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(operationTimeout);
+
+        finishSetUp();
     }
 
     /**
@@ -833,7 +849,8 @@ public class OHTable implements Table {
                     throw new IllegalArgumentException("family is empty");
                 }
                 for (Cell kv : entry.getValue()) {
-                    if (kv.getRowLength() + kv.getValueLength() + kv.getQualifierLength() + Bytes.toBytes(kv.getTimestamp()).length + kv.getFamilyLength() > maxKeyValueSize) {
+                    if (kv.getRowLength() + kv.getValueLength() + kv.getQualifierLength()
+                        + Bytes.toBytes(kv.getTimestamp()).length + kv.getFamilyLength() > maxKeyValueSize) {
                         throw new IllegalArgumentException("KeyValue size too large");
                     }
                 }

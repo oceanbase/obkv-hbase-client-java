@@ -56,8 +56,7 @@ public class OHConnectionImpl implements Connection {
 
     private final OHConnectionConfiguration connectionConfig;
 
-    OHConnectionImpl(Configuration conf, ExecutorService pool,
-                     final User user) throws IOException {
+    OHConnectionImpl(Configuration conf, ExecutorService pool, final User user) throws IOException {
         this.conf = conf;
         this.batchPool = pool;
         this.connectionConfig = new OHConnectionConfiguration(conf);
@@ -129,9 +128,7 @@ public class OHConnectionImpl implements Connection {
         if (params.getTableName() == null) {
             throw new IllegalArgumentException("TableName cannot be null.");
         }
-        if (params.getPool() == null) {
-            params.pool(HTable.getDefaultExecutor(getConfiguration()));
-        }
+        // do not check whether the pool is null, cause now the bufferedMutator will take over the control
         if (params.getWriteBufferSize() == BUFFERED_PARAM_UNSET) {
             params.writeBufferSize(connectionConfig.getWriteBufferSize());
         }

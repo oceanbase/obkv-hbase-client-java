@@ -157,7 +157,7 @@ public final class OHConstants {
 
     public static final long     WRITE_BUFFER_SIZE_DEFAULT                   = 2097152L;
 
-    public static final int      MAX_KEYVALUE_SIZE_DEFAULT                   = -1;
+    public static final int      MAX_KEYVALUE_SIZE_DEFAULT                   = 10485760;
 
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 

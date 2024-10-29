@@ -17,12 +17,11 @@
 
 package com.alipay.oceanbase.hbase;
 
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -73,13 +72,6 @@ public class OHConnectionTest {
         hTable.close();
     }
 
-    @BeforeClass
-    public static void before() throws Exception {
-        // use self-defined namespace "n1"
-        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
-        ((OHTableClient) hTable).init();
-    }
-
     @AfterClass
     public static void finish() throws IOException {
         hTable.close();
@@ -87,6 +79,8 @@ public class OHConnectionTest {
 
     @Test
     public void testRefreshTableEntry() throws Exception {
+        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
+        ((OHTableClient) hTable).init();
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
         ((OHTableClient) hTable).refreshTableEntry("family1", true);
     }
@@ -140,7 +134,8 @@ public class OHConnectionTest {
         hTable.delete(delete);
 
         for (Cell keyValue : r.rawCells()) {
-            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue)) + " columnQualifier:"
+            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
+                               + " columnQualifier:"
                                + new String(CellUtil.cloneQualifier(keyValue)) + " timestamp:"
                                + keyValue.getTimestamp() + " value:"
                                + new String(CellUtil.cloneValue(keyValue)));
@@ -171,8 +166,10 @@ public class OHConnectionTest {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
@@ -194,8 +191,10 @@ public class OHConnectionTest {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
                         countAdd = false;
@@ -231,8 +230,7 @@ public class OHConnectionTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
         conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
-        BufferedMutator putBufferMutator = null;
-        BufferedMutator delBufferedMutator = null;
+        BufferedMutator bufferMutator = null;
         String key = "putKey";
         String column1 = "putColumn1";
         String value = "value333444";
@@ -247,17 +245,15 @@ public class OHConnectionTest {
             hTable.delete(delete);
 
             // use defualt params
-            putBufferMutator = connection.getBufferedMutator(tableName);
-            delBufferedMutator = connection.getBufferedMutator(tableName);
+            bufferMutator = connection.getBufferedMutator(tableName);
 
 
             long timestamp = System.currentTimeMillis();
 
             // only support Put and Delete
-            // for other type of operations, BufferedMutator will not set its type for them
             Append append = new Append(Bytes.toBytes(key));
-            append.add("family_group".getBytes(), column1.getBytes(), toBytes("_suffix"));
-            final BufferedMutator apMut = putBufferMutator;
+            append.addColumn("family_group".getBytes(), column1.getBytes(), toBytes("_suffix"));
+            final BufferedMutator apMut = bufferMutator;
             Assert.assertThrows(IllegalArgumentException.class, () -> {
                 apMut.mutate(append);
             });
@@ -271,31 +267,47 @@ public class OHConnectionTest {
             put2.addColumn(Bytes.toBytes(family), Bytes.toBytes(column1 + "1"), timestamp, Bytes.toBytes(value + "4"));
             mutations.add(put2);
             // test add Mutations with List
-            putBufferMutator.mutate(mutations);
-            putBufferMutator.flush();
+            bufferMutator.mutate(mutations);
+            bufferMutator.flush();
 
             Get get = new Get(toBytes(key));
             Result r = hTable.get(get);
             Assert.assertEquals(2, r.rawCells().length);
 
-            Delete del = new Delete(Bytes.toBytes(key));
-            final BufferedMutator noCfMut = putBufferMutator;
-            // test mutation without setting family
-            Assert.assertThrows(FeatureNotSupportedException.class, () -> {
-                noCfMut.mutate(del);
-            });
-            del.addFamily(Bytes.toBytes(family));
-            // test reuse different type bufferedMutator
-            final BufferedMutator difTypeMut = putBufferMutator;
+            Put put3 = new Put(Bytes.toBytes(key));
+            final BufferedMutator noCfMut = bufferMutator;
+            // test Put without setting family
             Assert.assertThrows(IllegalArgumentException.class, () -> {
-                difTypeMut.mutate(del);
+                noCfMut.mutate(put3);
             });
+            put3.addColumn(Bytes.toBytes(family), Bytes.toBytes(column1 + "2"), timestamp, Bytes.toBytes(value));
             // test add Mutation directly
-            delBufferedMutator.mutate(del);
-            delBufferedMutator.flush();
+            bufferMutator.mutate(put3);
+            bufferMutator.flush();
+            r = hTable.get(get);
+            Assert.assertEquals(3, r.rawCells().length);
+
+            // test Delete
+            Delete del = new Delete(toBytes(key));
+            del.addFamily(toBytes(family));
+            // test without setting family, delete all
+            bufferMutator.mutate(del);
+            bufferMutator.flush();
 
             r = hTable.get(get);
             Assert.assertEquals(0, r.rawCells().length);
+
+            // test hybrid mutations
+            mutations.clear();
+            mutations.add(put1);
+            mutations.add(put2);
+            mutations.add(del);
+            mutations.add(put3);
+            bufferMutator.mutate(mutations);
+            bufferMutator.flush();
+
+            r = hTable.get(get);
+            Assert.assertEquals(1, r.rawCells().length);
         } catch (Exception ex) {
             if (ex instanceof RetriesExhaustedWithDetailsException) {
                 ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
@@ -304,20 +316,22 @@ public class OHConnectionTest {
             }
             Assert.assertTrue(false);
         } finally {
-            if (putBufferMutator != null ) {
-                putBufferMutator.close();
+            if (bufferMutator != null ) {
+                bufferMutator.close();
                 // test flush after closed
-                putBufferMutator.flush();
-            }
-            if (delBufferedMutator != null) {
-                delBufferedMutator.close();
+                final BufferedMutator closedMutator = bufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
                 // test add mutations after closed
                 Delete delete = new Delete(Bytes.toBytes(key));
                 delete.addFamily(Bytes.toBytes(family));
-                final BufferedMutator closedMutator = delBufferedMutator;
                 Assert.assertThrows(IllegalStateException.class, () -> {
                     closedMutator.mutate(delete);
                 });
+                if (((OHBufferedMutatorImpl) bufferMutator).getPool() != null) {
+                    Assert.assertTrue(((OHBufferedMutatorImpl) bufferMutator).getPool().isShutdown());
+                }
             }
         }
     }
@@ -338,32 +352,31 @@ public class OHConnectionTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
         conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
-        BufferedMutator putBufferMutator = null;
-        BufferedMutator delBufferedMutator = null;
+        BufferedMutator bufferMutator = null;
         String key = "putKey";
         String column1 = "putColumn1";
         String value = "value333444";
         String family = "family_group";
-        long timestamp = System.currentTimeMillis();
         try {
             // use n1 database
             TableName tableName = TableName.valueOf("n1","test");
             connection = ConnectionFactory.createConnection(conf);
             hTable = connection.getTable(tableName);
+            Assert.assertEquals("n1:test", hTable.getName().getNameAsString());
 
             Delete delete= new Delete(toBytes(key));
             delete.addFamily(toBytes(family));
             hTable.delete(delete);
 
             // use defualt params
-            putBufferMutator = connection.getBufferedMutator(tableName);
-            delBufferedMutator = connection.getBufferedMutator(tableName);
+            bufferMutator = connection.getBufferedMutator(tableName);
+
+            long timestamp = System.currentTimeMillis();
 
             // only support Put and Delete
-            // for other type of operations, BufferedMutator will not set its type for them
             Append append = new Append(Bytes.toBytes(key));
-            append.add(toBytes(family), toBytes(column1), toBytes("_suffix"));
-            final BufferedMutator apMut = putBufferMutator;
+            append.add("family_group".getBytes(), column1.getBytes(), toBytes("_suffix"));
+            final BufferedMutator apMut = bufferMutator;
             Assert.assertThrows(IllegalArgumentException.class, () -> {
                 apMut.mutate(append);
             });
@@ -377,31 +390,46 @@ public class OHConnectionTest {
             put2.addColumn(Bytes.toBytes(family), Bytes.toBytes(column1 + "1"), timestamp, Bytes.toBytes(value + "4"));
             mutations.add(put2);
             // test add Mutations with List
-            putBufferMutator.mutate(mutations);
-            putBufferMutator.flush();
+            bufferMutator.mutate(mutations);
+            bufferMutator.flush();
 
             Get get = new Get(toBytes(key));
             Result r = hTable.get(get);
             Assert.assertEquals(2, r.rawCells().length);
 
-            Delete del = new Delete(Bytes.toBytes(key));
-            final BufferedMutator noCfMut = putBufferMutator;
-            // test mutation without setting family
-            Assert.assertThrows(FeatureNotSupportedException.class, () -> {
-                noCfMut.mutate(del);
-            });
-            del.addFamily(Bytes.toBytes(family));
-            final BufferedMutator difTypeMut = putBufferMutator;
-            // test reuse different type bufferedMutator
+            Put put3 = new Put(Bytes.toBytes(key));
+            final BufferedMutator noCfMut = bufferMutator;
+            // test Put without setting family
             Assert.assertThrows(IllegalArgumentException.class, () -> {
-                difTypeMut.mutate(del);
+                noCfMut.mutate(put3);
             });
+            put3.addColumn(Bytes.toBytes(family), Bytes.toBytes(column1 + "2"), timestamp, Bytes.toBytes(value));
             // test add Mutation directly
-            delBufferedMutator.mutate(del);
-            delBufferedMutator.flush();
+            bufferMutator.mutate(put3);
+            bufferMutator.flush();
+            r = hTable.get(get);
+            Assert.assertEquals(3, r.rawCells().length);
+
+            // test Delete
+            Delete del = new Delete(toBytes(key));
+            // test without setting family, delete all
+            bufferMutator.mutate(del);
+            bufferMutator.flush();
 
             r = hTable.get(get);
             Assert.assertEquals(0, r.rawCells().length);
+
+            // test hybrid mutations
+            mutations.clear();
+            mutations.add(put1);
+            mutations.add(put2);
+            mutations.add(del);
+            mutations.add(put3);
+            bufferMutator.mutate(mutations);
+            bufferMutator.flush();
+
+            r = hTable.get(get);
+            Assert.assertEquals(1, r.rawCells().length);
         } catch (Exception ex) {
             if (ex instanceof RetriesExhaustedWithDetailsException) {
                 ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
@@ -410,20 +438,22 @@ public class OHConnectionTest {
             }
             Assert.assertTrue(false);
         } finally {
-            if (putBufferMutator != null ) {
-                putBufferMutator.close();
+            if (bufferMutator != null ) {
+                bufferMutator.close();
                 // test flush after closed
-                putBufferMutator.flush();
-            }
-            if (delBufferedMutator != null) {
-                delBufferedMutator.close();
+                final BufferedMutator closedMutator = bufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
                 // test add mutations after closed
-                Delete delete = new Delete(Bytes.toBytes("putKey"));
-                delete.addFamily(Bytes.toBytes("family_group"));
-                final BufferedMutator closedMutator = delBufferedMutator;
+                Delete delete = new Delete(Bytes.toBytes(key));
+                delete.addFamily(Bytes.toBytes(family));
                 Assert.assertThrows(IllegalStateException.class, () -> {
                     closedMutator.mutate(delete);
                 });
+                if (((OHBufferedMutatorImpl) bufferMutator).getPool() != null) {
+                    Assert.assertTrue(((OHBufferedMutatorImpl) bufferMutator).getPool().isShutdown());
+                }
             }
         }
     }
@@ -442,7 +472,7 @@ public class OHConnectionTest {
     public void testBufferedMutatorWithAutoFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         conf.set("rs.list.acquire.read.timeout", "10000");
-        BufferedMutator putBufferMutator = null;
+        BufferedMutator bufferMutator = null;
         BufferedMutatorParams params = null;
         long bufferSize = 45000L;
         int count = 0;
@@ -463,7 +493,7 @@ public class OHConnectionTest {
             // set params
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
-            putBufferMutator = connection.getBufferedMutator(params);
+            bufferMutator = connection.getBufferedMutator(params);
 
             List<Mutation> mutations = new ArrayList<>();
             for (int i = 0; i < 50; ++i) {
@@ -474,8 +504,20 @@ public class OHConnectionTest {
                             timestamp, Bytes.toBytes(value + "_" + i + "_" + j));
                     mutations.add(put);
                 }
-                putBufferMutator.mutate(mutations);
+                if (i % 10 == 0) {  // 0, 10, 20, 30, 40
+                    for(int j = 0; j < 4; ++j) {
+                        Delete del = new Delete(Bytes.toBytes(key));
+                        del.addColumns(toBytes(family), toBytes(column1 + "_" + i + "_" + j));
+                        mutations.add(del);
+                    }
+                }
+                bufferMutator.mutate(mutations);
             }
+            Get get = new Get(toBytes(key));
+            get.addFamily(toBytes(family));
+            Result r = hTable.get(get);
+            count = r.rawCells().length;
+            Assert.assertTrue(count > 0);
         } catch (Exception ex) {
             if (ex instanceof RetriesExhaustedWithDetailsException) {
                 ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
@@ -484,14 +526,13 @@ public class OHConnectionTest {
             }
             Assert.assertTrue(false);
         } finally {
-            if (putBufferMutator != null) {
-                putBufferMutator.close();
+            if (bufferMutator != null) {
+                bufferMutator.close();
                 Get get = new Get(toBytes(key));
+                get.addFamily(toBytes(family));
                 Result r = hTable.get(get);
-                for (Cell keyValue : r.rawCells()) {
-                    ++count;
-                }
-                Assert.assertEquals(200, count);
+                count = r.rawCells().length;
+                Assert.assertEquals(180, count);
                 Delete delete = new Delete(toBytes(key));
                 delete.addFamily(toBytes(family));
                 hTable.delete(delete);
@@ -499,17 +540,16 @@ public class OHConnectionTest {
                 Assert.assertEquals(0, r.rawCells().length);
 
                 // test add mutations after closed
-                final BufferedMutator closedMutator = putBufferMutator;
+                final BufferedMutator closedMutator = bufferMutator;
                 Assert.assertThrows(IllegalStateException.class, () -> {
                     closedMutator.mutate(delete);
                 });
                 // test flush after closed
-                putBufferMutator.flush();
-            }
-
-            if (params != null) {
-                if (params.getPool() != null) {
-                    Assert.assertTrue(params.getPool().isShutdown());
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
+                if (((OHBufferedMutatorImpl) bufferMutator).getPool() != null) {
+                    Assert.assertTrue(((OHBufferedMutatorImpl) bufferMutator).getPool().isShutdown());
                 }
             }
         }
@@ -531,6 +571,7 @@ public class OHConnectionTest {
         conf.set("rs.list.acquire.read.timeout", "10000");
         BufferedMutator ohBufferMutator = null;
         BufferedMutatorParams params = null;
+        ThreadPoolExecutor pool = null;
         long bufferSize = 45000L;
         int count = 0;
         String key = "putKey";
@@ -553,7 +594,7 @@ public class OHConnectionTest {
 
             // set thread pool
             long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
-            ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+            pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
             pool.allowCoreThreadTimeOut(true);
             params.pool(pool);
 
@@ -568,8 +609,20 @@ public class OHConnectionTest {
                             timestamp, Bytes.toBytes(value + "_" + i + "_" + j));
                     mutations.add(put);
                 }
+                if (i % 10 == 0) {  // 0, 10, 20, 30, 40
+                    for(int j = 0; j < 4; ++j) {
+                        Delete del = new Delete(Bytes.toBytes(key));
+                        del.addColumns(toBytes(family), toBytes(column1 + "_" + i + "_" + j));
+                        mutations.add(del);
+                    }
+                }
                 ohBufferMutator.mutate(mutations);
             }
+            Get get = new Get(toBytes(key));
+            get.addFamily(toBytes(family));
+            Result r = hTable.get(get);
+            count = r.rawCells().length;
+            Assert.assertTrue(count > 0);
         } catch (Exception ex) {
             if (ex instanceof RetriesExhaustedWithDetailsException) {
                 ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
@@ -581,11 +634,10 @@ public class OHConnectionTest {
             if (ohBufferMutator != null) {
                 ohBufferMutator.close();
                 Get get = new Get(toBytes(key));
+                get.addFamily(toBytes(family));
                 Result r = hTable.get(get);
-                for (Cell keyValue : r.rawCells()) {
-                    ++count;
-                }
-                Assert.assertEquals(200, count);
+                count = r.rawCells().length;
+                Assert.assertEquals(180, count);
                 Delete delete = new Delete(toBytes(key));
                 delete.addFamily(toBytes(family));
                 hTable.delete(delete);
@@ -598,11 +650,23 @@ public class OHConnectionTest {
                     closedMutator.mutate(delete);
                 });
                 // test flush after closed
-                ohBufferMutator.flush();
-            }
-            if (params != null) {
-                if (params.getPool() != null) {
-                    Assert.assertTrue(params.getPool().isShutdown());
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
+                ExecutorService bufferPool = ((OHBufferedMutatorImpl) ohBufferMutator).getPool();
+                if (bufferPool != null) {
+                    // self-defined pool must be shutdown by users
+                    Assert.assertFalse(bufferPool.isShutdown());
+                    bufferPool.shutdown();
+                    try {
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("waitForTermination interrupted");
+                        Thread.currentThread().interrupt();
+                    }
+                    Assert.assertTrue(bufferPool.isShutdown());
                 }
             }
         }
@@ -624,6 +688,7 @@ public class OHConnectionTest {
         conf.set("rs.list.acquire.read.timeout", "10000");
         BufferedMutator ohBufferMutator = null;
         BufferedMutatorParams params = null;
+        ThreadPoolExecutor pool = null;
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         long bufferSize = 45000L;
         int count = 0;
@@ -647,24 +712,24 @@ public class OHConnectionTest {
 
             // set thread pool
             long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
-            ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+            pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
             pool.allowCoreThreadTimeOut(true);
             params.pool(pool);
 
             ohBufferMutator = connection.getBufferedMutator(params);
 
+            // BufferedMutator is not concurrently safe
             for (int i = 0; i < 50; ++i) {
                 final int taskId = i;
                 final BufferedMutator thrBufferMutator = ohBufferMutator;
                 executorService.submit(() -> {
                     List<Mutation> mutations = new ArrayList<>();
                     for (int j = 0; j < 4; ++j) {
-                        String thrKey = key;
                         String thrColumn = column1 + "_" + taskId + "_" + j;
                         String thrValue = value + "_" + taskId + "_" + j;
                         long thrTimestamp = timestamp;
 
-                        Put put = new Put(Bytes.toBytes(thrKey));
+                        Put put = new Put(Bytes.toBytes(key));
                         put.addColumn(Bytes.toBytes(family), Bytes.toBytes(thrColumn),
                                 thrTimestamp, Bytes.toBytes(thrValue));
                         mutations.add(put);
@@ -691,7 +756,7 @@ public class OHConnectionTest {
         } finally {
             executorService.shutdown();
             try {
-                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
                     executorService.shutdownNow();
                 }
             } catch (InterruptedException e) {
@@ -701,11 +766,132 @@ public class OHConnectionTest {
             if (ohBufferMutator != null) {
                 ohBufferMutator.close();
                 Get get = new Get(toBytes(key));
+                get.addFamily(toBytes(family));
                 Result r = hTable.get(get);
-                for (Cell keyValue : r.rawCells()) {
-                    ++count;
-                }
+                count = r.rawCells().length;
                 Assert.assertEquals(200, count);
+                Delete delete = new Delete(toBytes(key));
+                delete.addFamily(toBytes(family));
+                hTable.delete(delete);
+                r = hTable.get(get);
+                Assert.assertEquals(0, r.rawCells().length);
+                // test add mutations after closed
+                final BufferedMutator closedMutator = ohBufferMutator;
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.mutate(delete);
+                });
+                // test flush after closed
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
+                ExecutorService bufferPool = ((OHBufferedMutatorImpl) ohBufferMutator).getPool();
+                if (bufferPool != null) {
+                    // self-defined pool must be shutdown by users
+                    Assert.assertFalse(bufferPool.isShutdown());
+                    bufferPool.shutdown();
+                    try {
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("waitForTermination interrupted");
+                        Thread.currentThread().interrupt();
+                    }
+                    Assert.assertTrue(bufferPool.isShutdown());
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testBufferedMutatorPeriodicFlush() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        BufferedMutator ohBufferMutator = null;
+        BufferedMutatorParams params = null;
+        ThreadPoolExecutor pool = null;
+        long bufferSize = 45000L;
+        int count = 0;
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String value = "value333444";
+        long timestamp = System.currentTimeMillis();
+        String family = "family_group";
+        try {
+            TableName tableName = TableName.valueOf("test");
+            connection = ConnectionFactory.createConnection(conf);
+            hTable = connection.getTable(tableName);
+
+            Delete delete= new Delete(toBytes(key));
+            delete.addFamily(toBytes(family));
+            hTable.delete(delete);
+
+            // set params
+            params = new BufferedMutatorParams(tableName);
+            params.writeBufferSize(bufferSize);
+            // set periodic flush timeout to enable Timer
+            params.setWriteBufferPeriodicFlushTimeoutMs(100);
+
+            // set thread pool
+            long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
+            pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS, new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+            pool.allowCoreThreadTimeOut(true);
+            params.pool(pool);
+
+            ohBufferMutator = connection.getBufferedMutator(params);
+
+            List<Mutation> mutations = new ArrayList<>();
+            for (int i = 0; i < 50; ++i) {
+                mutations.clear();
+                for (int j = 0; j < 4; ++j) {
+                    Put put = new Put(Bytes.toBytes(key));
+                    put.addColumn(Bytes.toBytes(family), Bytes.toBytes(column1 + "_" + i + "_" + j),
+                            timestamp, Bytes.toBytes(value + "_" + i + "_" + j));
+                    mutations.add(put);
+                }
+                if (i % 10 == 0) {  // 0, 10, 20, 30, 40
+                    for(int j = 0; j < 4; ++j) {
+                        Delete del = new Delete(Bytes.toBytes(key));
+                        del.addColumns(toBytes(family), toBytes(column1 + "_" + i + "_" + j));
+                        mutations.add(del);
+                    }
+                }
+                ohBufferMutator.mutate(mutations);
+            }
+
+            // test auto flush
+            Get get = new Get(toBytes(key));
+            get.setMaxVersions();
+            get.addFamily(toBytes(family));
+            Result r = hTable.get(get);
+            count = r.rawCells().length;
+            Assert.assertTrue(count > 0);
+
+            // test timer periodic flush
+            int lastUndealtCount = ((OHBufferedMutatorImpl) ohBufferMutator).size();
+            Thread.sleep(1000);
+            int currentUndealtCount = ((OHBufferedMutatorImpl) ohBufferMutator).size();
+            Assert.assertNotEquals(lastUndealtCount, currentUndealtCount);
+            // after periodic flush, all mutations will be committed
+            Assert.assertEquals(0, currentUndealtCount);
+            r = hTable.get(get);
+            int newCount = r.rawCells().length;
+            Assert.assertNotEquals(count, newCount);
+        } catch (Exception ex) {
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                ((RetriesExhaustedWithDetailsException) ex).getCauses().get(0).printStackTrace();
+            } else {
+                ex.printStackTrace();
+            }
+            Assert.assertTrue(false);
+        } finally {
+            if (ohBufferMutator != null) {
+                ohBufferMutator.close();
+                Get get = new Get(toBytes(key));
+                get.addFamily(toBytes(family));
+                Result r = hTable.get(get);
+                count = r.rawCells().length;
+                Assert.assertEquals(180, count);
                 Delete delete = new Delete(toBytes(key));
                 delete.addFamily(toBytes(family));
                 hTable.delete(delete);
@@ -718,11 +904,23 @@ public class OHConnectionTest {
                     closedMutator.mutate(delete);
                 });
                 // test flush after closed
-                ohBufferMutator.flush();
-            }
-            if (params != null) {
-                if (params.getPool() != null) {
-                    Assert.assertTrue(params.getPool().isShutdown());
+                Assert.assertThrows(IllegalStateException.class, () -> {
+                    closedMutator.flush();
+                });
+                ExecutorService bufferPool = ((OHBufferedMutatorImpl) ohBufferMutator).getPool();
+                if (bufferPool != null) {
+                    // self-defined pool must be shutdown by users
+                    Assert.assertFalse(bufferPool.isShutdown());
+                    bufferPool.shutdown();
+                    try {
+                        if (!bufferPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                            System.out.println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
+                        }
+                    } catch (InterruptedException e) {
+                        System.out.println("waitForTermination interrupted");
+                        Thread.currentThread().interrupt();
+                    }
+                    Assert.assertTrue(bufferPool.isShutdown());
                 }
             }
         }

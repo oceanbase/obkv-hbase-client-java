@@ -25,6 +25,10 @@ import org.apache.hadoop.hbase.HConstants;
 import java.util.Properties;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS;
+import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT;
+import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS;
+import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.hadoop.hbase.ipc.RpcClient.DEFAULT_SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
@@ -48,6 +52,8 @@ public class OHConnectionConfiguration {
     private final int        maxKeyValueSize;
     private final int        rpcTimeout;
     private final int        rpcConnectTimeout;
+    private final long       writeBufferPeriodicFlushTimeoutMs;
+    private final long       writeBufferPeriodicFlushTimerTickMs;
 
     public OHConnectionConfiguration(Configuration conf) {
         this.paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
@@ -64,9 +70,15 @@ public class OHConnectionConfiguration {
         }
         this.database = database;
         this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
-        this.operationTimeout = conf.getInt("hbase.client.operation.timeout", 1200000);
+        this.operationTimeout = conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+        this.writeBufferPeriodicFlushTimeoutMs = conf.getLong(
+            WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS, WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT);
+        this.writeBufferPeriodicFlushTimerTickMs = conf.getLong(
+            WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS,
+            WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT);
         int rpcConnectTimeout = -1;
         if (conf.get(SOCKET_TIMEOUT_CONNECT) != null) {
             rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
@@ -79,9 +91,10 @@ public class OHConnectionConfiguration {
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
-        this.scannerCaching = conf.getInt("hbase.client.scanner.caching", Integer.MAX_VALUE);
-        this.scannerMaxResultSize = conf.getLong("hbase.client.scanner.max.result.size",
-            WRITE_BUFFER_SIZE_DEFAULT);
+        this.scannerCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING,
+            Integer.MAX_VALUE);
+        this.scannerMaxResultSize = conf.getLong(
+            HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
         this.maxKeyValueSize = conf.getInt(MAX_KEYVALUE_SIZE_KEY, MAX_KEYVALUE_SIZE_DEFAULT);
         properties = new Properties();
         for (Property property : Property.values()) {
@@ -166,5 +179,13 @@ public class OHConnectionConfiguration {
 
     public String getDatabase() {
         return this.database;
+    }
+
+    public long getWriteBufferPeriodicFlushTimeoutMs() {
+        return this.writeBufferPeriodicFlushTimeoutMs;
+    }
+
+    public long getWriteBufferPeriodicFlushTimerTickMs() {
+        return this.writeBufferPeriodicFlushTimerTickMs;
     }
 }

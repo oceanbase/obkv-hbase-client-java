@@ -355,7 +355,8 @@ public class HBaseFilterUtils {
     }
 
     // ColumnValueFilter('cf','q')
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream, ColumnValueFilter filter) throws IOException {
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             ColumnValueFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write("'".getBytes());
