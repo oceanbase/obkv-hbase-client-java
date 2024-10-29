@@ -166,7 +166,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
 
-        delete = new Delete(key.getBytes());
+        Delete delete = new Delete(key.getBytes());
         delete.addFamily(family.getBytes());
         hTable.delete(delete);
 
@@ -3146,7 +3146,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
 
     @Test
-    public void testScanSessionClean() throws Exception {
+    public void testScanSession() throws Exception {
         String key1 = "bKey";
         String key2 = "cKey";
         String key3 = "dKey";
@@ -3198,16 +3198,17 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setBatch(1);
 
         ResultScanner scanner = hTable.getScanner(scan);
-        scanner.next();
 
         // The server defaults to a lease of 60 seconds. Therefore, at 20 seconds,
         // the transaction is checked to ensure it has not rolled back, and the lease is updated.
         // At 55 seconds, the query should still be able to retrieve the data and update the lease.
         // If it exceeds 60 seconds (at 61 seconds), the session is deleted.
-        Thread.sleep(20 * 1000);
+        Thread.sleep(5 * 1000);
         scanner.next();
+        Thread.sleep(20 * 1000);
+        scanner.renewLease();
 
-        Thread.sleep(55 * 1000);
+        Thread.sleep(41 * 1000);
         scanner.next();
 
         Thread.sleep(61 * 1000);

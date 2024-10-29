@@ -21,7 +21,7 @@ import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.junit.*;
 
 import java.io.IOException;
@@ -32,7 +32,6 @@ import java.util.concurrent.Executors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class OHTablePoolLoadTest extends HTableTestBase {
@@ -93,10 +92,10 @@ public class OHTablePoolLoadTest extends HTableTestBase {
         String key = "existKey";
 
         Delete delete = new Delete(key.getBytes());
-        delete.deleteColumns("testload".getBytes(), column.getBytes());
+        delete.addColumns("testload".getBytes(), column.getBytes());
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
         try {
-            delete.deleteColumns("testload".getBytes(), column.getBytes());
+            delete.addColumns("testload".getBytes(), column.getBytes());
             hTable.delete(delete);
         } catch (IOException e) {
             Throwable t = e;
@@ -112,7 +111,7 @@ public class OHTablePoolLoadTest extends HTableTestBase {
         }
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_SUFFIX, "_a");
         try {
-            delete.deleteColumns("testload".getBytes(), column.getBytes());
+            delete.addColumns("testload".getBytes(), column.getBytes());
             hTable.delete(delete);
         } catch (IOException e) {
             Throwable t = e;
@@ -150,17 +149,9 @@ public class OHTablePoolLoadTest extends HTableTestBase {
             ohTablePool2.setSysPassword("test", ObHTableTestUtil.SYS_PASSWORD);
         }
         ohTablePool2.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
-        HTableInterface hTable2 = ohTablePool2.getTable("test");
+        Table hTable2 = ohTablePool2.getTable("test");
         ohTablePool2.putTable(hTable2);
-        assertTrue(hTable2.isAutoFlush());
-        hTable2.setAutoFlush(false);
-        assertFalse(hTable2.isAutoFlush());
-        hTable2.setAutoFlush(true, true);
-        assertTrue(hTable2.isAutoFlush());
-        hTable2.setWriteBufferSize(10000000L);
-        assertEquals(10000000L, hTable2.getWriteBufferSize());
-        assertEquals("test", new String(hTable2.getTableName()));
-        hTable2.flushCommits();
+        assertEquals("test", new String(hTable2.getName().getName()));
         hTable2.close();
         assertTrue(true);
     }

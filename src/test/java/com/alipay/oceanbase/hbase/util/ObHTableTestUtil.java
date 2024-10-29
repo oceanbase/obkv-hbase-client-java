@@ -60,7 +60,7 @@ public class ObHTableTestUtil {
 
     public static void prepareClean(List<String> tableGroupList) throws Exception {
         for (String tableGroup : tableGroupList) {
-            tableNameList.addAll(getOTableNameList(tableGroup));
+            tableNameList.addAll(getOHTableNameList(tableGroup));
         }
         conn = getConnection();
         stmt = conn.createStatement();
@@ -70,6 +70,9 @@ public class ObHTableTestUtil {
         try {
             for (String realTableName : tableNameList) {
                 try {
+                    if (realTableName.contains("'")) {
+                        realTableName = "`" + realTableName + "`";
+                    }
                     stmt.execute(String.format(SQL_FORMAT, realTableName));
                 } catch (Exception e) {
                     System.out.println(
@@ -109,7 +112,7 @@ public class ObHTableTestUtil {
         return new OHTableClient(tableName, newConfiguration());
     }
 
-    static public List<String> getOTableNameList(String tableGroup) throws IOException {
+    static public List<String> getOHTableNameList(String tableGroup) throws IOException {
         // 读取建表语句
         List<String> res = new LinkedList<>();
         String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
