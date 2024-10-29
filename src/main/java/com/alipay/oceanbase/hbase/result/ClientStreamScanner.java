@@ -50,8 +50,6 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private boolean                         closed       = false;
 
-    private boolean                         streamNext   = true;
-
     private boolean                         isTableGroup = false;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
@@ -145,7 +143,12 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     @Override
     public boolean renewLease() {
-        throw new FeatureNotSupportedException("not supported yet'");
+        try {
+            streamResult.renewLease();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void checkStatus() throws IllegalStateException {

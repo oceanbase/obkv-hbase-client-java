@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;

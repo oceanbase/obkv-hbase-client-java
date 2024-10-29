@@ -17,16 +17,18 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Table;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
+import java.sql.SQLException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.SynchronousQueue;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
@@ -35,12 +37,23 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class OHTableTest extends HTableTestBase {
-    @Before
-    public void setup() throws IOException {
 
+    @BeforeClass
+    public static void setup() throws Exception {
         Configuration c = ObHTableTestUtil.newConfiguration();
         c.set("rs.list.acquire.read.timeout", "10000");
+
         hTable = new OHTable(c, "test");
+        multiCfHTable = new OHTable(c, "test_multi_cf");
+        List<String> tableGroups = new LinkedList<>();
+        tableGroups.add("test");
+//        tableGroups.add("test_multi_cf");
+        ObHTableTestUtil.prepareClean(tableGroups);
+    }
+
+    @Before
+    public void prepareCase() {
+        ObHTableTestUtil.cleanData();
     }
 
     @Test
@@ -91,6 +104,13 @@ public class OHTableTest extends HTableTestBase {
         new OHTable("test".getBytes(), client, executor2);
         assertTrue(true);
 
+    }
+
+    @AfterClass
+    public static void finish() throws IOException, SQLException {
+        hTable.close();
+        multiCfHTable.close();
+        ObHTableTestUtil.closeConn();
     }
 
 }
