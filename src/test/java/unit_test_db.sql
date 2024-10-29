@@ -168,7 +168,7 @@ CREATE TABLE `test$family'1` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
-) TABLEGROUP = test;
+);
 
 CREATE TABLE `test_t$family'1` (
     `K` varbinary(1024) NOT NULL,
@@ -176,7 +176,7 @@ CREATE TABLE `test_t$family'1` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
-) TABLEGROUP = test_t;
+);
 
 CREATE TABLEGROUP test_multi_cf SHARDING = 'ADAPTIVE';
 
@@ -230,7 +230,7 @@ CREATE TABLE `n1:test$family'1` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
-) TABLEGROUP = `n1:test`;
+);
 
 CREATE TABLE `n1:test$family_with_local_index` (
     `K` varbinary(1024) NOT NULL,

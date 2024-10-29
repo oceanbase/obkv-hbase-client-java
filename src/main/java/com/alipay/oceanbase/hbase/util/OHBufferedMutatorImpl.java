@@ -69,7 +69,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                                                                                           0);
     private final AtomicInteger                   rpcTimeout;
     private final AtomicInteger                   operationTimeout;
-    private final boolean                         cleanipPoolOnClose;
+    private final boolean                         cleanupPoolOnClose;
     private volatile boolean                      closed                              = false;
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
@@ -84,10 +84,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.listener = params.getListener();
         if (params.getPool() == null) { // need to verify necessity
             this.pool = HTable.getDefaultExecutor(conf);
-            this.cleanipPoolOnClose = true;
+            this.cleanupPoolOnClose = true;
         } else {
             this.pool = params.getPool();
-            this.cleanipPoolOnClose = false;
+            this.cleanupPoolOnClose = false;
         }
         this.rpcTimeout = new AtomicInteger(
             params.getRpcTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
@@ -165,7 +165,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     private void checkClose() {
         if (closed) {
-            throw new IllegalStateException("Cannot put when the BufferedMutator is closed.");
+            throw new IllegalStateException("The BufferedMutator is closed.");
         }
     }
 
@@ -321,7 +321,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         try {
             execute(true);
         } finally {
-            if (cleanipPoolOnClose) {
+            if (cleanupPoolOnClose) {
                 // the pool in ObTableClient will be shut down too
                 this.pool.shutdown();
                 try {
