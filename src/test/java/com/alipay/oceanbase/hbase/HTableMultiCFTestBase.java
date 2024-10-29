@@ -146,21 +146,21 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         Result r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key3));
         get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key2));
         get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         Delete delKey1MinTs = new Delete(toBytes(key1));
         delKey1MinTs.addFamilyVersion(toBytes(family1), minTimeStamp);
@@ -171,7 +171,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts1 = new Delete(toBytes(key3));
         delKey3Ts1.addFamilyVersion(toBytes(family1), timeStamp1);
@@ -182,7 +182,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey2Ts3 = new Delete(toBytes(key2));
         delKey2Ts3.addFamilyVersion(family1.getBytes(), timeStamp3);
@@ -193,7 +193,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Scan scan = new Scan();
         scan.setStartRow(toBytes(key1));
@@ -288,21 +288,21 @@ public abstract class HTableMultiCFTestBase {
         getKey1.addFamily(toBytes(family2));
         getKey1.setMaxVersions(10);
         r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey2 = new Get(toBytes(key2));
         getKey2.addFamily(toBytes(family1));
         getKey2.addFamily(toBytes(family2));
         getKey2.setMaxVersions(10);
         r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey3 = new Get(toBytes(key3));
         getKey3.addFamily(toBytes(family1));
         getKey3.addFamily(toBytes(family2));
         getKey3.setMaxVersions(10);
         r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Delete delKey1Ts_6_2 = new Delete(toBytes(key1));
         delKey1Ts_6_2.addFamilyVersion(toBytes(family1), timeStamp4);
@@ -314,7 +314,7 @@ public abstract class HTableMultiCFTestBase {
         getKey1.addFamily(toBytes(family2));
         getKey1.setMaxVersions(10);
         r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(1, r.getRow().length);
+        Assert.assertEquals(1, r.rawCells().length);
         for (Cell cell : r.rawCells()) {
             Assert.assertEquals(timeStamp1, cell.getTimestamp());
         }
@@ -329,7 +329,7 @@ public abstract class HTableMultiCFTestBase {
         getKey2.addFamily(toBytes(family2));
         getKey2.setMaxVersions(10);
         r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts_2_7 = new Delete(toBytes(key3));
         delKey3Ts_2_7.addFamilyVersion(toBytes(family1), timeStamp2);
@@ -341,7 +341,7 @@ public abstract class HTableMultiCFTestBase {
         getKey3.addFamily(toBytes(family2));
         getKey3.setMaxVersions(10);
         r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(1, r.getRow().length);
+        Assert.assertEquals(1, r.rawCells().length);
         for (Cell cell : r.rawCells()) {
             Assert.assertEquals(timeStamp6, cell.getTimestamp());
         }

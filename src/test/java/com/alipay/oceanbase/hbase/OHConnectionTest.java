@@ -72,13 +72,6 @@ public class OHConnectionTest {
         hTable.close();
     }
 
-    @BeforeClass
-    public static void before() throws Exception {
-        // use self-defined namespace "n1"
-        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
-        ((OHTableClient) hTable).init();
-    }
-
     @AfterClass
     public static void finish() throws IOException {
         hTable.close();
@@ -86,6 +79,8 @@ public class OHConnectionTest {
 
     @Test
     public void testRefreshTableEntry() throws Exception {
+        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
+        ((OHTableClient) hTable).init();
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
         ((OHTableClient) hTable).refreshTableEntry("family1", true);
     }
