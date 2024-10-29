@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import org.apache.hadoop.hbase.Cell;
