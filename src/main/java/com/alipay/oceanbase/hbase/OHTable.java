@@ -1960,7 +1960,7 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
             } catch(Exception e) {
                 logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                         + e.getMessage() + " error.", e);
             }
         }
@@ -1974,7 +1974,7 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
             } catch(Exception e) {
                 logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                         + e.getMessage() + " error.", e);
             }
         }
@@ -1986,11 +1986,10 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, mutation);
             } catch(Exception e) {
                 logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
-                throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                         + e.getMessage() + " error.", e);
             }
         }
-
 
         private void checkCmpOp() {
             checkNotNull(this.cmpOp, "The compare condition is null. Please use"

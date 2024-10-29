@@ -4642,6 +4642,11 @@ public abstract class HTableTestBase {
         put.addColumn(family.getBytes(), column.getBytes(), "value1".getBytes());
         ret = builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenPut(put);
         Assert.assertTrue(ret);
+        Put difFamPut = new Put(key.getBytes());
+        difFamPut.addColumn("family_group".getBytes(), column.getBytes(), "value1".getBytes());
+        Assert.assertThrows(IOException.class, () -> {
+            builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenPut(difFamPut);
+        });
 
         ret = builder.qualifier(toBytes(column))
             .ifMatches(CompareOperator.GREATER, toBytes("value1")).thenPut(put);
@@ -5091,10 +5096,8 @@ public abstract class HTableTestBase {
         Assert.assertEquals(6, r.rawCells().length);
 
         // test less op
-        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value1))
+        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value2))
             .thenMutate(rowMutations);
-        ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
-            CompareFilter.CompareOp.LESS, value2.getBytes(), rowMutations);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.addFamily(family.getBytes());
