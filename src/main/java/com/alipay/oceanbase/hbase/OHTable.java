@@ -35,6 +35,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
+import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -540,8 +541,6 @@ public class OHTable implements HTableInterface {
             public Result call() throws IOException {
                 List<KeyValue> keyValueList = new ArrayList<KeyValue>();
                 byte[] family = new byte[] {};
-                ObTableClientQueryAsyncStreamResult clientQueryStreamResult;
-                ObTableQueryAsyncRequest request;
                 ObTableQuery obTableQuery;
                 try {
                     if (get.getFamilyMap().keySet() == null
@@ -553,10 +552,10 @@ public class OHTable implements HTableInterface {
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         processColumnFilters(columnFilters, get.getFamilyMap());
                         obTableQuery = buildObTableQuery(get, columnFilters);
-                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                        ObTableQueryAsyncRequest request = buildObTableQueryAsyncRequest(obTableQuery,
                             getTargetTableName(tableNameString));
 
-                        clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                        ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
@@ -564,10 +563,10 @@ public class OHTable implements HTableInterface {
                             .entrySet()) {
                             family = entry.getKey();
                             obTableQuery = buildObTableQuery(get, entry.getValue());
-                            request = buildObTableQueryAsyncRequest(obTableQuery,
+                            ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration));
-                            clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                            ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
                                 family);
