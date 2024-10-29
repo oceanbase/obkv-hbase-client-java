@@ -105,10 +105,17 @@
                 </exclusion>
             </exclusions>
         </dependency>
+<!--        <dependency>-->
+<!--            <groupId>com.oceanbase</groupId>-->
+<!--            <artifactId>obkv-table-client</artifactId>-->
+<!--            <version>${table.client.version}</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>com.oceanbase</groupId>
             <artifactId>obkv-table-client</artifactId>
-            <version>${table.client.version}</version>
+            <version>1.2.114-SNAPSHOT</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/obkv-table-client-1.2.114-SNAPSHOT-jar-with-dependencies.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.apache.hbase</groupId>

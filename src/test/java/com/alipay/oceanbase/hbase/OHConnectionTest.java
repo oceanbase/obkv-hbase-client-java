@@ -18,7 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -27,9 +27,9 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Threads;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -37,10 +37,11 @@ import java.util.concurrent.*;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.SOCKET_TIMEOUT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
+import static org.junit.Assert.*;
 
 public class OHConnectionTest {
-    protected Table      hTable;
-    protected Connection connection;
+    protected static Table hTable;
+    protected Connection   connection;
 
     @Test
     public void testConnectionBySet() throws Exception {
@@ -56,6 +57,7 @@ public class OHConnectionTest {
         TableName tableName = TableName.valueOf("test");
         hTable = connection.getTable(tableName);
         testBasic();
+        hTable.close();
     }
 
     @Test
@@ -68,6 +70,30 @@ public class OHConnectionTest {
         TableName tableName = TableName.valueOf("test");
         hTable = connection.getTable(tableName);
         testBasic();
+        hTable.close();
+    }
+
+    @BeforeClass
+    public static void before() throws Exception {
+        // use self-defined namespace "n1"
+        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
+        ((OHTableClient) hTable).init();
+    }
+
+    @AfterClass
+    public static void finish() throws IOException {
+        hTable.close();
+    }
+
+    @Test
+    public void testRefreshTableEntry() throws Exception {
+        ((OHTableClient) hTable).refreshTableEntry("family1", false);
+        ((OHTableClient) hTable).refreshTableEntry("family1", true);
+    }
+
+    @After
+    public void after() throws IOException {
+        hTable.close();
     }
 
     private void testBasic() throws Exception {

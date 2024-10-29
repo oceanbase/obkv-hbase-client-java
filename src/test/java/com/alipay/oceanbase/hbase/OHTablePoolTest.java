@@ -17,25 +17,26 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.remoting.util.ConcurrentHashSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.PoolMap;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
+import java.sql.SQLException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
 import static com.alipay.oceanbase.hbase.util.ObTableClientManager.OB_TABLE_CLIENT_INSTANCE;
 
 public class OHTablePoolTest extends HTableTestBase {
-    protected OHTablePool ohTablePool;
+    protected static OHTablePool ohTablePool;
 
-    private OHTablePool newOHTablePool(final int maxSize, final PoolMap.PoolType poolType) {
+    private static OHTablePool newOHTablePool(final int maxSize, final PoolMap.PoolType poolType) {
         OHTablePool pool = new OHTablePool(new Configuration(), maxSize, poolType);
         pool.setFullUserName("test", ObHTableTestUtil.FULL_USER_NAME);
         pool.setPassword("test", ObHTableTestUtil.PASSWORD);
@@ -52,17 +53,29 @@ public class OHTablePoolTest extends HTableTestBase {
         return pool;
     }
 
-    @Before
-    public void setup() throws IOException {
+    @BeforeClass
+    public static void setup() throws Exception {
         Configuration c = new Configuration();
         ohTablePool = newOHTablePool(10, null);
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
         hTable = ohTablePool.getTable("test");
+        multiCfHTable = ohTablePool.getTable("test_multi_cf");
+        List<String> tableGroups = new LinkedList<>();
+        tableGroups.add("test");
+        tableGroups.add("test_multi_cf");
+        ObHTableTestUtil.prepareClean(tableGroups);
     }
 
-    @After
-    public void finish() throws IOException {
+    @Before
+    public void prepareCase() {
+        ObHTableTestUtil.cleanData();
+    }
+
+    @AfterClass
+    public static void finish() throws IOException, SQLException {
         hTable.close();
+        multiCfHTable.close();
+        ObHTableTestUtil.closeConn();
     }
 
     public void test_current_get_close(final OHTablePool ohTablePool, int concurrency, int maxSize) {
