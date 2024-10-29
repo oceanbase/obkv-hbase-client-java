@@ -17,15 +17,17 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.rpc.exception.ObTableNotExistException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.HTableInterface;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
+import java.sql.SQLException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
@@ -34,10 +36,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class OHTablePoolLoadTest extends HTableTestBase {
-    private OHTablePool ohTablePool;
+    private static OHTablePool ohTablePool;
 
-    @Before
-    public void setup() throws IOException {
+    @BeforeClass
+    public static void setup() throws Exception {
         Configuration c = new Configuration();
         c.set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
         ohTablePool = new OHTablePool(c, 10);
@@ -56,6 +58,16 @@ public class OHTablePoolLoadTest extends HTableTestBase {
         }
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
         hTable = ohTablePool.getTable("test");
+        multiCfHTable = ohTablePool.getTable("test_multi_cf");
+        List<String> tableGroups = new LinkedList<>();
+        tableGroups.add("test");
+        tableGroups.add("test_multi_cf");
+        ObHTableTestUtil.prepareClean(tableGroups);
+    }
+
+    @Before
+    public void prepareCase() {
+        ObHTableTestUtil.cleanData();
     }
 
     @Test
@@ -151,5 +163,12 @@ public class OHTablePoolLoadTest extends HTableTestBase {
         hTable2.flushCommits();
         hTable2.close();
         assertTrue(true);
+    }
+
+    @AfterClass
+    public static void finish() throws IOException, SQLException {
+        hTable.close();
+        multiCfHTable.close();
+        ObHTableTestUtil.closeConn();
     }
 }
