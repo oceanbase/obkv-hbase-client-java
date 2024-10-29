@@ -97,29 +97,36 @@ public abstract class HTableMultiCFTestBase {
             toBytes(value1));
 
         Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp1, toBytes(value2));
+        putKey3Fam1Column1Ts1.addColumn(toBytes(family1), toBytes(column1), timeStamp1,
+            toBytes(value2));
 
         Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
         putKey1Fam1Column2MinTs.addColumn(toBytes(family1), toBytes(column2), minTimeStamp,
             toBytes(value1));
 
         Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
+        putKey1Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3,
+            toBytes(value2));
 
         Put putKey2Fam1Column2Ts3 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3, toBytes(value2));
+        putKey2Fam1Column2Ts3.addColumn(toBytes(family1), toBytes(column2), timeStamp3,
+            toBytes(value2));
 
         Put putKey2Fam1Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
+        putKey2Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1,
+            toBytes(value2));
 
         Put putKey3Fam1Column3Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1, toBytes(value2));
+        putKey3Fam1Column3Ts1.addColumn(toBytes(family1), toBytes(column3), timeStamp1,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts4 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts4.addColumn(toBytes(family1), toBytes(column2), timeStamp4, toBytes(value1));
+        putKey3Fam1Column2Ts4.addColumn(toBytes(family1), toBytes(column2), timeStamp4,
+            toBytes(value1));
 
         Put putKey2Fam1Column3Ts3 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts3.addColumn(toBytes(family1), toBytes(column3), timeStamp3, toBytes(value1));
+        putKey2Fam1Column3Ts3.addColumn(toBytes(family1), toBytes(column3), timeStamp3,
+            toBytes(value1));
 
         tryPut(multiCfHTable, putKey1Fam1Column1MinTs);
         tryPut(multiCfHTable, putKey3Fam1Column1Ts1);
@@ -137,21 +144,21 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         Result r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key3));
         get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         get = new Get(toBytes(key2));
         get.addFamily(toBytes(family1));
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.getRow().length);
+        Assert.assertEquals(2, r.rawCells().length);
 
         Delete delKey1MinTs = new Delete(toBytes(key1));
         delKey1MinTs.addFamilyVersion(toBytes(family1), minTimeStamp);
@@ -162,7 +169,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(minTimeStamp);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts1 = new Delete(toBytes(key3));
         delKey3Ts1.addFamilyVersion(toBytes(family1), timeStamp1);
@@ -173,7 +180,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(timeStamp1);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey2Ts3 = new Delete(toBytes(key2));
         delKey2Ts3.addFamilyVersion(family1.getBytes(), timeStamp3);
@@ -184,7 +191,7 @@ public abstract class HTableMultiCFTestBase {
         get.setTimeStamp(timeStamp3);
         get.setMaxVersions(10);
         r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Scan scan = new Scan();
         scan.setStartRow(toBytes(key1));
@@ -214,40 +221,52 @@ public abstract class HTableMultiCFTestBase {
 
         // test DeleteFamilyVersion multiple cf
         Put putKey1Fam1Column3Ts4 = new Put(toBytes(key1));
-        putKey1Fam1Column3Ts4.addColumn(toBytes(family1), toBytes(column3), timeStamp4, toBytes(value3));
+        putKey1Fam1Column3Ts4.addColumn(toBytes(family1), toBytes(column3), timeStamp4,
+            toBytes(value3));
 
         Put putKey1Fam2Column2Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column2Ts2.addColumn(toBytes(family2), toBytes(column2), timeStamp2, toBytes(value1));
+        putKey1Fam2Column2Ts2.addColumn(toBytes(family2), toBytes(column2), timeStamp2,
+            toBytes(value1));
 
         Put putKey1Fam2Column3Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column3Ts2.addColumn(toBytes(family2), toBytes(column3), timeStamp2, toBytes(value1));
+        putKey1Fam2Column3Ts2.addColumn(toBytes(family2), toBytes(column3), timeStamp2,
+            toBytes(value1));
 
         Put putKey1Fam1Column2Ts1 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts1.addColumn(toBytes(family1), toBytes(column2), timeStamp1, toBytes(value2));
+        putKey1Fam1Column2Ts1.addColumn(toBytes(family1), toBytes(column2), timeStamp1,
+            toBytes(value2));
 
         Put putKey2Fam1Column2Ts5 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts5.addColumn(toBytes(family1), toBytes(column2), timeStamp5, toBytes(value2));
+        putKey2Fam1Column2Ts5.addColumn(toBytes(family1), toBytes(column2), timeStamp5,
+            toBytes(value2));
 
         Put putKey2Fam2Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam2Column3Ts1.addColumn(toBytes(family2), toBytes(column3), timeStamp3, toBytes(value3));
+        putKey2Fam2Column3Ts1.addColumn(toBytes(family2), toBytes(column3), timeStamp3,
+            toBytes(value3));
 
         Put putKey2Fam1Column1Ts5 = new Put(toBytes(key2));
-        putKey2Fam1Column1Ts5.addColumn(toBytes(family1), toBytes(column1), timeStamp5, toBytes(value1));
+        putKey2Fam1Column1Ts5.addColumn(toBytes(family1), toBytes(column1), timeStamp5,
+            toBytes(value1));
 
         Put putKey2Fam2Column1Ts3 = new Put(toBytes(key2));
-        putKey2Fam2Column1Ts3.addColumn(toBytes(family2), toBytes(column1), timeStamp3, toBytes(value2));
+        putKey2Fam2Column1Ts3.addColumn(toBytes(family2), toBytes(column1), timeStamp3,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts6 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts6.addColumn(toBytes(family1), toBytes(column2), timeStamp6, toBytes(value2));
+        putKey3Fam1Column2Ts6.addColumn(toBytes(family1), toBytes(column2), timeStamp6,
+            toBytes(value2));
 
         Put putKey3Fam2Column3Ts7 = new Put(toBytes(key3));
-        putKey3Fam2Column3Ts7.addColumn(toBytes(family2), toBytes(column3), timeStamp7, toBytes(value1));
+        putKey3Fam2Column3Ts7.addColumn(toBytes(family2), toBytes(column3), timeStamp7,
+            toBytes(value1));
 
         Put putKey3Fam2Column1Ts7 = new Put(toBytes(key3));
-        putKey3Fam2Column1Ts7.addColumn(toBytes(family2), toBytes(column1), timeStamp7, toBytes(value2));
+        putKey3Fam2Column1Ts7.addColumn(toBytes(family2), toBytes(column1), timeStamp7,
+            toBytes(value2));
 
         Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts2.addColumn(toBytes(family1), toBytes(column2), timeStamp2, toBytes(value1));
+        putKey3Fam1Column2Ts2.addColumn(toBytes(family1), toBytes(column2), timeStamp2,
+            toBytes(value1));
 
         tryPut(multiCfHTable, putKey1Fam1Column3Ts4);
         tryPut(multiCfHTable, putKey1Fam2Column2Ts2);
@@ -267,21 +286,21 @@ public abstract class HTableMultiCFTestBase {
         getKey1.addFamily(toBytes(family2));
         getKey1.setMaxVersions(10);
         r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey2 = new Get(toBytes(key2));
         getKey2.addFamily(toBytes(family1));
         getKey2.addFamily(toBytes(family2));
         getKey2.setMaxVersions(10);
         r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Get getKey3 = new Get(toBytes(key3));
         getKey3.addFamily(toBytes(family1));
         getKey3.addFamily(toBytes(family2));
         getKey3.setMaxVersions(10);
         r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(4, r.getRow().length);
+        Assert.assertEquals(4, r.rawCells().length);
 
         Delete delKey1Ts_6_2 = new Delete(toBytes(key1));
         delKey1Ts_6_2.addFamilyVersion(toBytes(family1), timeStamp4);
@@ -293,7 +312,7 @@ public abstract class HTableMultiCFTestBase {
         getKey1.addFamily(toBytes(family2));
         getKey1.setMaxVersions(10);
         r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(1, r.getRow().length);
+        Assert.assertEquals(1, r.rawCells().length);
         for (Cell cell : r.rawCells()) {
             Assert.assertEquals(timeStamp1, cell.getTimestamp());
         }
@@ -308,7 +327,7 @@ public abstract class HTableMultiCFTestBase {
         getKey2.addFamily(toBytes(family2));
         getKey2.setMaxVersions(10);
         r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(0, r.getRow().length);
+        Assert.assertEquals(0, r.rawCells().length);
 
         Delete delKey3Ts_2_7 = new Delete(toBytes(key3));
         delKey3Ts_2_7.addFamilyVersion(toBytes(family1), timeStamp2);
@@ -320,7 +339,7 @@ public abstract class HTableMultiCFTestBase {
         getKey3.addFamily(toBytes(family2));
         getKey3.setMaxVersions(10);
         r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(1, r.getRow().length);
+        Assert.assertEquals(1, r.rawCells().length);
         for (Cell cell : r.rawCells()) {
             Assert.assertEquals(timeStamp6, cell.getTimestamp());
         }

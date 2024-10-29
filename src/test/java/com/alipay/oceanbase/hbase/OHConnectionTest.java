@@ -72,13 +72,6 @@ public class OHConnectionTest {
         hTable.close();
     }
 
-    @BeforeClass
-    public static void before() throws Exception {
-        // use self-defined namespace "n1"
-        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
-        ((OHTableClient) hTable).init();
-    }
-
     @AfterClass
     public static void finish() throws IOException {
         hTable.close();
@@ -86,6 +79,8 @@ public class OHConnectionTest {
 
     @Test
     public void testRefreshTableEntry() throws Exception {
+        hTable = ObHTableTestUtil.newOHTableClient("n1:test");
+        ((OHTableClient) hTable).init();
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
         ((OHTableClient) hTable).refreshTableEntry("family1", true);
     }
@@ -139,7 +134,8 @@ public class OHConnectionTest {
         hTable.delete(delete);
 
         for (Cell keyValue : r.rawCells()) {
-            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue)) + " columnQualifier:"
+            System.out.println("rowKey: " + new String(CellUtil.cloneRow(keyValue))
+                               + " columnQualifier:"
                                + new String(CellUtil.cloneQualifier(keyValue)) + " timestamp:"
                                + keyValue.getTimestamp() + " value:"
                                + new String(CellUtil.cloneValue(keyValue)));
@@ -170,8 +166,10 @@ public class OHConnectionTest {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
@@ -193,8 +191,10 @@ public class OHConnectionTest {
                 boolean countAdd = true;
                 for (Cell keyValue : result.rawCells()) {
                     Assert.assertEquals(key + "_" + i, Bytes.toString(CellUtil.cloneRow(keyValue)));
-                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue)))
-                                      || column2.equals(Bytes.toString(CellUtil.cloneQualifier(keyValue))));
+                    Assert.assertTrue(column1.equals(Bytes.toString(CellUtil
+                        .cloneQualifier(keyValue)))
+                                      || column2.equals(Bytes.toString(CellUtil
+                                          .cloneQualifier(keyValue))));
                     Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(keyValue)));
                     if (countAdd) {
                         countAdd = false;
