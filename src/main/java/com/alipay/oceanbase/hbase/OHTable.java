@@ -798,43 +798,53 @@ public class OHTable implements HTableInterface {
         checkArgument(delete.getRow() != null, "row is null");
         List<Integer> errorCodeList = new ArrayList<Integer>();
         BatchOperationResult results = null;
-        
+
         try {
             checkFamilyViolation(delete.getFamilyMap().keySet(), false);
             if (delete.getFamilyMap().isEmpty()) {
                 // For a Delete operation without any qualifiers, we construct a DeleteFamily request.  
                 // The server then performs the operation on all column families.
                 KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                        KeyValue.Type.DeleteFamily);
-                
-                BatchOperation batch = buildBatchOperation(tableNameString, Arrays.asList(kv), false, null);
+                    KeyValue.Type.DeleteFamily);
+
+                BatchOperation batch = buildBatchOperation(tableNameString, Arrays.asList(kv),
+                    false, null);
                 results = batch.execute();
             } else if (delete.getFamilyMap().size() > 1) {
                 // Currently, the Delete Family operation type cannot transmit qualifiers to the server.  
                 // As a result, the server cannot identify which families need to be deleted.  
                 // Therefore, this process is handled sequentially.
-                boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
-                        .flatMap(entry -> entry.getValue().stream())
-                        .anyMatch(kv -> KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily);
-                if (!has_delete_family) {
+                boolean hasDeleteFamily = false;
+                for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
+                    for (KeyValue kv : entry.getValue()) {
+                        if (KeyValue.Type.codeToType(kv.getType()) == KeyValue.Type.DeleteFamily) {
+                            hasDeleteFamily = true;
+                            break;
+                        }
+                    }
+                    if (hasDeleteFamily) {
+                        break;
+                    }
+                }
+                if (!hasDeleteFamily) {
                     BatchOperation batch = buildBatchOperation(tableNameString,
-                            delete.getFamilyMap(), false, null);
+                        delete.getFamilyMap(), false, null);
                     results = batch.execute();
                 } else {
                     for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         BatchOperation batch = buildBatchOperation(
-                                getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration),
-                                entry.getValue(), false, null);
+                            getTargetTableName(tableNameString, Bytes.toString(entry.getKey()),
+                                configuration), entry.getValue(), false, null);
                         results = batch.execute();
                     }
                 }
             } else {
-                Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet().iterator()
-                        .next();
+                Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet()
+                    .iterator().next();
 
                 BatchOperation batch = buildBatchOperation(
-                        getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration),
-                        entry.getValue(), false, null);
+                    getTargetTableName(tableNameString, Bytes.toString(entry.getKey()),
+                        configuration), entry.getValue(), false, null);
                 results = batch.execute();
             }
 
@@ -1019,12 +1029,12 @@ public class OHTable implements HTableInterface {
             byte[] f = entry.getKey();
 
             ObTableBatchOperation batch = new ObTableBatchOperation();
-            entry.getValue().forEach(cell -> {
+            for (Cell cell : entry.getValue()) {
                 byte[] qualifier = cell.getQualifier();
                 qualifiers.add(qualifier);
                 batch.addTableOperation(getInstance(INCREMENT, new Object[] { rowKey, qualifier,
                         Long.MAX_VALUE }, V_COLUMNS, new Object[] { cell.getValue() }));
-            });
+            }
 
             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
                 qualifiers);
