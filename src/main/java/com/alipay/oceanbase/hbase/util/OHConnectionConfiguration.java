@@ -47,10 +47,13 @@ public class OHConnectionConfiguration {
     private final boolean    odpMode;
     private final long       writeBufferSize;
     private final int        operationTimeout;
+    private final int        metaOperationTimeout;
     private final int        scannerCaching;
     private final long       scannerMaxResultSize;
     private final int        maxKeyValueSize;
     private final int        rpcTimeout;
+    private final int        readRpcTimeout;
+    private final int        writeRpcTimeout;
     private final int        rpcConnectTimeout;
     private final long       writeBufferPeriodicFlushTimeoutMs;
     private final long       writeBufferPeriodicFlushTimerTickMs;
@@ -70,9 +73,15 @@ public class OHConnectionConfiguration {
         }
         this.database = database;
         this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
+        this.metaOperationTimeout = conf.getInt(HConstants.HBASE_CLIENT_META_OPERATION_TIMEOUT,
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
         this.operationTimeout = conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
             HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
+            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+        this.readRpcTimeout = conf.getInt(HConstants.HBASE_RPC_READ_TIMEOUT_KEY,
+            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+        this.writeRpcTimeout = conf.getInt(HConstants.HBASE_RPC_WRITE_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         this.writeBufferPeriodicFlushTimeoutMs = conf.getLong(
             WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS, WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT);
@@ -117,6 +126,10 @@ public class OHConnectionConfiguration {
         return this.writeBufferSize;
     }
 
+    public int getMetaOperationTimeout() {
+        return this.metaOperationTimeout;
+    }
+
     public int getOperationTimeout() {
         return this.operationTimeout;
     }
@@ -131,6 +144,14 @@ public class OHConnectionConfiguration {
 
     public int getRpcTimeout() {
         return this.rpcTimeout;
+    }
+
+    public int getReadRpcTimeout() {
+        return this.readRpcTimeout;
+    }
+
+    public int getWriteRpcTimeout() {
+        return this.writeRpcTimeout;
     }
 
     public int getRpcConnectTimeout() {

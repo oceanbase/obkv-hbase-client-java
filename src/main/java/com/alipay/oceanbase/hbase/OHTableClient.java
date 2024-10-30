@@ -174,6 +174,12 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
+    public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
+        checkStatus();
+        return ohTable.checkAndMutate(row, family);
+    }
+
+    @Override
     public void setOperationTimeout(int i) {
         checkStatus();
         ohTable.setOperationTimeout(i);

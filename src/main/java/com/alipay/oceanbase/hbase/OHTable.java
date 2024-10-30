@@ -63,6 +63,7 @@ import java.util.concurrent.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
+import static com.alipay.oceanbase.hbase.util.Preconditions.checkNotNull;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
@@ -103,6 +104,16 @@ public class OHTable implements Table {
      * timeout for each rpc request
      */
     private int                  rpcTimeout;
+
+    /**
+     * timeout for each read rpc request
+     */
+    private int                  readRpcTimeout;
+
+    /**
+     * timeout for each write rpc request
+     */
+    private int                  writeRpcTimeout;
 
     /**
      * if the <code>Get</code> executing pool is specified by user cleanupPoolOnClose will be false ,
@@ -292,7 +303,7 @@ public class OHTable implements Table {
     public OHTable(TableName tableName, Connection connection,
                    OHConnectionConfiguration connectionConfig, ExecutorService executePool)
                                                                                            throws IOException {
-        checkArgument(connection.getConfiguration() != null, "configuration is null.");
+        checkArgument(connection != null, "connection is null.");
         checkArgument(tableName != null, "tableName is null.");
         checkArgument(connection.getConfiguration() != null, "configuration is null.");
         checkArgument(tableName.getName() != null, "tableNameString is null.");
@@ -311,6 +322,8 @@ public class OHTable implements Table {
             this.cleanupPoolOnClose = false;
         }
         this.rpcTimeout = connectionConfig.getRpcTimeout();
+        this.readRpcTimeout = connectionConfig.getReadRpcTimeout();
+        this.writeRpcTimeout = connectionConfig.getWriteRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
@@ -320,6 +333,50 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+            this.tableNameString, connectionConfig));
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(operationTimeout);
+
+        finishSetUp();
+    }
+
+    public OHTable(Connection connection, ObTableBuilderBase builder,
+                   OHConnectionConfiguration connectionConfig, ExecutorService executePool)
+                                                                                           throws IOException {
+        checkArgument(connection != null, "connection is null.");
+        checkArgument(connection.getConfiguration() != null, "configuration is null.");
+        checkArgument(builder != null, "builder is null");
+        checkArgument(connectionConfig != null, "connectionConfig is null.");
+        TableName builderTableName = builder.getTableName();
+        this.tableName = builderTableName.getName();
+        this.tableNameString = builderTableName.getNameAsString();
+        this.configuration = connection.getConfiguration();
+        this.executePool = executePool;
+        if (executePool == null) {
+            int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
+                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
+            long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
+                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
+            this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+            this.cleanupPoolOnClose = true;
+        } else {
+            this.cleanupPoolOnClose = false;
+        }
+        this.rpcTimeout = builder.getRpcTimeout();
+        this.readRpcTimeout = builder.getReadRpcTimeout();
+        this.writeRpcTimeout = builder.getWriteRpcTimeout();
+        this.operationTimeout = builder.getOperationTimeout();
+        this.operationExecuteInPool = this.configuration.getBoolean(
+            HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
+            (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
+        this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
+        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
+            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
+        this.writeBufferSize = connectionConfig.getWriteBufferSize();
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
             HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
@@ -370,11 +427,15 @@ public class OHTable implements Table {
             HConstants.HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD,
             HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
             HConstants.DEFAULT_HBASE_CLIENT_SCANNER_TIMEOUT_PERIOD);
-        this.rpcTimeout = configuration.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
-            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-        this.operationTimeout = this.configuration.getInt(
+        this.rpcTimeout = this.rpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
+            HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.rpcTimeout;
+        this.readRpcTimeout = this.readRpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_READ_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.readRpcTimeout;
+        this.writeRpcTimeout = this.writeRpcTimeout <= 0 ? configuration.getInt(HConstants.HBASE_RPC_WRITE_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_TIMEOUT) : this.writeRpcTimeout;
+        this.operationTimeout = this.operationTimeout <= 0 ? this.configuration.getInt(
             HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
-            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+            HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT) : this.operationTimeout;
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -388,7 +449,7 @@ public class OHTable implements Table {
 
     private OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
                                                               OHConnectionConfiguration ohConnectionConf)
-                                                                                                         throws IOException {
+                                                                                                         throws IllegalArgumentException {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
             if (params.length != 2) {
@@ -903,7 +964,7 @@ public class OHTable implements Table {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(put);
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), put, tableNameString, e);
             throw new IOException("checkAndPut type table:" + tableNameString + " e.msg:"
@@ -959,7 +1020,7 @@ public class OHTable implements Table {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(delete);
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), delete, tableNameString, e);
             throw new IOException("checkAndDelete type table:" + tableNameString + " e.msg:"
@@ -972,7 +1033,7 @@ public class OHTable implements Table {
                                   CompareFilter.CompareOp compareOp, byte[] value,
                                   RowMutations rowMutations) throws IOException {
         try {
-            return checkAndMutation(row, family, qualifier, compareOp, value, rowMutations);
+            return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
             throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
@@ -980,18 +1041,21 @@ public class OHTable implements Table {
         }
     }
 
+    @Override
+    public CheckAndMutateBuilder checkAndMutate(byte[]row , byte[] family) {
+        return new ObCheckAndMutateBuilderImpl(row, family);
+    }
+
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier, CompareFilter.CompareOp compareOp, byte[] value,
-                                     RowMutations rowMutations) throws Exception {
+                                     TimeRange timeRange, RowMutations rowMutations) throws Exception {
             checkArgument(row != null, "row is null");
             checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
             checkArgument(Bytes.equals(row, rowMutations.getRow()),
-                "mutation row is not equal check row");
-
+                    "mutation row is not equal check row");
             checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
-
             byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
 
-            ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
+            ObHTableFilter filter = buildObHTableFilter(filterString, timeRange, 1, qualifier);
             List<Mutation> mutations = rowMutations.getMutations();
             List<Cell> keyValueList = new LinkedList<>();
             // only one family operation is allowed
@@ -1320,6 +1384,16 @@ public class OHTable implements Table {
         return this.rpcTimeout;
     }
 
+    @Override
+    public int getReadRpcTimeout() {
+        return this.readRpcTimeout;
+    }
+
+    @Override
+    public int getWriteRpcTimeout() {
+        return this.writeRpcTimeout;
+    }
+
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
         this.obTableClient.setRuntimeBatchExecutor(runtimeBatchExecutor);
     }
@@ -1466,6 +1540,7 @@ public class OHTable implements Table {
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
                 ObObj.getMin()));
+            obBorderFlag.setInclusiveStart();
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
             obBorderFlag.setInclusiveStart();
@@ -1477,6 +1552,7 @@ public class OHTable implements Table {
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
                 ObObj.getMax()));
+            obBorderFlag.setInclusiveEnd();
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
             obBorderFlag.setInclusiveEnd();
@@ -1507,11 +1583,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false, scan.getStartRow(),
-                true, true);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
+                    scan.includeStartRow(), true);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true, scan.getStopRow(),
-                false, false);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
+                    scan.includeStopRow(), false);
         }
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());
@@ -1837,6 +1913,111 @@ public class OHTable implements Table {
                 return OHOpType.DeleteFamilyVersion;
             default:
                 throw new IllegalArgumentException("illegal mutation type " + type);
+        }
+    }
+
+    private class ObCheckAndMutateBuilderImpl implements CheckAndMutateBuilder {
+        private final byte[] row;
+        private final byte[] family;
+        private byte[] qualifier;
+        private byte[] value;
+        private TimeRange timeRange;
+        private CompareOperator cmpOp;
+
+        ObCheckAndMutateBuilderImpl(byte[] row, byte[] family) {
+            this.row = checkNotNull(row, "The provided row is null.");
+            this.family = checkNotNull(family, "The provided family is null.");
+        }
+
+        @Override
+        public CheckAndMutateBuilder qualifier(byte[] qualifier) {
+            this.qualifier = checkNotNull(qualifier, "The provided qualifier is null. You could" +
+                    " use an empty byte array, or do not call this method if you want a null qualifier.");
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder timeRange(TimeRange timeRange) {
+            this.timeRange = timeRange;
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder ifNotExists() {
+            this.cmpOp = CompareOperator.EQUAL;
+            this.value = null;
+            return this;
+        }
+
+        @Override
+        public CheckAndMutateBuilder ifMatches(CompareOperator cmpOp, byte[] value) {
+            this.cmpOp = checkNotNull(cmpOp, "The provided cmpOp is null.");
+            this.value = checkNotNull(value , "The provided value is null.");
+            return this;
+        }
+
+        @Override
+        public boolean thenPut(Put put) throws IOException {
+            checkCmpOp();
+            RowMutations rowMutations = new RowMutations(row);
+            rowMutations.add(put);
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+        @Override
+        public boolean thenDelete(Delete delete) throws IOException {
+            checkCmpOp();
+            RowMutations rowMutations = new RowMutations(row);
+            rowMutations.add(delete);
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, rowMutations);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+        @Override
+        public boolean thenMutate(RowMutations mutation) throws IOException {
+            checkCmpOp();
+            try {
+                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange, mutation);
+            } catch(Exception e) {
+                logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
+                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
+                        + e.getMessage() + " error.", e);
+            }
+        }
+
+        private void checkCmpOp() {
+            checkNotNull(this.cmpOp, "The compare condition is null. Please use"
+                    + " ifNotExists/ifEquals/ifMatches before executing the request");
+        }
+
+        private CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
+            switch (cmpOp) {
+                case LESS:
+                    return CompareFilter.CompareOp.LESS;
+                case LESS_OR_EQUAL:
+                    return CompareFilter.CompareOp.LESS_OR_EQUAL;
+                case EQUAL:
+                    return CompareFilter.CompareOp.EQUAL;
+                case NOT_EQUAL:
+                    return CompareFilter.CompareOp.NOT_EQUAL;
+                case GREATER_OR_EQUAL:
+                    return CompareFilter.CompareOp.GREATER_OR_EQUAL;
+                case GREATER:
+                    return CompareFilter.CompareOp.GREATER;
+                default:
+                    return CompareFilter.CompareOp.NO_OP;
+            }
         }
     }
 }

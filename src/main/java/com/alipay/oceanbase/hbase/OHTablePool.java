@@ -752,7 +752,7 @@ public class OHTablePool implements Closeable {
         public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                       Batch.Callback<R> callback) throws IOException,
                                                                  InterruptedException {
-            throw new FeatureNotSupportedException("not supported yet'");
+            table.batchCallback(actions, results, callback);
         }
 
         @Override
@@ -824,6 +824,11 @@ public class OHTablePool implements Closeable {
                                       CompareFilter.CompareOp compareOp, byte[] value, Delete delete)
                                                                                                      throws IOException {
             return table.checkAndDelete(row, family, qualifier, compareOp, value, delete);
+        }
+
+        @Override
+        public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
+            return table.checkAndMutate(row, family);
         }
 
         @Override
