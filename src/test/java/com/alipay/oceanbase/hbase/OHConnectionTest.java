@@ -297,7 +297,7 @@ public class OHConnectionTest {
 
             // test Delete
             Delete del = new Delete(toBytes(key));
-            // test without setting family, delete all
+            del.deleteFamily(toBytes(family));
             bufferMutator.mutate(del);
             bufferMutator.flush();
 
