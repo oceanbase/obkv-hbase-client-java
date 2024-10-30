@@ -31,8 +31,10 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 
+import java.io.IOException;
 import java.util.*;
 
+import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 
@@ -361,6 +363,80 @@ public abstract class HTableMultiCFTestBase {
         multiCfHTable.delete(deleteKey1Family);
         multiCfHTable.delete(deleteKey2Family);
         multiCfHTable.delete(deleteKey3Family);
+    }
+
+    @Test
+    public void testMultiColumnFamilyTableBuilder() throws Exception {
+        byte[] family1 = "family_with_group1".getBytes();
+        byte[] family2 = "family_with_group2".getBytes();
+        byte[] family3 = "family_with_group3".getBytes();
+
+        byte[] family1_column1 = "family1_column1".getBytes();
+        byte[] family1_column2 = "family1_column2".getBytes();
+        byte[] family1_column3 = "family1_column3".getBytes();
+        byte[] family2_column1 = "family2_column1".getBytes();
+        byte[] family2_column2 = "family2_column2".getBytes();
+        byte[] family3_column1 = "family3_column1".getBytes();
+        byte[] family1_value = "VVV1".getBytes();
+        byte[] family2_value = "VVV2".getBytes();
+        byte[] family3_value = "VVV3".getBytes();
+
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
+        Connection connection = ConnectionFactory.createConnection(conf);
+        TableName tableName = TableName.valueOf("test_multi_cf");
+        TableBuilder builder = connection.getTableBuilder(tableName, null);
+        // build a OHTable with default params
+        Table tmpMultiCfHTable = builder.build();
+
+        Delete delete = new Delete(toBytes("Key0"));
+        delete.addFamily(family1);
+        delete.addFamily(family2);
+        delete.addFamily(family3);
+        tmpMultiCfHTable.delete(delete);
+
+        Put put = new Put(toBytes("Key0"));
+        put.addColumn(family1, family1_column1, family1_value);
+        put.addColumn(family1, family1_column2, family1_value);
+        put.addColumn(family1, family1_column3, family1_value);
+        put.addColumn(family2, family2_column1, family2_value);
+        put.addColumn(family2, family2_column2, family2_value);
+        put.addColumn(family3, family3_column1, family3_value);
+        tmpMultiCfHTable.put(put);
+
+        int count = 0;
+        Get get = new Get(toBytes("Key0"));
+        get.setMaxVersions();
+        Result r = tmpMultiCfHTable.get(get);
+        Assert.assertEquals(6, r.rawCells().length);
+
+        delete = new Delete(toBytes("Key0"));
+        delete.addFamily(family1);
+        delete.addFamily(family2);
+        delete.addFamily(family3);
+        tmpMultiCfHTable.delete(delete);
+        r = tmpMultiCfHTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
+
+        // set params for TableBuilder
+        builder.setOperationTimeout(1500000);
+        builder.setRpcTimeout(40000);
+        tmpMultiCfHTable = builder.build();
+
+        put = new Put(toBytes("Key0"));
+        put.addColumn(family1, family1_column1, family1_value);
+        put.addColumn(family1, family1_column2, family1_value);
+        put.addColumn(family2, family2_column1, family2_value);
+        put.addColumn(family3, family3_column1, family3_value);
+        tmpMultiCfHTable.put(put);
+
+        r = tmpMultiCfHTable.get(get);
+        Assert.assertEquals(4, r.rawCells().length);
+
+        tmpMultiCfHTable.delete(delete);
+        r = tmpMultiCfHTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
     }
 
     @Test

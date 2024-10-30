@@ -71,17 +71,61 @@ public class OHConnectionTest {
         hTable.close();
     }
 
-    @AfterClass
-    public static void finish() throws IOException {
-        hTable.close();
-    }
-
     @Test
     public void testRefreshTableEntry() throws Exception {
         hTable = ObHTableTestUtil.newOHTableClient("n1:test");
         ((OHTableClient) hTable).init();
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
         ((OHTableClient) hTable).refreshTableEntry("family1", true);
+    }
+
+    @After
+    public void after() throws IOException {
+        hTable.close();
+    }
+
+    @Test
+    public void testGetTableByTableBuilder() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        conf.set("rs.list.acquire.read.timeout", "10000");
+        conf.set(SOCKET_TIMEOUT_CONNECT, "15000");
+        connection = ConnectionFactory.createConnection(conf);
+        TableName tableName = TableName.valueOf("test");
+        TableBuilder builder = connection.getTableBuilder(tableName, null);
+        // build a OHTable with default params
+        hTable = builder.build();
+        testBasic();
+
+        // set params for TableBuilder
+        long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(10, 256, keepAliveTime, TimeUnit.SECONDS,
+            new SynchronousQueue(), Threads.newDaemonThreadFactory("htable"));
+        pool.allowCoreThreadTimeOut(true);
+        builder = connection.getTableBuilder(tableName, pool);
+        builder.setRpcTimeout(40000);
+        builder.setReadRpcTimeout(30000);
+        builder.setWriteRpcTimeout(50000);
+        builder.setOperationTimeout(1500000);
+        hTable = builder.build();
+        Assert.assertEquals(40000, hTable.getRpcTimeout());
+        Assert.assertEquals(30000, hTable.getReadRpcTimeout());
+        Assert.assertEquals(50000, hTable.getWriteRpcTimeout());
+        Assert.assertEquals(1500000, hTable.getOperationTimeout());
+        testBasic();
+
+        hTable.close();
+        Assert.assertFalse(pool.isShutdown());
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                System.out
+                    .println("close() failed to terminate pool after 10 seconds. Abandoning pool.");
+            }
+        } catch (InterruptedException e) {
+            System.out.println("waitForTermination interrupted");
+            Thread.currentThread().interrupt();
+        }
+        Assert.assertTrue(pool.isShutdown());
     }
 
     private void testBasic() throws Exception {
