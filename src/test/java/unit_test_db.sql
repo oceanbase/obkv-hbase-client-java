@@ -204,6 +204,7 @@ CREATE TABLE `test_multi_cf$family_with_group3` (
     PRIMARY KEY (`K`, `Q`, `T`) 
 ) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
 
+CREATE DATABASE IF NOT EXISTS `n1`;
 USE `n1`;
 CREATE TABLE `n1:test$family1` (
     `K` varbinary(1024) NOT NULL,
