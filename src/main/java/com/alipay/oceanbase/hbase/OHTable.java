@@ -198,8 +198,13 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -246,8 +251,13 @@ public class OHTable implements HTableInterface {
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
+        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(ohConnectionConf.getOperationTimeout());
 
         finishSetUp();
     }
@@ -301,6 +311,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.cleanupPoolOnClose = false;
         }
+
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.operationTimeout = connectionConfig.getOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
@@ -311,8 +322,15 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
+        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
+        this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
+        this.obTableClient.setRuntimeRetryTimes(numRetries);
+        setOperationTimeout(operationTimeout);
+
+        finishSetUp();
     }
 
     /**
@@ -526,15 +544,26 @@ public class OHTable implements HTableInterface {
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
-                                                             InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+            InterruptedException {
+        try {
+            batch(actions, results);
+        } finally {
+            if (results != null) {
+                for (int i = 0; i < results.length; i++) {
+                    if (!(results[i] instanceof ObTableException)) {
+                        callback.update(null, actions.get(i).getRow(), (R) results[i]);
+                    }
+                }
+            }
+        }
     }
 
     @Override
-    public <R> Object[] batchCallback(List<? extends Row> actions, Batch.Callback<R> callback)
-                                                                                              throws IOException,
-                                                                                              InterruptedException {
-        throw new FeatureNotSupportedException("not supported yet'");
+    public <R> Object[] batchCallback(
+            final List<? extends Row> actions, final Batch.Callback<R> callback) throws IOException, InterruptedException {
+        Object[] results = new Object[actions.size()];
+        batchCallback(actions, results, callback);
+        return results;
     }
 
     public static int compareByteArray(byte[] bt1, byte[] bt2) {
@@ -1547,14 +1576,16 @@ public class OHTable implements HTableInterface {
                                            boolean includeStart, byte[] stop, boolean includeStop,
                                            boolean isReversed) {
         ObNewRange obNewRange = new ObNewRange();
-
+        ObBorderFlag obBorderFlag = new ObBorderFlag();
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
                 ObObj.getMin()));
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
+            obBorderFlag.setInclusiveStart();
         } else {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
+            obBorderFlag.unsetInclusiveStart();
         }
 
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
@@ -1562,10 +1593,13 @@ public class OHTable implements HTableInterface {
                 ObObj.getMax()));
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
+            obBorderFlag.setInclusiveEnd();
         } else {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), ObObj.getMin()));
+            obBorderFlag.unsetInclusiveEnd();
         }
         ObTableQuery obTableQuery = new ObTableQuery();
+        obNewRange.setBorderFlag(obBorderFlag);
         if (isReversed) {
             obTableQuery.setScanOrder(ObScanOrder.Reverse);
         }
