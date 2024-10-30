@@ -36,7 +36,6 @@ import java.util.concurrent.*;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.SOCKET_TIMEOUT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.*;
 
 public class OHConnectionTest {
     protected static Table hTable;
@@ -83,11 +82,6 @@ public class OHConnectionTest {
         ((OHTableClient) hTable).init();
         ((OHTableClient) hTable).refreshTableEntry("family1", false);
         ((OHTableClient) hTable).refreshTableEntry("family1", true);
-    }
-
-    @After
-    public void after() throws IOException {
-        hTable.close();
     }
 
     private void testBasic() throws Exception {
