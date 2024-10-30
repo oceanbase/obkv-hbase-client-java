@@ -1540,6 +1540,7 @@ public class OHTable implements Table {
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
                 ObObj.getMin()));
+            obBorderFlag.setInclusiveStart();
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
             obBorderFlag.setInclusiveStart();
@@ -1551,6 +1552,7 @@ public class OHTable implements Table {
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
                 ObObj.getMax()));
+            obBorderFlag.setInclusiveEnd();
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
             obBorderFlag.setInclusiveEnd();
@@ -1581,11 +1583,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false, scan.getStartRow(),
-                true, true);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
+                    scan.includeStartRow(), true);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true, scan.getStopRow(),
-                false, false);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
+                    scan.includeStopRow(), false);
         }
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());

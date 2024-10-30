@@ -51,16 +51,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Test
     public void testTableGroup() throws IOError, IOException {
-        /*
-        CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
-        CREATE TABLE `test$family_group` (
-                      `K` varbinary(1024) NOT NULL,
-                      `Q` varbinary(256) NOT NULL,
-                      `T` bigint(20) NOT NULL,
-                      `V` varbinary(1024) DEFAULT NULL,
-                      PRIMARY KEY (`K`, `Q`, `T`)
-                ) TABLEGROUP = test;
-         */
         String key = "putKey";
         String column1 = "putColumn1";
         String value = "value333444";
@@ -277,7 +267,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column1 = "putColumn1";
         String column2 = "putColumn2";
         String value = "value";
-        String family = "family1";
         long startTimeBase = 1539700745718L;
         for (int j = 1; j <= testNum; j++) {
             byte[] rowkey = new byte[keyBytes.length + 8];
@@ -334,8 +323,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Test
     public void testMultiPut() throws IOException {
-        String key1 = "getKey1";
-        String key2 = "getKey2";
         String column1 = "column1";
         String column2 = "column2";
         String value1 = "value1";
@@ -980,8 +967,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column2 = "def";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
+
         Delete deleteKey1Family = new Delete(toBytes(key1));
         deleteKey1Family.addFamily(toBytes(family));
 
@@ -1012,8 +999,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Put putKey2Column2Value1 = new Put(toBytes(key2));
         putKey2Column2Value1.addColumn(toBytes(family), toBytes(column2), toBytes(value1));
 
-        hTable.delete(deleteKey1Family);
-        hTable.delete(deleteKey2Family);
         tryPut(hTable, putKey1Column1Value1);
         tryPut(hTable, putKey1Column1Value2);
         tryPut(hTable, putKey1Column1Value1);
@@ -1413,7 +1398,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column2 = "def";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
         Delete deleteKey1Family = new Delete(toBytes(key1));
         deleteKey1Family.addFamily(toBytes(family));
@@ -1492,7 +1476,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column2 = "def";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
         long   ts;
         Delete deleteKey1Family = new Delete(toBytes(key1));
@@ -1797,7 +1780,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column5 = "c5";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
         Delete deleteKey1Family = new Delete(toBytes(key1));
         deleteKey1Family.addFamily(toBytes(family));
@@ -1994,7 +1976,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column5 = "c5";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
         Delete deleteKey1Family = new Delete(toBytes(key1));
         deleteKey1Family.addFamily(toBytes(family));
@@ -2055,8 +2036,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.addFamily(family.getBytes());
         scan.setMaxVersions(10);
         List<Pair<byte[], byte[]>> fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("abab"), Bytes.toBytes("0000")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("abab"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         FuzzyRowFilter filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         ResultScanner scanner = hTable.getScanner(scan);
@@ -2082,8 +2063,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("abcc"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("abcc"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2109,8 +2090,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("ccab"), Bytes.toBytes("1100")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("ccab"), Bytes.toBytes("1100")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2136,8 +2117,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("cccc"), Bytes.toBytes("1100")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("cccc"), Bytes.toBytes("1100")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2163,8 +2144,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("ab##"), Bytes.toBytes("0011")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("ab##"), Bytes.toBytes("0011")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2190,8 +2171,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("azc"), Bytes.toBytes("010")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("azc"), Bytes.toBytes("010")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2217,8 +2198,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("azccd"), Bytes.toBytes("01001")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("azccd"), Bytes.toBytes("01001")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2244,8 +2225,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.setMaxVersions(10);
         scan.setReversed(true);
         fuzzyKey = new ArrayList<>();
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes(""), Bytes.toBytes("")));
-        fuzzyKey.add(new Pair<byte[], byte[]>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes(""), Bytes.toBytes("")));
+        fuzzyKey.add(new Pair<>(Bytes.toBytes("dddd"), Bytes.toBytes("0000")));
         filter = new FuzzyRowFilter(fuzzyKey);
         scan.setFilter(filter);
         scanner = hTable.getScanner(scan);
@@ -2278,7 +2259,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column5 = "c5";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
         Delete deleteKey1Family = new Delete(toBytes(key1));
         deleteKey1Family.addFamily(toBytes(family));
@@ -2319,8 +2299,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Put putKey2Column2Value1 = new Put(toBytes(key2));
         putKey2Column2Value1.addColumn(toBytes(family), toBytes(column2), toBytes(value1));
 
-        hTable.delete(deleteKey1Family);
-        hTable.delete(deleteKey2Family);
         tryPut(hTable, putKey1Column1Value1);
         tryPut(hTable, putKey1Column1Value2);
         tryPut(hTable, putKey1Column1Value1);
@@ -2348,19 +2326,11 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         int res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
                 res_count += 1;
             }
         }
         Assert.assertEquals(res_count, 5);
         scanner.close();
-
         scan = new Scan();
         scan.addFamily(family.getBytes());
         scan.setMaxVersions(10);
@@ -2375,17 +2345,10 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
-                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(CellUtil.cloneValue(keyValue))
-                );
                 res_count += 1;
             }
         }
-        Assert.assertEquals(res_count, 11);
+        Assert.assertEquals(11, res_count);
         scanner.close();
 
         scan = new Scan();
@@ -4018,7 +3981,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         String column2 = "column2";
         String value1 = "value1";
         String value2 = "value2";
-        String value3 = "value3";
         String family = "family1";
 
         // delete previous data
@@ -4069,9 +4031,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Put putKey3Column2Value2 = new Put(toBytes(key3));
         putKey3Column2Value2.addColumn(toBytes(family), toBytes(column2), toBytes(value2));
 
-        Get get;
         Scan scan;
-        Result r;
         int res_count = 0;
 
         tryPut(hTable, putKey1Column1Value1);
@@ -5571,7 +5531,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         // delete 只支持删一行
         String key = "qualifyNullKey";
         String value = "value";
-        String value1 = "value1";
         String family = "   ";
         Delete delete = new Delete(key.getBytes());
         delete.addFamily(family.getBytes());
