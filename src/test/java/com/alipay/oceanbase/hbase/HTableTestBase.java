@@ -113,11 +113,11 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
                 Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
                 Assert.assertEquals(timestamp, keyValue.getTimestamp());
                 Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
-                System.out.println(
-                        "rowKey: " + new String(keyValue.getRow()) + " family :" + new String(
-                                keyValue.getFamily()) + " columnQualifier:" + new String(
-                                keyValue.getQualifier()) + " timestamp:" + keyValue.getTimestamp() + " value:" + new String(
-                                keyValue.getValue()));
+                System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
+                                   + new String(keyValue.getFamily()) + " columnQualifier:"
+                                   + new String(keyValue.getQualifier()) + " timestamp:"
+                                   + keyValue.getTimestamp() + " value:"
+                                   + new String(keyValue.getValue()));
             }
         }
     }
