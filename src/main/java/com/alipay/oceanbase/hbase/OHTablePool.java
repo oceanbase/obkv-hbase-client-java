@@ -827,6 +827,11 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
+            return table.checkAndMutate(row, family);
+        }
+
+        @Override
         public Result increment(Increment increment) throws IOException {
             return table.increment(increment);
         }

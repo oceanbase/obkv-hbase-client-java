@@ -22,6 +22,7 @@ import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
+import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;
@@ -4705,6 +4706,71 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         r = hTable.get(get);
         Assert.assertEquals(3, r.rawCells().length);
         Assert.assertEquals("value1", Bytes.toString(CellUtil.cloneValue(r.rawCells()[0])));
+
+        // test CheckAndMutateBuilder
+        Delete delete = new Delete(key.getBytes());
+        delete.addFamily(family.getBytes());
+        hTable.delete(delete);
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
+
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), value.getBytes());
+        hTable.put(put);
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addColumn(family.getBytes(), column.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+
+        Table.CheckAndMutateBuilder builder = hTable.checkAndMutate(toBytes(key), toBytes(family));
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), "value1".getBytes());
+        ret = builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenPut(put);
+        Assert.assertTrue(ret);
+        Put difFamPut = new Put(key.getBytes());
+        difFamPut.addColumn("family_group".getBytes(), column.getBytes(), "value1".getBytes());
+        Assert.assertThrows(IOException.class, () -> {
+            builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenPut(difFamPut);
+        });
+
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.GREATER, toBytes("value1")).thenPut(put);
+        Assert.assertFalse(ret);
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("value1")).thenPut(put);
+        Assert.assertTrue(ret);
+        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.LESS, toBytes(""))
+            .thenPut(put);
+        Assert.assertFalse(ret);
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("")).thenPut(put);
+        Assert.assertFalse(ret);
+
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addColumn(family.getBytes(), column.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(3, r.rawCells().length);
+        Assert.assertEquals("value1", Bytes.toString(CellUtil.cloneValue(r.rawCells()[0])));
+
+        // test TimeRange
+        long t = System.currentTimeMillis();
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t, value.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t + 3, "value1".getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t + 5, "value2".getBytes());
+        hTable.put(put);
+        put = new Put(toBytes(key));
+        put.addColumn(toBytes(family), toBytes(column), toBytes(value));
+        TimeRange timeRange = new TimeRange(t + 1, t + 3);
+        ret = builder.qualifier(toBytes(column)).timeRange(timeRange).ifEquals(toBytes("value1"))
+            .thenPut(put);
+        Assert.assertFalse(ret);
+        timeRange = new TimeRange(t, t + 2);
+        ret = builder.qualifier(toBytes(column)).timeRange(timeRange).ifEquals(toBytes(value))
+            .thenPut(put);
+        Assert.assertTrue(ret);
     }
 
     @Test
@@ -4799,6 +4865,104 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         r = hTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
 
+        // test CheckAndMutateBuilder
+        delete = new Delete(key.getBytes());
+        delete.addFamily(family.getBytes());
+        hTable.delete(delete);
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), value.getBytes());
+        hTable.put(put);
+
+        // check delete column
+        delete = new Delete(key.getBytes());
+        delete.addColumn(family.getBytes(), column.getBytes());
+        Table.CheckAndMutateBuilder builder = hTable.checkAndMutate(toBytes(key), toBytes(family));
+        ret = builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenDelete(delete);
+        Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), "value6".getBytes());
+        hTable.put(put);
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.GREATER, toBytes("value5")).thenDelete(delete);
+        Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), "value5".getBytes());
+        hTable.put(put);
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("value5")).thenDelete(delete);
+        Assert.assertTrue(ret);
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), "value1".getBytes());
+        hTable.put(put);
+        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.LESS, toBytes("value1"))
+            .thenDelete(delete);
+        Assert.assertFalse(ret);
+        ret = builder.qualifier(toBytes(column))
+            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("value1")).thenDelete(delete);
+        Assert.assertTrue(ret);
+
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addColumn(family.getBytes(), column.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
+
+        // check delete columns
+        t = System.currentTimeMillis();
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t, value.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t + 1, value.getBytes());
+        hTable.put(put);
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addColumn(family.getBytes(), column.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.rawCells().length);
+        delete = new Delete(key.getBytes());
+        delete.addColumns(family.getBytes(), column.getBytes());
+        ret = builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenDelete(delete);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addColumn(family.getBytes(), column.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
+
+        // check delete family
+        t = System.currentTimeMillis();
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t, value.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), t + 1, value.getBytes());
+        put.addColumn(family.getBytes(), column2.getBytes(), t, value.getBytes());
+        put.addColumn(family.getBytes(), column2.getBytes(), t + 1, value.getBytes());
+        hTable.put(put);
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addFamily(family.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.rawCells().length);
+
+        // test TimeRange
+        put = new Put(key.getBytes());
+        put.addColumn(family.getBytes(), column.getBytes(), value.getBytes());
+        TimeRange timeRange = new TimeRange(t + 2, t + 4);
+        ret = builder.qualifier(toBytes(column)).timeRange(timeRange).ifEquals(toBytes(value))
+            .thenPut(put);
+        Assert.assertFalse(ret);
+        timeRange = new TimeRange(t, t + 2);
+        ret = builder.qualifier(toBytes(column)).timeRange(timeRange).ifEquals(toBytes(value))
+            .thenPut(put);
+        Assert.assertTrue(ret);
+
+        delete = new Delete(key.getBytes());
+        delete.addFamily(family.getBytes());
+        ret = builder.qualifier(toBytes(column)).ifEquals(toBytes(value)).thenDelete(delete);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        get.addFamily(family.getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(0, r.rawCells().length);
     }
 
     @Test
@@ -4943,6 +5107,163 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(Integer.MAX_VALUE);
         r = hTable.get(get);
         Assert.assertEquals(10, r.rawCells().length);
+
+        // test CheckAndMutateBuilder
+        Delete delete = new Delete(key.getBytes());
+        delete.addFamily(family.getBytes());
+        hTable.delete(delete);
+
+        t = System.currentTimeMillis();
+        // put
+        put1 = new Put(key.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.addColumn(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key.getBytes());
+        put2.addColumn(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.addColumn(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.addColumn(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+
+        //put data
+        Table.CheckAndMutateBuilder builder = hTable.checkAndMutate(toBytes(key),
+            family.getBytes(StandardCharsets.UTF_8));
+        ret = builder.qualifier(toBytes(column1)).ifNotExists().thenMutate(rowMutations);
+        Assert.assertTrue(ret);
+
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(6, r.rawCells().length);
+
+        t = System.currentTimeMillis() + 7;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.addColumn(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key.getBytes());
+        put2.addColumn(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.addColumn(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.addColumn(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // test greater op
+        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value1))
+            .thenMutate(rowMutations);
+        Assert.assertFalse(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(6, r.rawCells().length);
+
+        // test less op
+        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value2))
+            .thenMutate(rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(12, r.rawCells().length);
+
+        t = System.currentTimeMillis() + 14;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.addColumn(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key.getBytes());
+        put2.addColumn(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.addColumn(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.addColumn(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // test NO_OP
+        try {
+            builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.NO_OP, toBytes(value1))
+                .thenMutate(rowMutations);
+            fail();
+        } catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("checkAndMutate"));
+        }
+
+        // test equal op
+        ret = builder.qualifier(toBytes(column1)).ifEquals(toBytes(value1))
+            .thenMutate(rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(18, r.rawCells().length);
+
+        t = System.currentTimeMillis() + 21;
+        // put
+        put1 = new Put(key.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.addColumn(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        // delete
+        delete1 = new Delete(key.getBytes());
+        delete1.addColumns(family.getBytes(), column1.getBytes());
+
+        // check delete and put
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(delete1);
+        rowMutations.add(put1);
+        ret = builder.qualifier(toBytes(column1)).ifEquals(toBytes(value1))
+            .thenMutate(rowMutations);
+        Assert.assertTrue(ret);
+        get = new Get(key.getBytes());
+        get.addColumn(family.getBytes(), column1.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+
+        get = new Get(key.getBytes());
+        get.addColumn(family.getBytes(), column2.getBytes());
+        get.setMaxVersions(Integer.MAX_VALUE);
+        r = hTable.get(get);
+        Assert.assertEquals(10, r.rawCells().length);
+
+        // check TimeRange
+        put1 = new Put(toBytes(key));
+        put1.addColumn(toBytes(family), toBytes(column1), toBytes(value1));
+        rowMutations = new RowMutations(key.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(delete1);
+        TimeRange timeRange = new TimeRange(t + 1, t + 3);
+        ret = builder.qualifier(toBytes(column1)).timeRange(timeRange).ifEquals(toBytes(value1))
+            .thenMutate(rowMutations);
+        Assert.assertFalse(ret);
+        timeRange = new TimeRange(t, t + 2);
+        ret = builder.qualifier(toBytes(column1)).timeRange(timeRange).ifEquals(toBytes(value1))
+            .thenMutate(rowMutations);
+        Assert.assertTrue(ret);
+
+        delete = new Delete(key.getBytes());
+        delete.addFamily(family.getBytes());
+        hTable.delete(delete);
     }
 
     @Test
