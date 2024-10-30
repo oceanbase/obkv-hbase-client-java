@@ -388,13 +388,13 @@ public abstract class HTableMultiCFTestBase {
         TableName tableName = TableName.valueOf("test_multi_cf");
         TableBuilder builder = connection.getTableBuilder(tableName, null);
         // build a OHTable with default params
-        multiCfHTable = builder.build();
+        Table tmpMultiCfHTable = builder.build();
 
         Delete delete = new Delete(toBytes("Key0"));
         delete.addFamily(family1);
         delete.addFamily(family2);
         delete.addFamily(family3);
-        multiCfHTable.delete(delete);
+        tmpMultiCfHTable.delete(delete);
 
         Put put = new Put(toBytes("Key0"));
         put.addColumn(family1, family1_column1, family1_value);
@@ -403,39 +403,39 @@ public abstract class HTableMultiCFTestBase {
         put.addColumn(family2, family2_column1, family2_value);
         put.addColumn(family2, family2_column2, family2_value);
         put.addColumn(family3, family3_column1, family3_value);
-        multiCfHTable.put(put);
+        tmpMultiCfHTable.put(put);
 
         int count = 0;
         Get get = new Get(toBytes("Key0"));
         get.setMaxVersions();
-        Result r = multiCfHTable.get(get);
+        Result r = tmpMultiCfHTable.get(get);
         Assert.assertEquals(6, r.rawCells().length);
 
         delete = new Delete(toBytes("Key0"));
         delete.addFamily(family1);
         delete.addFamily(family2);
         delete.addFamily(family3);
-        multiCfHTable.delete(delete);
-        r = multiCfHTable.get(get);
+        tmpMultiCfHTable.delete(delete);
+        r = tmpMultiCfHTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
 
         // set params for TableBuilder
         builder.setOperationTimeout(1500000);
         builder.setRpcTimeout(40000);
-        multiCfHTable = builder.build();
+        tmpMultiCfHTable = builder.build();
 
         put = new Put(toBytes("Key0"));
         put.addColumn(family1, family1_column1, family1_value);
         put.addColumn(family1, family1_column2, family1_value);
         put.addColumn(family2, family2_column1, family2_value);
         put.addColumn(family3, family3_column1, family3_value);
-        multiCfHTable.put(put);
+        tmpMultiCfHTable.put(put);
 
-        r = multiCfHTable.get(get);
+        r = tmpMultiCfHTable.get(get);
         Assert.assertEquals(4, r.rawCells().length);
 
-        multiCfHTable.delete(delete);
-        r = multiCfHTable.get(get);
+        tmpMultiCfHTable.delete(delete);
+        r = tmpMultiCfHTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
     }
 
