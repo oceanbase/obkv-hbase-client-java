@@ -36,7 +36,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -56,7 +55,6 @@ import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.slf4j.Logger;
-import org.tukaani.xz.check.Check;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
