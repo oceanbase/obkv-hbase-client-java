@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.result.ClientAsyncStreamScanner;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
@@ -36,6 +37,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
@@ -5625,6 +5628,54 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         }
 
         Assert.assertEquals(2, resultList.size());
+    }
+
+    @Test
+    public void testAsyncPrefetchScanner() throws IOException {
+        testAsyncPrefetchScannerInner(null);
+        testAsyncPrefetchScannerInner((b) -> {
+            try {
+                TimeUnit.MILLISECONDS.sleep(500);
+            } catch (InterruptedException ignored) {
+            }
+        });
+    }
+
+    public void testAsyncPrefetchScannerInner(Consumer<Boolean> listener) throws IOException {
+        String key = "async_scanner";
+        String column = "column";
+        String value = "value";
+        String family = "family1";
+        Put put;
+        int row_count = 40;
+        int column_count = 40;
+        for (int i = 0; i < row_count; i++) {
+            String k = key + i;
+            for (int j = 0; j < column_count; j++) {
+                put = new Put(k.getBytes());
+                put.addColumn(family.getBytes(), Bytes.toBytes(column + j), (value + j).getBytes());
+                hTable.put(put);
+            }
+        }
+
+        Scan scan = new Scan();
+        scan.readVersions(10);
+        scan.setAsyncPrefetch(true);
+        ResultScanner scanner = hTable.getScanner(scan);
+        assertTrue(scanner instanceof ClientAsyncStreamScanner);
+        ((ClientAsyncStreamScanner) scanner).setPrefetchListener(listener);
+
+        int count = 0;
+        for (Result res: scanner) {
+            for (Cell cell: res.rawCells()) {
+                int rowId = count / row_count;
+                int columnId = count % row_count;
+                Assert.assertEquals((key + rowId).getBytes(), CellUtil.cloneRow(cell));
+                Assert.assertEquals((column + columnId).getBytes(), CellUtil.cloneQualifier(cell));
+                count ++;
+            }
+        }
+        assertEquals(row_count * column_count, count);
     }
 
     @Test

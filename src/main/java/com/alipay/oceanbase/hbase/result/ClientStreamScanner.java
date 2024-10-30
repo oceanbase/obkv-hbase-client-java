@@ -39,18 +39,18 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 @InterfaceAudience.Private
 public class ClientStreamScanner extends AbstractClientScanner {
 
-    private static final Logger             logger       = TableHBaseLoggerFactory
+    protected static final Logger             logger       = TableHBaseLoggerFactory
                                                              .getLogger(ClientStreamScanner.class);
 
-    private final AbstractQueryStreamResult streamResult;
+    protected final AbstractQueryStreamResult streamResult;
 
-    private final String                    tableName;
+    protected final String                    tableName;
 
-    private byte[]                          family;
+    protected byte[]                          family;
 
-    private boolean                         closed       = false;
+    protected boolean                         closed       = false;
 
-    private boolean                         isTableGroup = false;
+    protected boolean                         isTableGroup = false;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup) {
@@ -151,7 +151,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
         }
     }
 
-    private void checkStatus() throws IllegalStateException {
+    void checkStatus() throws IllegalStateException {
         if (closed) {
             throw new IllegalStateException("table " + tableName + " family "
                                             + Bytes.toString(family) + " scanner is  closed");

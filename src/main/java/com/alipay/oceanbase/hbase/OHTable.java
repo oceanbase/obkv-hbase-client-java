@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
+import com.alipay.oceanbase.hbase.result.ClientAsyncStreamScanner;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
@@ -808,8 +809,13 @@ public class OHTable implements Table {
                             getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                            tableNameString, family, true);
+                        if (scan.isAsyncPrefetch()) {
+                            return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true, scan.getMaxResultSize());
+                        } else {
+                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true);
+                        }
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
@@ -835,8 +841,13 @@ public class OHTable implements Table {
                                     configuration));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, false);
+                            if (scan.isAsyncPrefetch()) {
+                                return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
+                                        tableNameString, family, false, scan.getMaxResultSize());
+                            } else {
+                                return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                        tableNameString, family, false);
+                            }
                         }
                     }
                 } catch (Exception e) {
