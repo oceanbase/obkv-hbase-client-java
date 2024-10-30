@@ -1354,31 +1354,31 @@ public abstract class HTableMultiCFTestBase {
         String family3 = "family_with_group3";
 
         Delete deleteKey1 = new Delete(toBytes(key1));
-        deleteKey1.deleteFamily(toBytes(family1));
-        deleteKey1.deleteFamily(toBytes(family2));
-        deleteKey1.deleteFamily(toBytes(family3));
+        deleteKey1.addFamily(toBytes(family1));
+        deleteKey1.addFamily(toBytes(family2));
+        deleteKey1.addFamily(toBytes(family3));
         Delete deleteKey2 = new Delete(toBytes(key2));
-        deleteKey2.deleteFamily(toBytes(family1));
-        deleteKey2.deleteFamily(toBytes(family2));
-        deleteKey2.deleteFamily(toBytes(family3));
+        deleteKey2.addFamily(toBytes(family1));
+        deleteKey2.addFamily(toBytes(family2));
+        deleteKey2.addFamily(toBytes(family3));
 
         Put putKey1Column1Value1 = new Put(toBytes(key1));
-        putKey1Column1Value1.add(toBytes(family1), toBytes(column1), toBytes(value1));
+        putKey1Column1Value1.addColumn(toBytes(family1), toBytes(column1), toBytes(value1));
 
         Put putKey1Column1Value2 = new Put(toBytes(key1));
-        putKey1Column1Value2.add(toBytes(family2), toBytes(column1), toBytes(value2));
+        putKey1Column1Value2.addColumn(toBytes(family2), toBytes(column1), toBytes(value2));
 
         Put putKey1Column2Value2 = new Put(toBytes(key1));
-        putKey1Column2Value2.add(toBytes(family2), toBytes(column2), toBytes(value2));
+        putKey1Column2Value2.addColumn(toBytes(family2), toBytes(column2), toBytes(value2));
 
         Put putKey2Column2Value1 = new Put(toBytes(key2));
-        putKey2Column2Value1.add(toBytes(family3), toBytes(column2), toBytes(value1));
+        putKey2Column2Value1.addColumn(toBytes(family3), toBytes(column2), toBytes(value1));
 
         Put putKey2Column1Value1 = new Put(toBytes(key2));
-        putKey2Column1Value1.add(toBytes(family3), toBytes(column1), toBytes(value1));
+        putKey2Column1Value1.addColumn(toBytes(family3), toBytes(column1), toBytes(value1));
 
         Put putKey2Column1Value2 = new Put(toBytes(key2));
-        putKey2Column1Value2.add(toBytes(family3), toBytes(column1), toBytes(value2));
+        putKey2Column1Value2.addColumn(toBytes(family3), toBytes(column1), toBytes(value2));
 
        multiCfHTable.delete(deleteKey1);
        multiCfHTable.delete(deleteKey2);
@@ -1401,15 +1401,15 @@ public abstract class HTableMultiCFTestBase {
 
         int res_count = 0;
         for (Result result : scanner) {
-            for (KeyValue keyValue : result.raw()) {
+            for (Cell keyValue : result.rawCells()) {
                 System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
                         keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
+                        Bytes.toString(CellUtil.cloneValue(keyValue))
                 );
-                Assert.assertArrayEquals(family2.getBytes(), keyValue.getFamily());
+                Assert.assertArrayEquals(family2.getBytes(), CellUtil.cloneFamily(keyValue));
                 res_count += 1;
             }
         }
@@ -1427,13 +1427,13 @@ public abstract class HTableMultiCFTestBase {
 
         res_count = 0;
         for (Result result : scanner) {
-            for (KeyValue keyValue : result.raw()) {
+            for (Cell keyValue : result.rawCells()) {
                 System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
                         keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
+                        Bytes.toString(CellUtil.cloneValue(keyValue))
                 );
                 res_count += 1;
             }
@@ -1452,15 +1452,15 @@ public abstract class HTableMultiCFTestBase {
 
         res_count = 0;
         for (Result result : scanner) {
-            for (KeyValue keyValue : result.raw()) {
+            for (Cell keyValue : result.rawCells()) {
                 System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
                         keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
+                        Bytes.toString(CellUtil.cloneValue(keyValue))
                 );
-                Assert.assertArrayEquals(family3.getBytes(), keyValue.getFamily());
+                Assert.assertArrayEquals(family3.getBytes(), CellUtil.cloneFamily(keyValue));
                 res_count += 1;
             }
         }
@@ -1478,13 +1478,13 @@ public abstract class HTableMultiCFTestBase {
 
         res_count = 0;
         for (Result result : scanner) {
-            for (KeyValue keyValue : result.raw()) {
+            for (Cell keyValue : result.rawCells()) {
                 System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)),
                         keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
+                        Bytes.toString(CellUtil.cloneValue(keyValue))
                 );
                 res_count += 1;
             }
