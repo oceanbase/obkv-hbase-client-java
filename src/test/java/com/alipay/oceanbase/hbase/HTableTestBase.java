@@ -5632,23 +5632,24 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Test
     public void testAsyncPrefetchScanner() throws IOException {
-        testAsyncPrefetchScannerInner(null);
-        testAsyncPrefetchScannerInner((b) -> {
+        testAsyncPrefetchScannerInner(40, 40, null);
+        testAsyncPrefetchScannerInner(40, 40, (b) -> {
             try {
                 TimeUnit.MILLISECONDS.sleep(500);
             } catch (InterruptedException ignored) {
             }
         });
+        testAsyncPrefetchScannerInner(40, 40, (b) -> {
+            System.out.println("prefetch status: " + b);
+        });
     }
 
-    public void testAsyncPrefetchScannerInner(Consumer<Boolean> listener) throws IOException {
+    public void testAsyncPrefetchScannerInner(int row_count, int column_count, Consumer<Boolean> listener) throws IOException {
         String key = "async_scanner";
         String column = "column";
         String value = "value";
         String family = "family1";
         Put put;
-        int row_count = 40;
-        int column_count = 40;
         for (int i = 0; i < row_count; i++) {
             String k = key + i;
             for (int j = 0; j < column_count; j++) {
