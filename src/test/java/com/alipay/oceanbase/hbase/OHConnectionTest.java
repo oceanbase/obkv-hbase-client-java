@@ -71,11 +71,6 @@ public class OHConnectionTest {
         hTable.close();
     }
 
-    @AfterClass
-    public static void finish() throws IOException {
-        hTable.close();
-    }
-
     @Test
     public void testRefreshTableEntry() throws Exception {
         hTable = ObHTableTestUtil.newOHTableClient("n1:test");
