@@ -752,7 +752,7 @@ public class OHTablePool implements Closeable {
         public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                       Batch.Callback<R> callback) throws IOException,
                                                                  InterruptedException {
-            throw new FeatureNotSupportedException("not supported yet'");
+            table.batchCallback(actions, results, callback);
         }
 
         @Override
