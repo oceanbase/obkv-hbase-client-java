@@ -789,6 +789,11 @@ public class OHTable implements Table {
                 ObTableQueryAsyncRequest request;
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
+                Boolean async = scan.isAsyncPrefetch();
+                if (async == null) {
+                    async = configuration.getBoolean(
+                            Scan.HBASE_CLIENT_SCANNER_ASYNC_PREFETCH, Scan.DEFAULT_HBASE_CLIENT_SCANNER_ASYNC_PREFETCH);
+                }
                 try {
                     if (scan.getFamilyMap().keySet() == null
                         || scan.getFamilyMap().keySet().isEmpty()
@@ -809,9 +814,16 @@ public class OHTable implements Table {
                             getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        if (scan.isAsyncPrefetch()) {
+                        if (async) {
+                            long maxScannerResultSize;
+                            if (scan.getMaxResultSize() > 0) {
+                                maxScannerResultSize = scan.getMaxResultSize();
+                            } else {
+                                maxScannerResultSize = conf.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                        HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE);
+                            }
                             return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
-                                    tableNameString, family, true, scan.getMaxResultSize());
+                                    tableNameString, family, true, maxScannerResultSize);
                         } else {
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
                                     tableNameString, family, true);
@@ -841,9 +853,16 @@ public class OHTable implements Table {
                                     configuration));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            if (scan.isAsyncPrefetch()) {
+                            if (async) {
+                                long maxScannerResultSize;
+                                if (scan.getMaxResultSize() > 0) {
+                                    maxScannerResultSize = scan.getMaxResultSize();
+                                } else {
+                                    maxScannerResultSize = conf.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                            HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE);
+                                }
                                 return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
-                                        tableNameString, family, false, scan.getMaxResultSize());
+                                        tableNameString, family, false, maxScannerResultSize);
                             } else {
                                 return new ClientStreamScanner(clientQueryAsyncStreamResult,
                                         tableNameString, family, false);

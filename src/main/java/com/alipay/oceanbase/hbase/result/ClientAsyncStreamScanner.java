@@ -38,6 +38,7 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
     private Thread prefetcher;
     // used for testing
     private Consumer<Boolean> prefetchListener = null;
+    private boolean streamNext = true;
 
     private final Lock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
@@ -47,14 +48,12 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
         super(streamResult, tableName, family, isTableGroup);
         this.maxResultSize = maxResultSize;
         initCache();
-        loadCache();
     }
 
     public ClientAsyncStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName, byte[] family, boolean isTableGroup, long maxResultSize) throws Exception {
         super(streamResult, tableName, family, isTableGroup);
         this.maxResultSize = maxResultSize;
         initCache();
-        loadCache();
     }
 
     @VisibleForTesting
@@ -74,6 +73,7 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
 
     private void loadCache() throws Exception {
         if (streamResult.getRowIndex() == -1 && !streamResult.next()) {
+            streamNext = false;
             return;
         }
 
@@ -82,15 +82,7 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
             try {
                 checkStatus();
 
-                List<ObObj> startRow;
-
-                if (streamResult.getRowIndex() != -1) {
-                    startRow = streamResult.getRow();
-                } else if (streamResult.next()) {
-                    startRow = streamResult.getRow();
-                } else {
-                    return;
-                }
+                List<ObObj> startRow = streamResult.getRow();
 
                 byte[][] familyAndQualifier = new byte[2][];
                 if (this.isTableGroup) {
@@ -111,7 +103,7 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
                 List<Cell> keyValues = new ArrayList<>();
                 keyValues.add(startKeyValue);
                 addSize = 0;
-                while (streamResult.next()) {
+                while ((streamNext = streamResult.next())) {
                     List<ObObj> row = streamResult.getRow();
                     if (this.isTableGroup) {
                         // split family and qualifier
@@ -149,7 +141,7 @@ public class ClientAsyncStreamScanner extends ClientStreamScanner {
     public Result next() throws IOException {
         try {
             lock.lock();
-            while (cache.isEmpty()) {
+            while (cache.isEmpty() && streamNext) {
                 handleException();
                 if (this.closed) {
                     return null;
