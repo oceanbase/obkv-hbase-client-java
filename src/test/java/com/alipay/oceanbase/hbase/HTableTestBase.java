@@ -5653,9 +5653,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
     @Test
     public void testAsyncPrefetchScanner5() throws IOException {
-        testAsyncPrefetchScannerInner(40, 40, (b) -> {
-            System.out.println("prefetch status: " + b);
-        });
+        testAsyncPrefetchScannerInner(40, 40, Assert::assertTrue);
     }
 
     public void testAsyncPrefetchScannerInner(int row_count, int column_count, Consumer<Boolean> listener) throws IOException {
@@ -5699,6 +5697,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             }
         }
         assertEquals(row_count * column_count, count);
+        scanner.close();
     }
 
     @Test
