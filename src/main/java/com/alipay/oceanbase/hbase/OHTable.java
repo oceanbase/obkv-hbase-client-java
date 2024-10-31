@@ -543,6 +543,11 @@ public class OHTable implements Table {
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
         BatchError batchError = new BatchError();
+        if (results != null) {
+            if (results.length != actions.size()) {
+                throw new AssertionError("results.length");
+            }
+        }
         try {
             List<Integer> resultMapSingleOp = new LinkedList<>();
             String realTableName = getTargetTableName(actions);
@@ -550,16 +555,15 @@ public class OHTable implements Table {
             BatchOperation batch = buildBatchOperation(realTableName, actions, tableNameString.equals(realTableName), resultMapSingleOp);
             BatchOperationResult tmpResults = batch.execute();
             if (results != null) {
-                if (results.length != actions.size()) {
-                    throw new AssertionError("results.length");
-                }
                 int index = 0;
                 for (int i = 0; i != results.length; ++i) {
-                    results[i] = tmpResults.getResults().get(index);
-                    index += resultMapSingleOp.get(i);
-                    if (results[i] instanceof ObTableException) {
+                    if (tmpResults.getResults().get(index) instanceof ObTableException) {
                         batchError.add((ObTableException) results[i], actions.get(i), null);
+                        results[i] = tmpResults.getResults().get(index);
+                    } else {
+                        results[i] = new Result();
                     }
+                    index += resultMapSingleOp.get(i);
                 }
                 if (batchError.hasErrors()) {
                     throw batchError.makeException();
@@ -1156,12 +1160,12 @@ public class OHTable implements Table {
             byte[] f = entry.getKey();
 
             ObTableBatchOperation batch = new ObTableBatchOperation();
-            entry.getValue().forEach(cell -> {
+            for (Cell cell : entry.getValue()) {
                 byte[] qualifier = CellUtil.cloneQualifier(cell);
                 qualifiers.add(qualifier);
                 batch.addTableOperation(getInstance(INCREMENT, new Object[] { rowKey, qualifier,
-                        Long.MAX_VALUE }, V_COLUMNS, new Object[] { CellUtil.cloneValue(cell) }));
-            });
+                                                                              Long.MAX_VALUE }, V_COLUMNS, new Object[] { CellUtil.cloneValue(cell) }));
+            }
 
             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
                 qualifiers);
@@ -1287,10 +1291,10 @@ public class OHTable implements Table {
                     }
                 }
                 if (!exceptionRowMap.isEmpty()) {
-                    exceptionRowMap.forEach((e, row)->{
-                        logger.error(LCD.convert("01-00008"), row, tableNameString, autoFlush,
-                                writeBuffer.size(), e);
-                    });
+                    for (Map.Entry<ObTableException, Row> entry : exceptionRowMap.entrySet()) {
+                        logger.error(LCD.convert("01-00008"), entry.getValue(), tableNameString, autoFlush,
+                                writeBuffer.size(), entry.getKey());
+                    }
                 }
             }
         } finally {
@@ -1540,7 +1544,6 @@ public class OHTable implements Table {
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
                 ObObj.getMin()));
-            obBorderFlag.setInclusiveStart();
         } else if (includeStart) {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
             obBorderFlag.setInclusiveStart();
@@ -1552,7 +1555,6 @@ public class OHTable implements Table {
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
             obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
                 ObObj.getMax()));
-            obBorderFlag.setInclusiveEnd();
         } else if (includeStop) {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
             obBorderFlag.setInclusiveEnd();

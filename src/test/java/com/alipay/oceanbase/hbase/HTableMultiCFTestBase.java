@@ -19,7 +19,6 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import org.apache.hadoop.conf.Configuration;
-import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 
-import java.io.IOException;
 import java.util.*;
 
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
@@ -820,9 +818,9 @@ public abstract class HTableMultiCFTestBase {
             batchLsit.add(put);
         }
         results = new Object[batchLsit.size()];
-        multiCfHTable.batchCallback(batchLsit, results, new Batch.Callback<MutationResult>() {
+        multiCfHTable.batchCallback(batchLsit, results, new Batch.Callback<Result>() {
             @Override
-            public void update(byte[] region, byte[] row, MutationResult result) {
+            public void update(byte[] region, byte[] row, Result result) {
                 updateCounter[0]++;
             }
         });

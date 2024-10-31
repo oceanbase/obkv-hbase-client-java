@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase.result;
 
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
