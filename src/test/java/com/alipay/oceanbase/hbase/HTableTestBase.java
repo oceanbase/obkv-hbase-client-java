@@ -3181,7 +3181,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         scan.addFamily(family.getBytes());
         scan.setMaxVersions(10);
         scan.setBatch(1);
-
         ResultScanner scanner = hTable.getScanner(scan);
 
         // The server defaults to a lease of 60 seconds. Therefore, at 20 seconds,

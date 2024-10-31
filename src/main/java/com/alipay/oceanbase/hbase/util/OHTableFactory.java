@@ -22,7 +22,6 @@ import com.alipay.oceanbase.hbase.OHTablePool;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.client.TableBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
