@@ -31,7 +31,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
@@ -56,8 +55,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private int                           rpcTimeout;
     private int                           operationTimeout;
 
-    public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params)
-                                                                                             throws IOException {
+    public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params,
+                                 OHTable ohTable) throws IOException {
         if (ohConnection == null || ohConnection.isClosed()) {
             throw new IllegalArgumentException("Connection is null or closed.");
         }
@@ -77,7 +76,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
 
         // create an OHTable object to do batch work
-        this.ohTable = new OHTable(tableName, ohConnection, connectionConfig, pool);
+        if (ohTable != null) {
+            this.ohTable = ohTable;
+        } else {
+            this.ohTable = new OHTable(tableName, ohConnection, connectionConfig, pool);
+        }
     }
 
     @Override
@@ -142,7 +145,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
         if (mt instanceof Put) {
             // family empty check is in validatePut
-            HTable.validatePut((Put) mt, maxKeyValueSize);
+            OHTable.validatePut((Put) mt, maxKeyValueSize);
             OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
         } else {
             OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
@@ -176,14 +179,17 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             // if commit all successfully, clean execBuffer
             execBuffer.clear();
         } catch (Exception ex) {
-            LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
-                LOGGER.error(tableName + ": One or more of the operations have failed after retries.");
+                LOGGER.error(TableHBaseLoggerFactory.LCD.convert("01-00011"), tableName.getNameAsString()
+                        + ": One or more of the operations have failed after retries.", ex.getCause());
                 RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
-                // recollect mutations
+                // recollect mutations and log error information
                 execBuffer.clear();
-                for (int i = 0; i < retryException.getNumExceptions(); ++i) {
-                    execBuffer.add((Mutation) retryException.getRow(i));
+                for (int i = 0;  i < retryException.getNumExceptions(); ++i) {
+                    Row failedOp = retryException.getRow(i);
+                    execBuffer.add((Mutation) failedOp);
+                    LOGGER.error(TableHBaseLoggerFactory.LCD.convert("01-00011"), failedOp, tableName.getNameAsString(),
+                            currentAsyncBufferSize.get(), retryException.getCause(i));
                 }
                 if (listener != null) {
                     listener.onException(retryException, this);
@@ -191,7 +197,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                     throw retryException;
                 }
             } else {
-                LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
+                LOGGER.error(TableHBaseLoggerFactory.LCD.convert("01-00011"), tableName.getNameAsString()
+                        + ": Errors unrelated to operations occur during mutation operation", ex);
                 throw ex;
             }
         } finally {
@@ -256,6 +263,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
         this.ohTable.setOperationTimeout(operationTimeout);
+    }
+
+    public long getCurrentBufferSize() {
+        return currentAsyncBufferSize.get();
     }
 
     @Deprecated
