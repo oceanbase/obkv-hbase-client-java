@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.oceanbase</groupId>
-    <artifactId>obkv-hbase-client</artifactId>
+    <artifactId>obkv-hbase-client-shade</artifactId>
     <version>0.1.6-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
@@ -54,7 +54,7 @@
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.encoding>UTF-8</project.encoding>
         <slf4j.version>1.7.21</slf4j.version>
-        <table.client.version>1.2.14.1-SNAPSHOT</table.client.version>
+        <table.client.version>1.2.14.3-SNAPSHOT</table.client.version>
     </properties>
 
     <dependencies>
@@ -223,6 +223,30 @@
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <minimizeJar>true</minimizeJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.hadoop</pattern>
+                                    <shadedPattern>shade.org.apache.hadoop</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <shadedClassifierName>shade</shadedClassifierName>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>license-maven-plugin</artifactId>
