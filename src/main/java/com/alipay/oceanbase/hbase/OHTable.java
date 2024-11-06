@@ -23,6 +23,7 @@ import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
+import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
