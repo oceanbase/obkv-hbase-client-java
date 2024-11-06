@@ -54,6 +54,7 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.util.VersionInfo;
 import org.slf4j.Logger;
 
 import java.io.ByteArrayOutputStream;
@@ -749,6 +750,7 @@ public class OHTable implements HTableInterface {
             obHBaseParams.setCallTimeout(scannerTimeout);
             obHBaseParams.setCacheBlock(scan.isGetScan());
             obHBaseParams.setAllowPartialResults(scan.getAllowPartialResults());
+            obHBaseParams.setHbaseVersion(VersionInfo.getVersion());
         }
         obKVParams.setObParamsBase(obHBaseParams);
         return obKVParams;
@@ -759,6 +761,7 @@ public class OHTable implements HTableInterface {
         ObHBaseParams obHBaseParams = new ObHBaseParams();
         obHBaseParams.setCheckExistenceOnly(get.isCheckExistenceOnly());
         obHBaseParams.setCacheBlock(get.getCacheBlocks());
+        obHBaseParams.setHbaseVersion(VersionInfo.getVersion());
         obKVParams.setObParamsBase(obHBaseParams);
         return obKVParams;
     }
