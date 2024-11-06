@@ -30,50 +30,61 @@ import java.nio.file.Paths;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String  PARAM_URL      = "";
-    public static String  FULL_USER_NAME = "";
-    public static String  PASSWORD       = "";
-    public static String  SYS_USER_NAME  = "";
-    public static String  SYS_PASSWORD   = "";
-    public static String  ODP_ADDR       = "";
-    public static int     ODP_PORT       = 0;
-    public static boolean ODP_MODE       = false;
-    public static String  DATABASE       = "";
-    public static String  JDBC_IP        = "";
-    public static String  JDBC_PORT      = "";
-    public static String  JDBC_DATABASE  = "";
-    public static String  JDBC_URL       = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ " + JDBC_DATABASE + "?" + "useUnicode=TRUE&" + "characterEncoding=utf-8&" + "socketTimeout=3000000&" + "connectTimeout=60000";
+    public static String       PARAM_URL      = "";
+    public static String       FULL_USER_NAME = "";
+    public static String       PASSWORD       = "";
+    public static String       SYS_USER_NAME  = "";
+    public static String       SYS_PASSWORD   = "";
+    public static String       ODP_ADDR       = "";
+    public static int          ODP_PORT       = 0;
+    public static boolean      ODP_MODE       = false;
+    public static String       DATABASE       = "";
+    public static String       JDBC_IP        = "";
+    public static String       JDBC_PORT      = "";
+    public static String       JDBC_DATABASE  = "";
+    public static String       JDBC_URL       = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
+                                                + JDBC_DATABASE + "?" + "useUnicode=TRUE&"
+                                                + "characterEncoding=utf-8&"
+                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
 
-    public static String       SQL_FORMAT    = "truncate %s";
-    public static List<String> tableNameList = new LinkedList<>();
+    public static String       SQL_FORMAT     = "truncate %s";
+    public static List<String> tableNameList;
     public static Connection   conn;
     public static Statement    stmt;
+
+    static {
+        tableNameList = new LinkedList<>();
+        conn = getConnection();
+        try {
+            stmt = conn.createStatement();
+        } catch (SQLException e) {
+            System.out.println("sql error " + e);
+        }
+    }
 
     public static void prepareClean(List<String> tableGroupList) throws Exception {
         for (String tableGroup : tableGroupList) {
             tableNameList.addAll(getOTableNameList(tableGroup));
         }
-        conn = getConnection();
-        stmt = conn.createStatement();
     }
 
     public static void cleanData() {
         try {
             for (String realTableName : tableNameList) {
                 try {
+                    if (realTableName.contains("'")) {
+                        realTableName = "`" + realTableName + "`";
+                    }
                     stmt.execute(String.format(SQL_FORMAT, realTableName));
                 } catch (Exception e) {
-                    System.out.println(
-                            "clean table data error ." + realTableName + "   exception:" + e);
+                    System.out.println("clean table data error ." + realTableName + "   exception:"
+                                       + e);
                 }
             }
         } catch (Exception e) {
@@ -110,29 +121,29 @@ public class ObHTableTestUtil {
     }
 
     static public List<String> getOTableNameList(String tableGroup) throws IOException {
-        // 读取建表语句
-        List<String> res = new LinkedList<>();
-        String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
-        String[] sqlList = sql.split(";");
-        Map<String, HTableDescriptor> tableMap = new LinkedHashMap<>();
-        for (String singleSql : sqlList) {
-            String realTableName;
-            if (singleSql.contains("CREATE TABLE ")) {
-                singleSql.trim();
-                String[] splits = singleSql.split(" ");
-                String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
-                if (tableGroupName.contains(":")) {
-                    String[] tmpStr = tableGroupName.split(":", 2);
-                    tableGroupName = tmpStr[1];
-                }
-                realTableName = tableGroupName.split("\\$", 2)[0];
-                if (realTableName.equals(tableGroup)) {
-                    res.add(tableGroupName);
+            // 读取建表语句
+            List<String> res = new LinkedList<>();
+            String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
+            String[] sqlList = sql.split(";");
+            Map<String, HTableDescriptor> tableMap = new LinkedHashMap<>();
+            for (String singleSql : sqlList) {
+                String realTableName;
+                if (singleSql.contains("CREATE TABLE ")) {
+                    singleSql.trim();
+                    String[] splits = singleSql.split(" ");
+                    String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
+                    if (tableGroupName.contains(":")) {
+                        String[] tmpStr = tableGroupName.split(":", 2);
+                        tableGroupName = tmpStr[1];
+                    }
+                    realTableName = tableGroupName.split("\\$", 2)[0];
+                    if (realTableName.equals(tableGroup)) {
+                        res.add(tableGroupName);
+                    }
                 }
             }
+            return res;
         }
-        return res;
-    }
 
     static public Connection getConnection() {
         try {

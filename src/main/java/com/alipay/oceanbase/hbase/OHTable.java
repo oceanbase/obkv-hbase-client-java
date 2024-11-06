@@ -36,7 +36,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
@@ -199,7 +198,7 @@ public class OHTable implements HTableInterface {
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -252,7 +251,7 @@ public class OHTable implements HTableInterface {
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -323,7 +322,7 @@ public class OHTable implements HTableInterface {
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
@@ -481,29 +480,130 @@ public class OHTable implements HTableInterface {
         return objectResults;
     }
 
-    @Override
-    public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
+    private void compatOldServerBatch(final List<? extends Row> actions, final Object[] results)
+            throws Exception {
+        for (Row row : actions) {
+            if (!(row instanceof Put) && !(row instanceof Delete)) {
+                throw new FeatureNotSupportedException(
+                        "not supported other type in batch yet,only support put and delete");
+            }
+        }
         BatchError batchError = new BatchError();
-        try {
-            List<Integer> resultMapSingleOp = new LinkedList<>();
-            String realTableName = getTargetTableName(actions);
-            obTableClient.setRuntimeBatchExecutor(executePool);
-            BatchOperation batch = buildBatchOperation(realTableName, actions, tableNameString.equals(realTableName), resultMapSingleOp);
-            BatchOperationResult tmpResults = batch.execute();
-            if (results != null) {
-                if (results.length != actions.size()) {
-                    throw new AssertionError("results.length");
+        List<Integer> resultMapSingleOp = new LinkedList<>();
+        for (int i = 0; i < actions.size(); i++) {
+            BatchOperationResult tmpResults;
+            BatchOperation batch = null;
+            if (actions.get(i) instanceof Put) {
+                Put put = (Put) actions.get(i);
+                if (put.getFamilyCellMap().size() > 1) {
+                    String realTableName = getTargetTableName(tableNameString);
+                    batch = buildBatchOperation(realTableName,
+                            Collections.singletonList(put),
+                            true, resultMapSingleOp);
+                } else {
+                    byte[] family = put.getFamilyCellMap().firstKey();
+                    String realTableName = getTargetTableName(tableNameString, Bytes.toString(family), configuration);
+                    batch = buildBatchOperation(realTableName,
+                            Collections.singletonList(put),
+                            false, resultMapSingleOp);
                 }
-                int index = 0;
-                for (int i = 0; i != results.length; ++i) {
-                    results[i] = tmpResults.getResults().get(index);
-                    index += resultMapSingleOp.get(i);
-                    if (results[i] instanceof ObTableException) {
-                        batchError.add((ObTableException) results[i], actions.get(i), null);
+            } else if (actions.get(i) instanceof Delete) {
+                Delete delete = (Delete)actions.get(i);
+                if (delete.isEmpty()) {
+                    batch = buildBatchOperation(tableNameString,
+                            Collections.singletonList(delete), true,
+                            resultMapSingleOp);
+                } else if (delete.getFamilyCellMap().size() > 1) {
+                    boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
+                            .flatMap(entry -> entry.getValue().stream()).anyMatch(
+                                    kv -> KeyValue.Type.codeToType(
+                                            kv.getType()) == KeyValue.Type.DeleteFamily || KeyValue.Type.codeToType(
+                                            kv.getType()) == KeyValue.Type.DeleteFamilyVersion);
+                    if (!has_delete_family) {
+                        batch = buildBatchOperation(tableNameString,
+                                Collections.singletonList(delete), true,
+                                resultMapSingleOp);
+                    } else {
+                        for (Map.Entry<byte[], List<Cell>> entry : delete.getFamilyCellMap()
+                                .entrySet()) {
+                            byte[] family = entry.getKey();
+                            String realTableName = getTargetTableName(tableNameString,
+                                    Bytes.toString(family), configuration);
+                            // split delete
+                            List<Cell> cells = entry.getValue();
+                            Delete del = new Delete(delete.getRow());
+                            del.getFamilyCellMap().put(family, cells);
+                            batch = buildBatchOperation(realTableName,
+                                    Collections.singletonList(del), false,
+                                    resultMapSingleOp);
+                            tmpResults = batch.execute();
+                            if (tmpResults.getResults().get(0) instanceof ObTableException) {
+                                results[i] = tmpResults.getResults().get(0);
+                            }
+                        }
+                        if (results[i] == null) {
+                            results[i] = new Result();
+                        } else {
+                            batchError.add((ObTableException) results[i], actions.get(i), null);
+                        }
+                        continue;
                     }
+                } else {
+                    byte[] family = delete.getFamilyCellMap().firstKey();
+                    String realTableName = getTargetTableName(tableNameString, Bytes.toString(family), configuration);
+                    batch = buildBatchOperation(realTableName,
+                            Collections.singletonList(delete),
+                            false, resultMapSingleOp);
                 }
-                if (batchError.hasErrors()) {
-                    throw batchError.makeException();
+            }
+            if (batch != null) {
+                tmpResults = batch.execute();
+                if (tmpResults.getResults().get(0) instanceof ObTableException) {
+                    results[i] = tmpResults.getResults().get(0);
+                    batchError.add((ObTableException) results[i], actions.get(i), null);
+                } else {
+                    results[i] = new Result();
+                }
+            }
+        }
+    }
+
+    @Override
+    public void batch(final List<? extends Row> actions, final Object[] results)
+            throws IOException, FeatureNotSupportedException, IllegalArgumentException {
+        if (actions == null) {
+            return;
+        }
+        if (results != null) {
+            if (results.length != actions.size()) {
+                throw new AssertionError("results.length");
+            }
+        }
+        BatchError batchError = new BatchError();
+        obTableClient.setRuntimeBatchExecutor(executePool);
+        List<Integer> resultMapSingleOp = new LinkedList<>();
+        try {
+            if (!CompatibilityUtil.isBatchSupport()) {
+                compatOldServerBatch(actions, results);
+            } else {
+                String realTableName = getTargetTableName(actions);
+                BatchOperation batch = buildBatchOperation(realTableName, actions,
+                        tableNameString.equals(realTableName), resultMapSingleOp);
+                BatchOperationResult tmpResults = batch.execute();
+                if (results != null) {
+                    int index = 0;
+                    for (int i = 0; i != results.length; ++i) {
+                        if (tmpResults.getResults().get(index) instanceof ObTableException) {
+                            results[i] = tmpResults.getResults().get(index);
+                            batchError.add((ObTableException) results[i], actions.get(i), null);
+                        } else {
+                            results[i] = new Result();
+                        }
+                        index += resultMapSingleOp.get(i);
+                    }
+                    if (batchError.hasErrors()) {
+                        throw batchError.makeException();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -544,7 +644,7 @@ public class OHTable implements HTableInterface {
     @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
-            InterruptedException {
+                                                             InterruptedException {
         try {
             batch(actions, results);
         } finally {
@@ -559,8 +659,9 @@ public class OHTable implements HTableInterface {
     }
 
     @Override
-    public <R> Object[] batchCallback(
-            final List<? extends Row> actions, final Batch.Callback<R> callback) throws IOException, InterruptedException {
+    public <R> Object[] batchCallback(final List<? extends Row> actions,
+                                      final Batch.Callback<R> callback) throws IOException,
+                                                                       InterruptedException {
         Object[] results = new Object[actions.size()];
         batchCallback(actions, results, callback);
         return results;
@@ -944,7 +1045,7 @@ public class OHTable implements HTableInterface {
             batch(Collections.singletonList(delete));
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
-            throw new IOException("delete  table " + tableNameString + "error" , e);
+            throw new IOException("delete table " + tableNameString + " error.", e);
         }
     }
 
@@ -1677,7 +1778,8 @@ public class OHTable implements HTableInterface {
     }
 
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
-                                                                     ObTableOperationType operationType, boolean isTableGroup) {
+                                                                     ObTableOperationType operationType,
+                                                                     boolean isTableGroup) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
         switch (operationType) {
             case INSERT_OR_UPDATE:
@@ -1690,29 +1792,29 @@ public class OHTable implements HTableInterface {
                 switch (kvType) {
                     case Delete:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
-                                null, null);
+                            ROW_KEY_COLUMNS,
+                            new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
+                            null, null);
                     case Maximum:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { kv.getRow(), null, -kv.getTimestamp() },
-                                null, null);
+                            ROW_KEY_COLUMNS,
+                            new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
                     case DeleteColumn:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() },
-                                null, null);
+                            ROW_KEY_COLUMNS,
+                            new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() },
+                            null, null);
                     case DeleteFamily:
                         return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null, -kv.getTimestamp() },
-                                null, null);
+                            ROW_KEY_COLUMNS,
+                            new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
+                                    -kv.getTimestamp() }, null, null);
                     case DeleteFamilyVersion:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                                ROW_KEY_COLUMNS,
-                                new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null, kv.getTimestamp() },
-                                null, null);
+                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                            DEL,
+                            ROW_KEY_COLUMNS,
+                            new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
+                                    kv.getTimestamp() }, null, null);
                     default:
                         throw new IllegalArgumentException("illegal mutation type " + kvType);
                 }
@@ -1733,65 +1835,67 @@ public class OHTable implements HTableInterface {
             value);
     }
 
-    private BatchOperation buildBatchOperation(String tableName, List<? extends Row> actions, boolean isTableGroup, List<Integer> resultMapSingleOp) {
+    private BatchOperation buildBatchOperation(String tableName, List<? extends Row> actions,
+                                               boolean isTableGroup, List<Integer> resultMapSingleOp)
+                                                                                                     throws FeatureNotSupportedException,
+                                                                                                     IllegalArgumentException {
         BatchOperation batch = obTableClient.batchOperation(tableName);
-        if (actions != null) {
-            int posInList = -1;
-            int singleOpResultNum;
-            for (Row row : actions) {
-                singleOpResultNum = 0;
-                posInList++;
-                if (!(row instanceof Put) && !(row instanceof Delete)) {
-                    throw new FeatureNotSupportedException(
-                        "not supported other type in batch yet,only support put and delete");
-                } else if (row instanceof Put) {
-                    Put put = (Put) row;
-                    if (put.isEmpty()) {
-                        throw new IllegalArgumentException("No columns to insert for #"
-                                                           + (posInList + 1) + " item");
+        int posInList = -1;
+        int singleOpResultNum;
+        for (Row row : actions) {
+            singleOpResultNum = 0;
+            posInList++;
+            if (row instanceof Put) {
+                Put put = (Put) row;
+                if (put.isEmpty()) {
+                    throw new IllegalArgumentException("No columns to insert for #"
+                                                       + (posInList + 1) + " item");
+                }
+                for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
+                    byte[] family = entry.getKey();
+                    List<KeyValue> keyValueList = entry.getValue();
+                    for (KeyValue kv : keyValueList) {
+                        singleOpResultNum++;
+                        if (isTableGroup) {
+                            KeyValue new_kv = modifyQualifier(kv,
+                                (Bytes.toString(family) + "." + Bytes.toString(kv.getQualifier()))
+                                    .getBytes());
+                            batch
+                                .addOperation(buildMutation(new_kv, INSERT_OR_UPDATE, isTableGroup));
+                        } else {
+                            batch.addOperation(buildMutation(kv, INSERT_OR_UPDATE, isTableGroup));
+                        }
                     }
-                    for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
+                }
+            } else if (row instanceof Delete) {
+                Delete delete = (Delete) row;
+                if (delete.isEmpty()) {
+                    singleOpResultNum++;
+                    KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
+                        KeyValue.Type.Maximum);
+                    batch.addOperation(buildMutation(kv, DEL, isTableGroup));
+                } else {
+                    for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         byte[] family = entry.getKey();
                         List<KeyValue> keyValueList = entry.getValue();
                         for (KeyValue kv : keyValueList) {
                             singleOpResultNum++;
-                            if(isTableGroup){
-                                KeyValue new_kv = modifyQualifier(kv,(Bytes.toString(family) + "." + Bytes.toString(kv.getQualifier()))
-                                    .getBytes());
-                                batch.addOperation(buildMutation(new_kv, INSERT_OR_UPDATE, isTableGroup));
+                            if (isTableGroup) {
+                                KeyValue new_kv = modifyQualifier(kv,
+                                    (Bytes.toString(family) + "." + Bytes.toString(kv
+                                        .getQualifier())).getBytes());
+                                batch.addOperation(buildMutation(new_kv, DEL, true));
                             } else {
-                                batch.addOperation(buildMutation(kv, INSERT_OR_UPDATE, isTableGroup));
-                            }
-                        }
-                    }
-                } else {
-                    Delete delete = (Delete) row;
-                    if (delete.isEmpty()) {
-                        singleOpResultNum++;
-                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                            KeyValue.Type.Maximum);
-                        batch.addOperation(buildMutation(kv, DEL, isTableGroup));
-                    } else {
-                        for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap()
-                            .entrySet()) {
-                            byte[] family = entry.getKey();
-                            List<KeyValue> keyValueList = entry.getValue();
-                            List<com.alipay.oceanbase.rpc.mutation.Mutation> mutations = new LinkedList<>();
-                            for (KeyValue kv : keyValueList) {
-                                singleOpResultNum++;
-                                if(isTableGroup){
-                                    KeyValue new_kv = modifyQualifier(kv,(Bytes.toString(family) + "." + Bytes.toString(kv.getQualifier()))
-                                            .getBytes());
-                                    batch.addOperation(buildMutation(new_kv, DEL, true));
-                                } else {
-                                    batch.addOperation(buildMutation(kv, DEL, false));
-                                }
+                                batch.addOperation(buildMutation(kv, DEL, false));
                             }
                         }
                     }
                 }
-                resultMapSingleOp.add(singleOpResultNum);
+            } else {
+                throw new FeatureNotSupportedException(
+                    "not supported other type in batch yet,only support put and delete");
             }
+            resultMapSingleOp.add(singleOpResultNum);
         }
         batch.setEntityType(ObTableEntityType.HKV);
         return batch;
