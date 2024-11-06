@@ -243,6 +243,11 @@
                                 </relocation>
                             </relocations>
                             <shadedClassifierName>shade</shadedClassifierName>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.hadoop:*</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>
