@@ -1221,7 +1221,7 @@ public class OHTable implements HTableInterface {
             mutator.flush();
         } catch (Exception e) {
             throw new IOException("put table " + tableNameString + " error codes " + null
-                                  + "auto flush " + autoFlush + " current buffer size "
+                                  + " auto flush " + autoFlush + " current buffer size "
                                   + mutator.getCurrentBufferSize(), e);
         }
     }
