@@ -68,6 +68,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private int                           rpcTimeout;
     private int                           operationTimeout;
     private static final long             OB_VERSION_4_3_5_0     = calcVersion(4, (short) 3, (byte) 5, (byte) 0);
+    private static final long             OB_VERSION_4_3_0_0     = calcVersion(4, (short) 3, (byte) 0, (byte) 0);
+    private static final long             OB_VERSION_4_2_5_1     = calcVersion(4, (short) 2, (byte) 5, (byte) 1);
+    private static final long             OB_VERSION_4_3_4_0     = calcVersion(4, (short) 3, (byte) 4, (byte) 0);
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params,
                                  OHTable ohTable) throws IOException {
@@ -144,16 +147,8 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 validateOperation(m);
                 toAddSize += m.heapSize();
             }
-
-            currentAsyncBufferSize.addAndGet(toAddSize);
-            asyncWriteBuffer.addAll(mutations);
-
-            if (currentAsyncBufferSize.get() > writeBufferSize) {
-                batchExecute(false);
-            }
         } else {
-            // check if every mutation's family is the same
-            // check if mutations are the same type
+            // version below 4_3_5 need the same type in one bufferedMutator
             for (Mutation m : mutations) {
                 validateOperation(m);
                 Class<?> curType = m.getClass();
@@ -164,11 +159,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 }
                 toAddSize += m.heapSize();
             }
+        }
+        currentAsyncBufferSize.addAndGet(toAddSize);
+        asyncWriteBuffer.addAll(mutations);
 
-            currentAsyncBufferSize.addAndGet(toAddSize);
-            asyncWriteBuffer.addAll(mutations);
-
-            if (currentAsyncBufferSize.get() > writeBufferSize) {
+        if (currentAsyncBufferSize.get() > writeBufferSize) {
+            if (isBatchSupport()) {
+                batchExecute(false);
+            } else {
                 normalExecute(false);
             }
         }
@@ -188,9 +186,17 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         if (mt instanceof Put) {
             // family empty check is in validatePut
             OHTable.validatePut((Put) mt, maxKeyValueSize);
-            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
+            if (isMultiFamilySupport()) {
+                OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
+            } else {
+                OHTable.checkFamilyViolationForOneFamily(mt.getFamilyMap().keySet());
+            }
         } else {
-            OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
+            if (isMultiFamilySupport()) {
+                OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
+            } else {
+                OHTable.checkFamilyViolationForOneFamily(mt.getFamilyMap().keySet());
+            }
         }
     }
 
@@ -392,6 +398,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     boolean isBatchSupport() {
         return OB_VERSION >= OB_VERSION_4_3_5_0;
+    }
+
+    /**
+     * Only 4_2_5 BP1 - 4_3_0 and after 4_3_4 support multi-cf
+     * */
+    boolean isMultiFamilySupport() {
+        return (OB_VERSION >= OB_VERSION_4_2_5_1 && OB_VERSION < OB_VERSION_4_3_0_0)
+                || (OB_VERSION >= OB_VERSION_4_3_4_0);
     }
 
     /**
