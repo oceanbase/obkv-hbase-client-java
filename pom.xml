@@ -246,8 +246,20 @@
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.hadoop:*</include>
+                                    <include>org.apache.hbase:*</include>
                                 </includes>
                             </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>hbase-default.xml</exclude>
+                                        <exclude>core-default.xml</exclude>
+                                        <exclude>mapred-default.xml</exclude>
+                                        <exclude>yarn-default.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
