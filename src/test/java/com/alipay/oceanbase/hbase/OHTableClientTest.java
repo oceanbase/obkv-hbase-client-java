@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.junit.*;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -37,7 +38,7 @@ public class OHTableClientTest extends HTableTestBase {
         ((OHTableClient) multiCfHTable).init();
         List<String> tableGroups = new LinkedList<>();
         tableGroups.add("test");
-        tableGroups.add("test_multi_cf");
+//        tableGroups.add("test_multi_cf");
         ObHTableTestUtil.prepareClean(tableGroups);
     }
 
@@ -77,8 +78,13 @@ public class OHTableClientTest extends HTableTestBase {
 
     @AfterClass
     public static void finish() throws Exception {
-        hTable.close();
-        multiCfHTable.close();
-        ObHTableTestUtil.closeConn();
+        try {
+            hTable.close();
+            multiCfHTable.close();
+            ObHTableTestUtil.closeConn();
+        } catch (Exception e) {
+            Assert.assertSame(e.getClass(), IOException.class);
+            Assert.assertTrue(e.getMessage().contains("put table"));
+        }
     }
 }

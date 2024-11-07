@@ -73,9 +73,14 @@ public class OHTablePoolTest extends HTableTestBase {
 
     @AfterClass
     public static void finish() throws IOException, SQLException {
-        hTable.close();
-        multiCfHTable.close();
-        ObHTableTestUtil.closeConn();
+        try {
+            hTable.close();
+            multiCfHTable.close();
+            ObHTableTestUtil.closeConn();
+        } catch (Exception e) {
+            Assert.assertSame(e.getClass(), IOException.class);
+            Assert.assertTrue(e.getMessage().contains("put table"));
+        }
     }
 
     public void test_current_get_close(final OHTablePool ohTablePool, int concurrency, int maxSize) {

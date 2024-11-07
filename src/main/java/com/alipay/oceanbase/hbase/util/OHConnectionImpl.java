@@ -126,6 +126,11 @@ public class OHConnectionImpl implements Connection {
 
     @Override
     public BufferedMutator getBufferedMutator(BufferedMutatorParams params) throws IOException {
+        return getBufferedMutator(params, null);
+    }
+
+    public BufferedMutator getBufferedMutator(BufferedMutatorParams params, OHTable ohTable)
+                                                                                            throws IOException {
         if (params.getTableName() == null) {
             throw new IllegalArgumentException("TableName cannot be null.");
         }
@@ -138,7 +143,7 @@ public class OHConnectionImpl implements Connection {
         if (params.getMaxKeyValueSize() == BUFFERED_PARAM_UNSET) {
             params.maxKeyValueSize(connectionConfig.getMaxKeyValueSize());
         }
-        return new OHBufferedMutatorImpl(this, params);
+        return new OHBufferedMutatorImpl(this, params, ohTable);
     }
 
     @Override

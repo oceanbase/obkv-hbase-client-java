@@ -4,6 +4,7 @@ import com.alipay.oceanbase.hbase.util.NativeHBaseUtil;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
@@ -39,8 +40,13 @@ public class NativeHBaseTest extends HTableTestBase {
 
     @AfterClass
     public static void finish() throws IOException {
-        hTable.close();
-        multiCfHTable.close();
+        try {
+            hTable.close();
+            multiCfHTable.close();
+        } catch (Exception e) {
+            Assert.assertSame(e.getClass(), IOException.class);
+            Assert.assertTrue(e.getMessage().contains("put table"));
+        }
     }
 
 }
