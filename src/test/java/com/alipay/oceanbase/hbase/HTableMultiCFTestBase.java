@@ -873,9 +873,7 @@ public abstract class HTableMultiCFTestBase {
 
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1117,9 +1115,7 @@ public abstract class HTableMultiCFTestBase {
 
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1180,9 +1176,7 @@ public abstract class HTableMultiCFTestBase {
         int count = 0;
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1237,9 +1231,7 @@ public abstract class HTableMultiCFTestBase {
         Get get = new Get(toBytes("Key1"));
         Result result = multiCfHTable.get(get);
         Cell[] keyValues = result.rawCells();
-        long timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
@@ -1255,9 +1247,7 @@ public abstract class HTableMultiCFTestBase {
         get2.addColumn(family2, family2_column2);
         Result result2 = multiCfHTable.get(get2);
         keyValues = result2.rawCells();
-        timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
@@ -1273,9 +1263,7 @@ public abstract class HTableMultiCFTestBase {
         get3.addColumn(family2, family2_column2);
         Result result3 = multiCfHTable.get(get3);
         keyValues = result3.rawCells();
-        timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
