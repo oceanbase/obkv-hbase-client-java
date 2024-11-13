@@ -1737,9 +1737,8 @@ public class OHTable implements Table {
             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(),
                 scan.getStopRow(), scan.includeStopRow(), false);
         }
-        if (scan.getBatch() > 0) {
-            obTableQuery.setBatchSize(scan.getBatch());
-        }
+        obTableQuery.setBatchSize(scan.getBatch());
+        obTableQuery.setLimit(scan.getLimit());
         obTableQuery.setMaxResultSize(scan.getMaxResultSize() > 0 ? scan.getMaxResultSize()
             : configuration.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
                 HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
