@@ -54,7 +54,7 @@
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.encoding>UTF-8</project.encoding>
         <slf4j.version>1.7.21</slf4j.version>
-        <table.client.version>1.2.14.1-SNAPSHOT</table.client.version>
+        <table.client.version>1.2.14.4-SNAPSHOT</table.client.version>
     </properties>
 
     <dependencies>
@@ -105,17 +105,10 @@
                 </exclusion>
             </exclusions>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>com.oceanbase</groupId>-->
-<!--            <artifactId>obkv-table-client</artifactId>-->
-<!--            <version>${table.client.version}</version>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>com.oceanbase</groupId>
             <artifactId>obkv-table-client</artifactId>
-            <version>1.2.114-SNAPSHOT</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/obkv-table-client-1.2.114-SNAPSHOT-jar-with-dependencies.jar</systemPath>
+            <version>${table.client.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hbase</groupId>
