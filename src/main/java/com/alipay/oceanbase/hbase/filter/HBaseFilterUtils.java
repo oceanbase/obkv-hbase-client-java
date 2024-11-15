@@ -45,7 +45,7 @@ public class HBaseFilterUtils {
         } else if (filter instanceof DependentColumnFilter) {
             toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else if (filter instanceof CompareFilter) {
-            // RowFilter, ValueFilter, QualifierFilter
+            // RowFilter, ValueFilter, QualifierFilter, FamilyFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
         } else if (filter instanceof SingleColumnValueExcludeFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueExcludeFilter) filter);
