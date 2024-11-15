@@ -20,6 +20,8 @@ package com.alipay.oceanbase.hbase;
 import org.apache.hadoop.conf.Configuration;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -29,6 +31,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 
+import java.io.IOException;
 import java.util.*;
 
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
@@ -1260,5 +1263,112 @@ public abstract class HTableMultiCFTestBase {
         assertEquals(oldTimestamp, result.getColumnCells(family2, family2_column1).get(0)
             .getTimestamp());
         assertTrue(lastTimestamp > oldTimestamp);
+    }
+
+    private void prepare_time_range_test_data() throws IOException {
+        byte[] family1 = "family_with_group1".getBytes();
+        byte[] family2 = "family_with_group2".getBytes();
+        byte[] family3 = "family_with_group3".getBytes();
+        byte[] key = "KEY".getBytes();
+        byte[] column = "COLUMN".getBytes();
+
+        Put put = new Put(key);
+        for (int i = 0; i < 60; i += 3) {
+            put.addColumn(family1, column, i, ("value" + i).getBytes());
+        }
+        multiCfHTable.put(put);
+        put = new Put(key);
+        for (int i = 0; i < 60; i += 3) {
+            put.addColumn(family2, column, i, ("value" + i).getBytes());
+        }
+        multiCfHTable.put(put);
+        put = new Put(key);
+        for (int i = 0; i < 60; i += 3) {
+            put.addColumn(family3, column, i, ("value" + i).getBytes());
+        }
+        multiCfHTable.put(put);
+    }
+
+    @Test
+    public void test_column_family_time_range() throws IOException {
+        byte[] family1 = "family_with_group1".getBytes();
+        byte[] family2 = "family_with_group2".getBytes();
+        byte[] family3 = "family_with_group3".getBytes();
+        prepare_time_range_test_data();
+        // 20 cell for every family.
+
+        long min = 10;
+        long max = 20;
+        Get get = new Get(toBytes("KEY"));
+        get.setMaxVersions(999);
+        get.addFamily(family1);
+        get.setColumnFamilyTimeRange(family1, min, max);
+        Result result = multiCfHTable.get(get);
+        System.out.println("test1 start:");
+        for (Cell keyValue : result.rawCells()) {
+            System.out
+                    .printf(
+                            "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue)));
+            assert(keyValue.getTimestamp() >= min && keyValue.getTimestamp() < max);
+        }
+        assertEquals(3, result.rawCells().length);
+
+        get = new Get(toBytes("KEY"));
+        get.setMaxVersions(999);
+        get.setColumnFamilyTimeRange(family1, 0, 10);
+        get.setColumnFamilyTimeRange(family2, 0, 20);
+        get.setColumnFamilyTimeRange(family3, 0, 30);
+        result = multiCfHTable.get(get);
+        System.out.println("\ntest2 start:");
+        for (Cell keyValue : result.rawCells()) {
+            System.out
+                    .printf(
+                            "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue)));
+        }
+        assertEquals(21, result.rawCells().length);
+
+        get = new Get(toBytes("KEY"));
+        get.setMaxVersions(999);
+        get.setColumnFamilyTimeRange(family1, 0, 10);
+        get.setColumnFamilyTimeRange(family3, 0, 30);
+        get.setTimeRange(54, 60);
+        result = multiCfHTable.get(get);
+        System.out.println("\ntest3 start:");
+        for (Cell keyValue : result.rawCells()) {
+            System.out
+                    .printf(
+                            "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue)));
+        }
+        assertEquals(16, result.rawCells().length);
+
+        get = new Get(toBytes("KEY"));
+        get.setMaxVersions(6);
+        get.setColumnFamilyTimeRange(family1, 0, 10);
+        get.setColumnFamilyTimeRange(family3, 0, 30);
+        get.setTimeRange(54, 60);
+        result = multiCfHTable.get(get);
+        System.out.println("\ntest3 start:");
+        for (Cell keyValue : result.rawCells()) {
+            System.out
+                    .printf(
+                            "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                            Bytes.toString(result.getRow()),
+                            Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                            Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                            Bytes.toString(CellUtil.cloneValue(keyValue)));
+        }
+        assertEquals(12, result.rawCells().length);
     }
 }
