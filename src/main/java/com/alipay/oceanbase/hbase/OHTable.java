@@ -1211,8 +1211,8 @@ public class OHTable implements HTableInterface {
             List<byte[]> qualifiers = new ArrayList<byte[]>();
 
             byte[] rowKey = increment.getRow();
-            Map.Entry<byte[], List<Cell>> entry = increment.getFamilyCellMap()
-                .entrySet().iterator().next();
+            Map.Entry<byte[], List<Cell>> entry = increment.getFamilyCellMap().entrySet()
+                .iterator().next();
 
             byte[] f = entry.getKey();
 
