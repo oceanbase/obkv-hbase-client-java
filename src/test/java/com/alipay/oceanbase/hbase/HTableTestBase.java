@@ -4069,7 +4069,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         // reverse scan
         scan = new Scan();
         scan.addFamily(family.getBytes());
-        scan.setStartRow("scanKey3x".getBytes());
         scan.setStopRow("scanKey1x".getBytes());
         scan.setReversed(true);
         scan.setMaxVersions(10);
@@ -4077,7 +4076,51 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         res_count = 0;
         for (Result result : scanner) {
             for (Cell keyValue : result.rawCells()) {
-                Arrays.equals(key1.getBytes(), CellUtil.cloneRow(keyValue));
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(6, res_count);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setReversed(true);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(13, res_count);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setReversed(true);
+        scan.setMaxVersions(10);
+        scan.setStartRow("scanKey2x".getBytes());
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(9, res_count);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family.getBytes());
+        scan.setStartRow("scanKey3x".getBytes());
+        scan.setStopRow("scanKey1x".getBytes());
+        scan.setReversed(true);
+        scan.setMaxVersions(10);
+        scanner = hTable.getScanner(scan);
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
                 res_count += 1;
             }
         }

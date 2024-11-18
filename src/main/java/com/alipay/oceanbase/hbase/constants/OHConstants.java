@@ -139,14 +139,6 @@ public final class OHConstants {
      */
     public static final String   HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL      = "hbase.client.operation.executeinpool";
 
-    public static final String   HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME         = "hbase.htable.threads.keepalivetime";
-
-    public static final long     DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME = 60;
-
-    public static final String   HBASE_HTABLE_PRIVATE_THREADS_MAX            = "hbase.htable.privatethreads.max";
-
-    public static final int      DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX    = Integer.MAX_VALUE;
-
     public static final String   WRITE_BUFFER_SIZE_KEY                       = "hbase.client.write.buffer";
 
     public static final String   MAX_KEYVALUE_SIZE_KEY                       = "hbase.client.keyvalue.maxsize";

@@ -201,12 +201,7 @@ public class OHTable implements Table {
         this.configuration = configuration;
         this.tableName = tableName.getBytes();
         this.tableNameString = tableName;
-
-        int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-            DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
-        long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-            DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
-        this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+        this.executePool = HTable.getDefaultExecutor(configuration);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
             HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
@@ -312,11 +307,7 @@ public class OHTable implements Table {
         this.configuration = connection.getConfiguration();
         this.executePool = executePool;
         if (executePool == null) {
-            int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
-            long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
-            this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+            this.executePool = HTable.getDefaultExecutor(configuration);
             this.cleanupPoolOnClose = true;
         } else {
             this.cleanupPoolOnClose = false;
@@ -357,11 +348,7 @@ public class OHTable implements Table {
         this.configuration = connection.getConfiguration();
         this.executePool = executePool;
         if (executePool == null) {
-            int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
-            long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
-                DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
-            this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
+            this.executePool = HTable.getDefaultExecutor(configuration);
             this.cleanupPoolOnClose = true;
         } else {
             this.cleanupPoolOnClose = false;
@@ -386,34 +373,6 @@ public class OHTable implements Table {
         setOperationTimeout(operationTimeout);
 
         finishSetUp();
-    }
-
-    /**
-     * 创建默认的线程池
-     * Using the "direct handoff" approach, new threads will only be created
-     * if it is necessary and will grow unbounded. This could be bad but in HCM
-     * we only create as many Runnables as there are region servers. It means
-     * it also scales when new region servers are added.
-     * @param coreSize core size
-     * @param maxThreads max threads
-     * @param keepAliveTime keep alive time
-     * @return ThreadPoolExecutor
-     */
-    @InterfaceAudience.Private
-    public static ThreadPoolExecutor createDefaultThreadPoolExecutor(int coreSize, int maxThreads,
-                                                                     long keepAliveTime) {
-        // NOTE: when SOFA_THREAD_POOL_LOGGING_CAPABILITY is set to true or not set,
-        // the static instance ThreadPoolGovernor will start a non-daemon thread pool
-        // monitor thread in the function ThreadPoolMonitorWrapper.startMonitor,
-        // which will prevent the client process from normal exit
-        if (System.getProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY) == null) {
-            System.setProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY, "false");
-        }
-        SofaThreadPoolExecutor executor = new SofaThreadPoolExecutor(coreSize, maxThreads,
-            keepAliveTime, SECONDS, new SynchronousQueue<>(), "OHTableDefaultExecutePool",
-            TABLE_HBASE_LOGGER_SPACE);
-        executor.allowCoreThreadTimeOut(true);
-        return executor;
     }
 
     /**
@@ -926,8 +885,23 @@ public class OHTable implements Table {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
+        CountDownLatch latch = new CountDownLatch(gets.size());
         for (int i = 0; i < gets.size(); i++) {
-            results[i] = get(gets.get(i));
+            int index = i;
+            executePool.execute(() -> {
+                try {
+                    results[index] = get(gets.get(index));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException("gets interrupted.", e);
         }
         return results;
     }

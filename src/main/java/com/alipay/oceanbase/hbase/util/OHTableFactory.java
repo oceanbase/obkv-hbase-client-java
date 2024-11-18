@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTablePool;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -48,10 +49,7 @@ public class OHTableFactory {
     private final OHTablePool     tablePool;
 
     public OHTableFactory(Configuration conf, OHTablePool tablePool) {
-        this(conf, tablePool, OHTable
-            .createDefaultThreadPoolExecutor(1, conf.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
-                DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX), conf.getLong(
-                HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME, DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME)));
+        this(conf, tablePool, HTable.getDefaultExecutor(conf));
     }
 
     public OHTableFactory(Configuration conf, OHTablePool tablePool,
