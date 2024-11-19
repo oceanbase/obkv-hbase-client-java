@@ -62,6 +62,7 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.util.Threads;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -312,9 +313,8 @@ public class OHTable implements HTableInterface {
         if (System.getProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY) == null) {
             System.setProperty(SOFA_THREAD_POOL_LOGGING_CAPABILITY, "false");
         }
-        SofaThreadPoolExecutor executor = new SofaThreadPoolExecutor(coreSize, maxThreads,
-            keepAliveTime, SECONDS, new SynchronousQueue<Runnable>(), "OHTableDefaultExecutePool",
-            TABLE_HBASE_LOGGER_SPACE);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(coreSize, maxThreads,
+            keepAliveTime, SECONDS, new SynchronousQueue<>(), Threads.newDaemonThreadFactory("ohtable"));
         executor.allowCoreThreadTimeOut(true);
         return executor;
     }
@@ -464,8 +464,18 @@ public class OHTable implements HTableInterface {
 
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
+        List<Future<Result>> futures = new LinkedList<>();
         for (int i = 0; i < gets.size(); i++) {
-            results[i] = get(gets.get(i));
+            int index = i;
+            Future<Result> future = executePool.submit(() -> get(gets.get(index)));
+            futures.add(future);
+        }
+        for (int i = 0; i < gets.size(); i++) {
+            try {
+                results[i] = futures.get(i).get();
+            } catch (Exception e) {
+                throw new RuntimeException("gets occur error. index:{" + i + "}",e);
+            }
         }
         return results;
     }
