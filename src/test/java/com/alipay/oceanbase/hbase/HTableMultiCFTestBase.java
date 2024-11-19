@@ -24,7 +24,7 @@ import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
@@ -1260,301 +1260,157 @@ public abstract class HTableMultiCFTestBase {
         assertEquals(oldTimestamp, result.getColumnCells(family2, family2_column1).get(0)
             .getTimestamp());
         assertTrue(lastTimestamp > oldTimestamp);
+    }
 
-        // delete previous data
-        Delete deleteKey1Family = new Delete(toBytes(key1));
-        deleteKey1Family.deleteFamily(family1);
-        deleteKey1Family.deleteFamily(family2);
-        Delete deleteKey2Family = new Delete(toBytes(key2));
-        deleteKey2Family.deleteFamily(family1);
-        deleteKey2Family.deleteFamily(family2);
-        Delete deleteKey3Family = new Delete(toBytes(key3));
-        deleteKey3Family.deleteFamily(family1);
-        deleteKey3Family.deleteFamily(family2);
+    @Test
+    public void testFamilyFilter() throws Exception {
+        String key1 = "getKey1";
+        String key2 = "getKey2";
+        String column1 = "abc";
+        String column2 = "def";
+        String value1 = "value1";
+        String value2 = "value2";
+        String family1 = "family_with_group1";
+        String family2 = "family_with_group2";
+        String family3 = "family_with_group3";
 
-        multiCfHTable.delete(deleteKey1Family);
-        multiCfHTable.delete(deleteKey2Family);
-        multiCfHTable.delete(deleteKey3Family);
+        Delete deleteKey1 = new Delete(toBytes(key1));
+        deleteKey1.deleteFamily(toBytes(family1));
+        deleteKey1.deleteFamily(toBytes(family2));
+        deleteKey1.deleteFamily(toBytes(family3));
+        Delete deleteKey2 = new Delete(toBytes(key2));
+        deleteKey2.deleteFamily(toBytes(family1));
+        deleteKey2.deleteFamily(toBytes(family2));
+        deleteKey2.deleteFamily(toBytes(family3));
 
-        long minTimeStamp = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp1 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp2 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp3 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp4 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp5 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp6 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp7 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp8 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp9 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp10 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long timeStamp11 = System.currentTimeMillis();
-        Thread.sleep(5);
-        long maxTimeStamp = System.currentTimeMillis();
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.add(toBytes(family1), toBytes(column1), toBytes(value1));
 
-        Put putKey1Fam1Column1MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column1MinTs.add(family1, family1_column1, minTimeStamp, toBytes(value1));
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.add(toBytes(family2), toBytes(column1), toBytes(value2));
 
-        Put putKey3Fam1Column1Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column1Ts1.add(family1, family1_column1, timeStamp1, toBytes(value2));
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.add(toBytes(family2), toBytes(column2), toBytes(value2));
 
-        Put putKey1Fam1Column2MinTs = new Put(toBytes(key1));
-        putKey1Fam1Column2MinTs.add(family1, family1_column2, minTimeStamp, toBytes(value1));
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.add(toBytes(family3), toBytes(column2), toBytes(value1));
 
-        Put putKey1Fam1Column2Ts3 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts3.add(family1, family1_column2, timeStamp3, toBytes(value2));
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.add(toBytes(family3), toBytes(column1), toBytes(value1));
 
-        Put putKey2Fam1Column2Ts3 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts3.add(family1, family1_column2, timeStamp3, toBytes(value2));
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.add(toBytes(family3), toBytes(column1), toBytes(value2));
 
-        Put putKey2Fam1Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts1.add(family1, family1_column3, timeStamp1, toBytes(value2));
+       multiCfHTable.delete(deleteKey1);
+       multiCfHTable.delete(deleteKey2);
+       multiCfHTable.put(putKey1Column1Value1);
+       multiCfHTable.put(putKey1Column1Value2);
+       multiCfHTable.put(putKey1Column2Value2);
+       multiCfHTable.put(putKey2Column2Value1);
+       multiCfHTable.put(putKey2Column1Value1);
+       multiCfHTable.put(putKey2Column1Value2);
 
-        Put putKey3Fam1Column3Ts1 = new Put(toBytes(key3));
-        putKey3Fam1Column3Ts1.add(family1, family1_column3, timeStamp1, toBytes(value2));
-
-        Put putKey3Fam1Column2Ts6 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts6.add(family1, family1_column2, timeStamp6, toBytes(value1));
-
-        Put putKey2Fam1Column3Ts6 = new Put(toBytes(key2));
-        putKey2Fam1Column3Ts6.add(family1, family1_column3, timeStamp3, toBytes(value1));
-
-        multiCfHTable.put(putKey1Fam1Column1MinTs);
-        multiCfHTable.put(putKey3Fam1Column1Ts1);
-        multiCfHTable.put(putKey1Fam1Column2MinTs);
-        multiCfHTable.put(putKey1Fam1Column2Ts3);
-        multiCfHTable.put(putKey2Fam1Column2Ts3);
-        multiCfHTable.put(putKey2Fam1Column3Ts1);
-        multiCfHTable.put(putKey3Fam1Column3Ts1);
-        multiCfHTable.put(putKey3Fam1Column2Ts6);
-        multiCfHTable.put(putKey2Fam1Column3Ts6);
-
-        // test DeleteFamilyVersion single cf
-        get = new Get(toBytes(key1));
-        get.addFamily(family1);
-        get.setTimeStamp(minTimeStamp);
-        get.setMaxVersions(10);
-        Result r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
-
-        get = new Get(toBytes(key3));
-        get.addFamily(family1);
-        get.setTimeStamp(timeStamp1);
-        get.setMaxVersions(10);
-        r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
-
-        get = new Get(toBytes(key2));
-        get.addFamily(family1);
-        get.setTimeStamp(timeStamp3);
-        get.setMaxVersions(10);
-        r = multiCfHTable.get(get);
-        Assert.assertEquals(2, r.raw().length);
-
-        Delete delKey1MinTs = new Delete(toBytes(key1));
-        delKey1MinTs.deleteFamilyVersion(family1, minTimeStamp);
-        multiCfHTable.delete(delKey1MinTs);
-
-        get = new Get(toBytes(key1));
-        get.addFamily(family1);
-        get.setTimeStamp(minTimeStamp);
-        get.setMaxVersions(10);
-        r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
-
-        Delete delKey3Ts1 = new Delete(toBytes(key3));
-        delKey3Ts1.deleteFamilyVersion(family1, timeStamp1);
-        multiCfHTable.delete(delKey3Ts1);
-
-        get = new Get(toBytes(key3));
-        get.addFamily(family1);
-        get.setTimeStamp(timeStamp1);
-        get.setMaxVersions(10);
-        r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
-
-        Delete delKey2Ts3 = new Delete(toBytes(key2));
-        delKey2Ts3.deleteFamilyVersion(family1, timeStamp3);
-        multiCfHTable.delete(delKey2Ts3);
-
-        get = new Get(toBytes(key2));
-        get.addFamily(family1);
-        get.setTimeStamp(timeStamp3);
-        get.setMaxVersions(10);
-        r = multiCfHTable.get(get);
-        Assert.assertEquals(0, r.raw().length);
-
-        Scan scan = new Scan();
-        scan.setStartRow(toBytes(key1));
-        scan.setStopRow("scanKey4x".getBytes());
-        scan.addFamily(family1);
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
+        FamilyFilter f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes(family2)));
+        scan.setFilter(f);
         ResultScanner scanner = multiCfHTable.getScanner(scan);
-        int key1Cnt = 0, key2Cnt = 0, key3Cnt = 0;
-        for (Result res : scanner) {
-            for (KeyValue kv : res.raw()) {
-                if (key1.equals(Bytes.toString(kv.getRow()))) {
-                    ++key1Cnt;
-                } else if (key2.equals(Bytes.toString(kv.getRow()))) {
-                    ++key2Cnt;
-                } else {
-                    ++key3Cnt;
-                }
+
+        int res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                Assert.assertArrayEquals(family2.getBytes(), keyValue.getFamily());
+                res_count += 1;
             }
         }
-        Assert.assertEquals(1, key1Cnt);
-        Assert.assertEquals(1, key2Cnt);
-        Assert.assertEquals(1, key3Cnt);
-
-        multiCfHTable.delete(deleteKey1Family);
-        multiCfHTable.delete(deleteKey2Family);
-        multiCfHTable.delete(deleteKey3Family);
-
-        // test DeleteFamilyVersion multiple cf
-        Put putKey1Fam1Column3Ts6 = new Put(toBytes(key1));
-        putKey1Fam1Column3Ts6.add(family1, family1_column3, timeStamp6, toBytes(value3));
-
-        Put putKey1Fam2Column2Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column2Ts2.add(family2, family2_column2, timeStamp2, toBytes(value1));
-
-        Put putKey1Fam2Column3Ts2 = new Put(toBytes(key1));
-        putKey1Fam2Column3Ts2.add(family2, family2_column3, timeStamp2, toBytes(value1));
-
-        Put putKey1Fam1Column2Ts1 = new Put(toBytes(key1));
-        putKey1Fam1Column2Ts1.add(family1, family1_column2, timeStamp1, toBytes(value2));
-
-        Put putKey2Fam1Column2Ts8 = new Put(toBytes(key2));
-        putKey2Fam1Column2Ts8.add(family1, family1_column2, timeStamp8, toBytes(value2));
-
-        Put putKey2Fam2Column3Ts1 = new Put(toBytes(key2));
-        putKey2Fam2Column3Ts1.add(family2, family2_column3, timeStamp3, toBytes(value3));
-
-        Put putKey2Fam1Column1Ts1 = new Put(toBytes(key2));
-        putKey2Fam1Column1Ts1.add(family1, family1_column1, timeStamp8, toBytes(value1));
-
-        Put putKey2Fam2Column1Ts3 = new Put(toBytes(key2));
-        putKey2Fam2Column1Ts3.add(family2, family2_column1, timeStamp3, toBytes(value2));
-
-        Put putKey3Fam1Column2Ts9 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts9.add(family1, family1_column2, timeStamp9, toBytes(value2));
-
-        Put putKey3Fam2Column3Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column3Ts10.add(family2, family2_column3, timeStamp10, toBytes(value1));
-
-        Put putKey3Fam2Column1Ts10 = new Put(toBytes(key3));
-        putKey3Fam2Column1Ts10.add(family2, family2_column1, timeStamp10, toBytes(value2));
-
-        Put putKey3Fam1Column2Ts2 = new Put(toBytes(key3));
-        putKey3Fam1Column2Ts2.add(family1, family1_column2, timeStamp2, toBytes(value1));
-
-        multiCfHTable.put(putKey1Fam1Column3Ts6);
-        multiCfHTable.put(putKey1Fam2Column2Ts2);
-        multiCfHTable.put(putKey1Fam2Column3Ts2);
-        multiCfHTable.put(putKey1Fam1Column2Ts1);
-        multiCfHTable.put(putKey2Fam1Column2Ts8);
-        multiCfHTable.put(putKey2Fam2Column3Ts1);
-        multiCfHTable.put(putKey2Fam1Column1Ts1);
-        multiCfHTable.put(putKey2Fam2Column1Ts3);
-        multiCfHTable.put(putKey3Fam1Column2Ts9);
-        multiCfHTable.put(putKey3Fam2Column3Ts10);
-        multiCfHTable.put(putKey3Fam2Column1Ts10);
-        multiCfHTable.put(putKey3Fam1Column2Ts2);
-
-        Get getKey1 = new Get(toBytes(key1));
-        getKey1.addFamily(family1);
-        getKey1.addFamily(family2);
-        getKey1.setMaxVersions(10);
-        r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(4, r.raw().length);
-
-        Get getKey2 = new Get(toBytes(key2));
-        getKey2.addFamily(family1);
-        getKey2.addFamily(family2);
-        getKey2.setMaxVersions(10);
-        r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(4, r.raw().length);
-
-        Get getKey3 = new Get(toBytes(key3));
-        getKey3.addFamily(family1);
-        getKey3.addFamily(family2);
-        getKey3.setMaxVersions(10);
-        r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(4, r.raw().length);
-
-        Delete delKey1Ts_6_2 = new Delete(toBytes(key1));
-        delKey1Ts_6_2.deleteFamilyVersion(family1, timeStamp6);
-        delKey1Ts_6_2.deleteFamilyVersion(family2, timeStamp2);
-        multiCfHTable.delete(delKey1Ts_6_2);
-
-        getKey1 = new Get(toBytes(key1));
-        getKey1.addFamily(family1);
-        getKey1.addFamily(family2);
-        getKey1.setMaxVersions(10);
-        r = multiCfHTable.get(getKey1);
-        Assert.assertEquals(1, r.raw().length);
-        for (KeyValue kv : r.raw()) {
-            Assert.assertEquals(timeStamp1, kv.getTimestamp());
-        }
-
-        Delete delKey2Ts_8_3 = new Delete(toBytes(key2));
-        delKey2Ts_8_3.deleteFamilyVersion(family1, timeStamp8);
-        delKey2Ts_8_3.deleteFamilyVersion(family2, timeStamp3);
-        multiCfHTable.delete(delKey2Ts_8_3);
-
-        getKey2 = new Get(toBytes(key2));
-        getKey2.addFamily(family1);
-        getKey2.addFamily(family2);
-        getKey2.setMaxVersions(10);
-        r = multiCfHTable.get(getKey2);
-        Assert.assertEquals(0, r.raw().length);
-
-        Delete delKey3Ts_2_10 = new Delete(toBytes(key3));
-        delKey3Ts_2_10.deleteFamilyVersion(family1, timeStamp2);
-        delKey3Ts_2_10.deleteFamilyVersion(family2, timeStamp10);
-        multiCfHTable.delete(delKey3Ts_2_10);
-
-        getKey3 = new Get(toBytes(key3));
-        getKey3.addFamily(family1);
-        getKey3.addFamily(family2);
-        getKey3.setMaxVersions(10);
-        r = multiCfHTable.get(getKey3);
-        Assert.assertEquals(1, r.raw().length);
-        for (KeyValue kv : r.raw()) {
-            Assert.assertEquals(timeStamp9, kv.getTimestamp());
-        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
 
         scan = new Scan();
-        scan.setStartRow(toBytes(key1));
-        scan.setStopRow("scanKey4x".getBytes());
-        scan.addFamily(family1);
-        scan.addFamily(family2);
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes(family2)));
+        scan.setFilter(f);
         scanner = multiCfHTable.getScanner(scan);
-        int ts1Cnt = 0, ts9Cnt = 0;
-        for (Result res : scanner) {
-            for (KeyValue kv : res.raw()) {
-                if (kv.getTimestamp() == timeStamp1) {
-                    ++ts1Cnt;
-                } else if (kv.getTimestamp() == timeStamp9) {
-                    ++ts9Cnt;
-                }
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
             }
         }
-        Assert.assertEquals(1, ts1Cnt);
-        Assert.assertEquals(1, ts9Cnt);
+        Assert.assertEquals(res_count, 4);
+        scanner.close();
 
-        multiCfHTable.delete(deleteKey1Family);
-        multiCfHTable.delete(deleteKey2Family);
-        multiCfHTable.delete(deleteKey3Family);
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(Bytes.toBytes(family2)));
+        scan.setFilter(f);
+        scanner = multiCfHTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                Assert.assertArrayEquals(family3.getBytes(), keyValue.getFamily());
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 3);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(Bytes.toBytes("family_with_group")));
+        scan.setFilter(f);
+        scanner = multiCfHTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 6);
+        scanner.close();
     }
 }
