@@ -18,9 +18,9 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.sofa.common.code.LogCode2Description;
-import com.alipay.sofa.common.log.LoggerSpaceManager;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @InterfaceAudience.Private
 public class TableHBaseLoggerFactory {
@@ -33,7 +33,7 @@ public class TableHBaseLoggerFactory {
         if (name == null || name.isEmpty()) {
             return null;
         }
-        return LoggerSpaceManager.getLoggerBySpace(name, TABLE_HBASE_LOGGER_SPACE);
+        return LoggerFactory.getLogger(name);
     }
 
     public static Logger getLogger(Class<?> klass) {
