@@ -657,9 +657,9 @@ public abstract class HTableMultiCFTestBase {
             put.add(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
-        multiCfHTable.batchCallback(batchLsit, new Batch.Callback<MutationResult>() {
+        multiCfHTable.batchCallback(batchLsit, new Batch.Callback<Result>() {
             @Override
-            public void update(byte[] region, byte[] row, MutationResult result) {
+            public void update(byte[] region, byte[] row, Result result) {
                 updateCounter[0]++;
             }
         });

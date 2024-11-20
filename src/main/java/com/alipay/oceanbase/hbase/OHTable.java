@@ -38,6 +38,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQ
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
+import com.alipay.oceanbase.rpc.table.ObTableClientQueryImpl;
 import com.alipay.sofa.common.thread.SofaThreadPoolExecutor;
 
 import com.google.protobuf.Descriptors;
@@ -1838,14 +1839,52 @@ public class OHTable implements HTableInterface {
     private BatchOperation buildBatchOperation(String tableName, List<? extends Row> actions,
                                                boolean isTableGroup, List<Integer> resultMapSingleOp)
                                                                                                      throws FeatureNotSupportedException,
-                                                                                                     IllegalArgumentException {
+                                                                                                     IllegalArgumentException,
+                                                                                                     IOException {
         BatchOperation batch = obTableClient.batchOperation(tableName);
         int posInList = -1;
         int singleOpResultNum;
         for (Row row : actions) {
             singleOpResultNum = 0;
             posInList++;
-            if (row instanceof Put) {
+            if (row instanceof Get) {
+                Get get = (Get) row;
+                ObTableQuery obTableQuery;
+                if (get.getFamilyMap().keySet() == null
+                        || get.getFamilyMap().keySet().isEmpty()
+                        || get.getFamilyMap().size() > 1) {
+                    // In a Get operation where the family map is greater than 1 or equal to 0,
+                    // we handle this by appending the column family to the qualifier on the client side.
+                    // The server can then use this information to filter the appropriate column families and qualifiers.
+                    if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                        throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                    }
+                    NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                    processColumnFilters(columnFilters, get.getFamilyMap());
+                    obTableQuery = buildObTableQuery(get, columnFilters);
+                    ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
+                    batch.addOperation(query);
+                } else {
+                    for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
+                            .entrySet()) {
+                        byte[] family = entry.getKey();
+                        if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                            Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                            if (colFamTimeRangeMap.size() > 1) {
+                                throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                            } else if (colFamTimeRangeMap.get(family) == null) {
+                                throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
+                            } else {
+                                TimeRange tr = colFamTimeRangeMap.get(family);
+                                get.setTimeRange(tr.getMin(), tr.getMax());
+                            }
+                        }
+                        obTableQuery = buildObTableQuery(get, entry.getValue());
+                        ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
+                        batch.addOperation(query);
+                    }
+                }
+            } else if (row instanceof Put) {
                 Put put = (Put) row;
                 if (put.isEmpty()) {
                     throw new IllegalArgumentException("No columns to insert for #"
