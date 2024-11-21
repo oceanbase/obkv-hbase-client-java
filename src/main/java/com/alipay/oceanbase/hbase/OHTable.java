@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
+import com.alipay.oceanbase.hbase.result.ClientAsyncStreamScanner;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
@@ -951,6 +952,11 @@ public class OHTable implements Table {
                 ObTableQueryAsyncRequest request;
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
+                Boolean async = scan.isAsyncPrefetch();
+                if (async == null) {
+                    async = configuration.getBoolean(
+                            Scan.HBASE_CLIENT_SCANNER_ASYNC_PREFETCH, Scan.DEFAULT_HBASE_CLIENT_SCANNER_ASYNC_PREFETCH);
+                }
                 try {
                     if (scan.getFamilyMap().keySet() == null
                         || scan.getFamilyMap().keySet().isEmpty()
@@ -971,8 +977,20 @@ public class OHTable implements Table {
                             getTargetTableName(tableNameString));
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                            tableNameString, family, true);
+                        if (async) {
+                            long maxScannerResultSize;
+                            if (scan.getMaxResultSize() > 0) {
+                                maxScannerResultSize = scan.getMaxResultSize();
+                            } else {
+                                maxScannerResultSize = conf.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                        HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE);
+                            }
+                            return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true, maxScannerResultSize);
+                        } else {
+                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true);
+                        }
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
@@ -998,8 +1016,20 @@ public class OHTable implements Table {
                                     configuration));
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, false);
+                            if (async) {
+                                long maxScannerResultSize;
+                                if (scan.getMaxResultSize() > 0) {
+                                    maxScannerResultSize = scan.getMaxResultSize();
+                                } else {
+                                    maxScannerResultSize = conf.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
+                                            HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE);
+                                }
+                                return new ClientAsyncStreamScanner(clientQueryAsyncStreamResult,
+                                        tableNameString, family, false, maxScannerResultSize);
+                            } else {
+                                return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                        tableNameString, family, false);
+                            }
                         }
                     }
                 } catch (Exception e) {

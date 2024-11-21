@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.result.ClientAsyncStreamScanner;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.*;
@@ -36,6 +37,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
@@ -5624,6 +5627,76 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         }
 
         Assert.assertEquals(2, resultList.size());
+    }
+
+    @Test
+    public void testAsyncPrefetchScanner1() throws IOException {
+        testAsyncPrefetchScannerInner(40, 40, null);
+    }
+    @Test
+    public void testAsyncPrefetchScanner2() throws IOException {
+        testAsyncPrefetchScannerInner(4000, 3, null);
+    }
+    @Test
+    public void testAsyncPrefetchScanner3() throws IOException {
+        testAsyncPrefetchScannerInner(3, 4000, null);
+    }
+    @Test
+    public void testAsyncPrefetchScanner4() throws IOException {
+        testAsyncPrefetchScannerInner(40, 40, (b) -> {
+            try {
+                TimeUnit.MILLISECONDS.sleep(500);
+            } catch (InterruptedException ignored) {
+            }
+        });
+    }
+    @Test
+    public void testAsyncPrefetchScanner5() throws IOException {
+        testAsyncPrefetchScannerInner(40, 40, Assert::assertTrue);
+    }
+
+    public void testAsyncPrefetchScannerInner(int row_count, int column_count, Consumer<Boolean> listener) throws IOException {
+        String key = "async_scanner";
+        String column = "column";
+        String value = "value";
+        String family = "family1";
+        Put put;
+        List<Put> puts = new ArrayList<>();
+        for (int i = 0; i < row_count; i++) {
+            String k = key + String.format("%05d", i);
+            for (int j = 0; j < column_count; j++) {
+                put = new Put(k.getBytes());
+                put.addColumn(family.getBytes(), Bytes.toBytes(column + String.format("%05d", j)), (value + String.format("%05d", j)).getBytes());
+                puts.add(put);
+                if (puts.size() > 1000) {
+                    hTable.put(puts);
+                    puts.clear();
+                }
+            }
+        }
+        hTable.put(puts);
+        puts.clear();
+
+        Scan scan = new Scan();
+        scan.readVersions(10);
+        scan.addFamily(family.getBytes());
+        scan.setAsyncPrefetch(true);
+        ResultScanner scanner = hTable.getScanner(scan);
+        assertTrue(scanner instanceof ClientAsyncStreamScanner);
+        ((ClientAsyncStreamScanner) scanner).setPrefetchListener(listener);
+
+        int count = 0;
+        for (Result res: scanner) {
+            for (Cell cell: res.rawCells()) {
+                int rowId = count / column_count;
+                int columnId = count % column_count;
+                Assert.assertEquals(key + String.format("%05d", rowId), Bytes.toString(CellUtil.cloneRow(cell)));
+                Assert.assertEquals(column + String.format("%05d", columnId), Bytes.toString(CellUtil.cloneQualifier(cell)));
+                count ++;
+            }
+        }
+        assertEquals(row_count * column_count, count);
+        scanner.close();
     }
 
     @Test
