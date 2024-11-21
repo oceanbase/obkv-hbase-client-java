@@ -25,8 +25,11 @@ import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
+import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
+import com.alipay.oceanbase.rpc.protocol.payload.ObPayload;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -69,6 +72,8 @@ import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkNotNull;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
+import static com.alipay.oceanbase.rpc.mutation.MutationFactory.colVal;
+import static com.alipay.oceanbase.rpc.mutation.MutationFactory.row;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
 import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_POOL_LOGGING_CAPABILITY;
@@ -694,39 +699,83 @@ public class OHTable implements Table {
         BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!CompatibilityUtil.isBatchSupport()) {
-            try {
-                compatOldServerBatch(actions, results, batchError);
-            } catch (Exception e) {
-                throw new IOException(e);
-            }
-        } else {
-            String realTableName = getTargetTableName(actions);
-            BatchOperation batch = buildBatchOperation(realTableName, actions,
-                    tableNameString.equals(realTableName), resultMapSingleOp);
-            BatchOperationResult tmpResults;
-            try {
-                tmpResults = batch.execute();
-            } catch (Exception e) {
-                throw new IOException(e);
-            }
-            int index = 0;
-            for (int i = 0; i != actions.size(); ++i) {
-                if (tmpResults.getResults().get(index) instanceof ObTableException) {
-                    if (results != null) {
-                        results[i] = tmpResults.getResults().get(index);
+        try {
+            if (!CompatibilityUtil.isBatchSupport()) {
+                compatOldServerBatch(actions, results);
+            } else {
+                String realTableName = getTargetTableName(actions);
+                BatchOperation batch = buildBatchOperation(realTableName, actions,
+                        tableNameString.equals(realTableName), resultMapSingleOp);
+                BatchOperationResult tmpResults = batch.execute();
+                if (results != null) {
+                    int index = 0;
+                    for (int i = 0; i != results.length; ++i) {
+                        if (tmpResults.getResults().get(index) instanceof ObTableException) {
+                            results[i] = tmpResults.getResults().get(index);
+                            batchError.add((ObTableException) results[i], actions.get(i), null);
+                        } else if (actions.get(i) instanceof Get) {
+                            Get get = (Get) actions.get(i);
+                            boolean isTableGroup = (get.getFamilyMap().keySet().size() != 1);
+                            if (tmpResults.getResults().get(index) instanceof MutationResult) {
+                                MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
+                                ObPayload innerResult = mutationResult.getResult();
+                                if (innerResult instanceof ObTableSingleOpResult) {
+                                    ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
+                                    ObTableSingleOpEntity singleOpEntity = singleOpResult.getEntity();
+                                    List<String> rowkeyNames = singleOpEntity.getRowKeyNames();
+                                    List<ObObj> rowKey = singleOpEntity.getRowkey();
+                                    List<String> propertiesNames = singleOpEntity.getPropertiesNames();
+                                    List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
+                                    if (!get.isCheckExistenceOnly()) {
+                                        if (rowKey.size() != (propertiesValues.size() * 3)) {
+                                            throw new IllegalArgumentException("the length of rowKey and properties is not matched");
+                                        } else if (rowkeyNames.size() != 3 || propertiesNames.size() != 1) {
+                                            throw new IllegalArgumentException("the length of rowKeyNames and propertyNames is not matched");
+                                        }
+                                    }
+                                    List<Cell> cells = new ArrayList<>();
+                                    int rowKeyIdx = 0, valueIdx = 0;
+                                    while (rowKeyIdx < rowKey.size() && valueIdx < propertiesValues.size()) {
+                                        byte[][] familyAndQualifier = new byte[2][];
+                                        if (isTableGroup) {
+                                            // split family and qualifier
+                                            familyAndQualifier = OHBaseFuncUtils
+                                                    .extractFamilyFromQualifier((byte[]) rowKey.get(rowKeyIdx + 1).getValue());
+                                        } else {
+                                            byte[] family = get.getFamilyMap().keySet().iterator().next();
+                                            familyAndQualifier[0] = family;
+                                            familyAndQualifier[1] = (byte[]) rowKey.get(rowKeyIdx + 1).getValue();
+                                        }
+                                        KeyValue kv = new KeyValue((byte[]) rowKey.get(rowKeyIdx).getValue(),//K
+                                                familyAndQualifier[0], // family
+                                                familyAndQualifier[1], // qualifiermat
+                                                (Long) rowKey.get(rowKeyIdx + 2).getValue(), // T
+                                                (byte[]) propertiesValues.get(valueIdx).getValue()//  V
+                                        );
+                                        cells.add(kv);
+                                        rowKeyIdx += 3;
+                                        valueIdx++;
+                                    }
+                                    results[i] = Result.create(cells, get.isCheckExistenceOnly());
+                                } else {
+                                    throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
+                                }
+                            } else {
+                                throw new ObTableUnexpectedException("Unexpected type of result in batch");
+                            }
+                        } else {
+                            results[i] = new Result();
+                        }
+                        index += resultMapSingleOp.get(i);
                     }
-                    batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
-                } else {
-                    if (results != null) {
-                        results[i] = new Result();
+                    if (batchError.hasErrors()) {
+                        throw batchError.makeException();
                     }
                 }
-                index += resultMapSingleOp.get(i);
             }
-        }
-        if (batchError.hasErrors()) {
-            throw batchError.makeException();
+        } catch (Exception e) {
+            logger.error(LCD.convert("01-000010"), tableNameString, actions, e);
+            throw new IOException("batch table " + tableNameString + " error", e);
         }
     }
 
@@ -736,11 +785,21 @@ public class OHTable implements Table {
             if (action instanceof RowMutations || action instanceof RegionCoprocessorServiceExec) {
                 throw new FeatureNotSupportedException("not supported yet'");
             } else {
-                Mutation mutation = (Mutation) action;
-                if (mutation.getFamilyCellMap().size() != 1) {
+                Set<byte[]> familySet = null;
+                if (action instanceof Get){
+                    Get get = (Get) action;
+                    familySet = get.familySet();
+                } else {
+                    Mutation mutation = (Mutation) action;
+                    familySet = mutation.getFamilyCellMap().keySet();
+                }
+                if (familySet == null) {
+                    throw new ObTableUnexpectedException("Fail to get family set in action");
+                }
+                if (familySet.size() != 1) {
                     return getTargetTableName(tableNameString);
                 } else {
-                    byte[] nextFamily = mutation.getFamilyCellMap().keySet().iterator().next();
+                    byte[] nextFamily = familySet.iterator().next();
                     if (family != null && !Arrays.equals(family, nextFamily)) {
                         return getTargetTableName(tableNameString);
                     } else if (family == null) {
@@ -1851,42 +1910,39 @@ public class OHTable implements Table {
             singleOpResultNum = 0;
             posInList++;
             if (row instanceof Get) {
+                ++singleOpResultNum;
                 Get get = (Get) row;
                 ObTableQuery obTableQuery;
-                if (get.getFamilyMap().keySet() == null
-                        || get.getFamilyMap().keySet().isEmpty()
-                        || get.getFamilyMap().size() > 1) {
-                    // In a Get operation where the family map is greater than 1 or equal to 0,
-                    // we handle this by appending the column family to the qualifier on the client side.
-                    // The server can then use this information to filter the appropriate column families and qualifiers.
-                    if (!get.getColumnFamilyTimeRange().isEmpty()) {
+                // In a Get operation in ls batch, we need to determine whether the get is a table-group operation or not,
+                // we handle this by appending the column family to the qualifier on the client side.
+                // The server can then use this information to filter the appropriate column families and qualifiers.
+                if ((get.getFamilyMap().keySet().isEmpty()
+                        || get.getFamilyMap().size() > 1) &&
+                        !get.getColumnFamilyTimeRange().isEmpty()) {
+                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                } else if (get.getFamilyMap().size() == 1 && !get.getColumnFamilyTimeRange().isEmpty()) {
+                    byte[] family = get.getFamilyMap().keySet().iterator().next();
+                    Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                    if (colFamTimeRangeMap.size() > 1) {
                         throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
-                    }
-                    NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
-                    processColumnFilters(columnFilters, get.getFamilyMap());
-                    obTableQuery = buildObTableQuery(get, columnFilters);
-                    ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
-                    batch.addOperation(query);
-                } else {
-                    for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
-                            .entrySet()) {
-                        byte[] family = entry.getKey();
-                        if (!get.getColumnFamilyTimeRange().isEmpty()) {
-                            Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
-                            if (colFamTimeRangeMap.size() > 1) {
-                                throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
-                            } else if (colFamTimeRangeMap.get(family) == null) {
-                                throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
-                            } else {
-                                TimeRange tr = colFamTimeRangeMap.get(family);
-                                get.setTimeRange(tr.getMin(), tr.getMax());
-                            }
-                        }
-                        obTableQuery = buildObTableQuery(get, entry.getValue());
-                        ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
-                        batch.addOperation(query);
+                    } else if (colFamTimeRangeMap.get(family) == null) {
+                        throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
+                    } else {
+                        TimeRange tr = colFamTimeRangeMap.get(family);
+                        get.setTimeRange(tr.getMin(), tr.getMax());
                     }
                 }
+                NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                processColumnFilters(columnFilters, get.getFamilyMap());
+                obTableQuery = buildObTableQuery(get, columnFilters);
+                ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
+                try {
+                    query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", null)));
+                } catch (Exception e) {
+                    logger.error("unexpected error occurs when set row key", e);
+                    throw new IOException(e);
+                }
+                batch.addOperation(query);
             } else if (row instanceof Put) {
                 Put put = (Put) row;
                 if (put.isEmpty()) {
@@ -1921,7 +1977,7 @@ public class OHTable implements Table {
                 }
             } else {
                 throw new FeatureNotSupportedException(
-                    "not supported other type in batch yet,only support put and delete");
+                    "not supported other type in batch yet,only support get, put and delete");
             }
             resultMapSingleOp.add(singleOpResultNum);
         }
