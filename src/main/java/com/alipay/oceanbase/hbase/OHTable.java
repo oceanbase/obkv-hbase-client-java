@@ -765,7 +765,7 @@ public class OHTable implements Table {
             if (results != null) {
                 for (int i = 0; i < results.length; i++) {
                     if (!(results[i] instanceof ObTableException)) {
-                        callback.update(null, actions.get(i).getRow(), (R) results[i]);
+                        callback.update(new byte[0], actions.get(i).getRow(), (R) results[i]);
                     }
                 }
             }
