@@ -604,37 +604,26 @@ public class OHTable implements HTableInterface {
                             batchError.add((ObTableException) results[i], actions.get(i), null);
                         } else if (actions.get(i) instanceof Get) {
                             Get get = (Get) actions.get(i);
-                            boolean isTableGroup = (get.getFamilyMap().keySet().size() != 1);
                             if (tmpResults.getResults().get(index) instanceof MutationResult) {
                                 MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
                                 ObPayload innerResult = mutationResult.getResult();
                                 if (innerResult instanceof ObTableSingleOpResult) {
                                     ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
                                     ObTableSingleOpEntity singleOpEntity = singleOpResult.getEntity();
-                                    List<String> rowkeyNames = singleOpEntity.getRowKeyNames();
                                     List<ObObj> rowKey = singleOpEntity.getRowkey();
-                                    List<String> propertiesNames = singleOpEntity.getPropertiesNames();
                                     List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
                                     if (!get.isCheckExistenceOnly()) {
                                         if (rowKey.size() != (propertiesValues.size() * 3)) {
                                             throw new IllegalArgumentException("the length of rowKey and properties is not matched");
-                                        } else if (rowkeyNames.size() != 3 || propertiesNames.size() != 1) {
-                                            throw new IllegalArgumentException("the length of rowKeyNames and propertyNames is not matched");
                                         }
                                     }
                                     List<Cell> cells = new ArrayList<>();
                                     int rowKeyIdx = 0, valueIdx = 0;
                                     while (rowKeyIdx < rowKey.size() && valueIdx < propertiesValues.size()) {
                                         byte[][] familyAndQualifier = new byte[2][];
-                                        if (isTableGroup) {
-                                            // split family and qualifier
-                                            familyAndQualifier = OHBaseFuncUtils
-                                                    .extractFamilyFromQualifier((byte[]) rowKey.get(rowKeyIdx + 1).getValue());
-                                        } else {
-                                            byte[] family = get.getFamilyMap().keySet().iterator().next();
-                                            familyAndQualifier[0] = family;
-                                            familyAndQualifier[1] = (byte[]) rowKey.get(rowKeyIdx + 1).getValue();
-                                        }
+                                        // split family and qualifier
+                                        familyAndQualifier = OHBaseFuncUtils
+                                                .extractFamilyFromQualifier((byte[]) rowKey.get(rowKeyIdx + 1).getValue());
                                         KeyValue kv = new KeyValue((byte[]) rowKey.get(rowKeyIdx).getValue(),//K
                                                 familyAndQualifier[0], // family
                                                 familyAndQualifier[1], // qualifiermat
@@ -645,7 +634,7 @@ public class OHTable implements HTableInterface {
                                         rowKeyIdx += 3;
                                         valueIdx++;
                                     }
-                                    results[i] = Result.create(cells, get.isCheckExistenceOnly());
+                                    results[i] = Result.create(cells);
                                 } else {
                                     throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
                                 }
