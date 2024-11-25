@@ -1930,6 +1930,15 @@ public class OHTable implements HTableInterface {
         }
     }
 
+    private ObTableQueryRequest buildObTableQueryRequest(ObTableQuery obTableQuery,
+                                                         String targetTableName) {
+        ObTableQueryRequest request = new ObTableQueryRequest();
+        request.setEntityType(ObTableEntityType.HKV);
+        request.setTableQuery(obTableQuery);
+        request.setTableName(targetTableName);
+        return request;
+    }
+
     private ObTableQueryAsyncRequest buildObTableQueryAsyncRequest(ObTableQuery obTableQuery,
                                                                    String targetTableName) {
         ObTableQueryRequest request = new ObTableQueryRequest();

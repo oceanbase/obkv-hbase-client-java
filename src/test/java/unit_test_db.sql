@@ -54,6 +54,15 @@ CREATE TABLE `test$partitionFamily1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
 
+CREATE TABLE `test_var_prefix_partition$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `K_PREFIX` varbinary(1024) generated always as (SUBSTRING_INDEX(`K`, '.', 1)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K_PREFIX`) partitions 15;
+
 CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
 CREATE TABLE `test$family_group` (
       `K` varbinary(1024) NOT NULL,
