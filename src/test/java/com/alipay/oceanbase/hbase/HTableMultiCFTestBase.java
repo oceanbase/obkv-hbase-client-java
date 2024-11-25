@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import org.apache.hadoop.conf.Configuration;
-import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
@@ -657,9 +656,9 @@ public abstract class HTableMultiCFTestBase {
             put.add(family3, family3_column1, family3_value);
             batchLsit.add(put);
         }
-        multiCfHTable.batchCallback(batchLsit, new Batch.Callback<MutationResult>() {
+        multiCfHTable.batchCallback(batchLsit, new Batch.Callback<Result>() {
             @Override
-            public void update(byte[] region, byte[] row, MutationResult result) {
+            public void update(byte[] region, byte[] row, Result result) {
                 updateCounter[0]++;
             }
         });
@@ -1301,14 +1300,14 @@ public abstract class HTableMultiCFTestBase {
         Put putKey2Column1Value2 = new Put(toBytes(key2));
         putKey2Column1Value2.add(toBytes(family3), toBytes(column1), toBytes(value2));
 
-       multiCfHTable.delete(deleteKey1);
-       multiCfHTable.delete(deleteKey2);
-       multiCfHTable.put(putKey1Column1Value1);
-       multiCfHTable.put(putKey1Column1Value2);
-       multiCfHTable.put(putKey1Column2Value2);
-       multiCfHTable.put(putKey2Column2Value1);
-       multiCfHTable.put(putKey2Column1Value1);
-       multiCfHTable.put(putKey2Column1Value2);
+        multiCfHTable.delete(deleteKey1);
+        multiCfHTable.delete(deleteKey2);
+        multiCfHTable.put(putKey1Column1Value1);
+        multiCfHTable.put(putKey1Column1Value2);
+        multiCfHTable.put(putKey1Column2Value2);
+        multiCfHTable.put(putKey2Column2Value1);
+        multiCfHTable.put(putKey2Column1Value1);
+        multiCfHTable.put(putKey2Column1Value2);
 
         Scan scan;
         scan = new Scan();
@@ -1316,20 +1315,20 @@ public abstract class HTableMultiCFTestBase {
         scan.addFamily(family2.getBytes());
         scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
-        FamilyFilter f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(Bytes.toBytes(family2)));
+        FamilyFilter f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(family2)));
         scan.setFilter(f);
         ResultScanner scanner = multiCfHTable.getScanner(scan);
 
         int res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
-                );
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()), Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()), keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue()));
                 Assert.assertArrayEquals(family2.getBytes(), keyValue.getFamily());
                 res_count += 1;
             }
@@ -1342,20 +1341,20 @@ public abstract class HTableMultiCFTestBase {
         scan.addFamily(family2.getBytes());
         scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
-        f = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes(family2)));
+        f = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
+            Bytes.toBytes(family2)));
         scan.setFilter(f);
         scanner = multiCfHTable.getScanner(scan);
 
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
-                );
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()), Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()), keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue()));
                 res_count += 1;
             }
         }
@@ -1367,20 +1366,20 @@ public abstract class HTableMultiCFTestBase {
         scan.addFamily(family2.getBytes());
         scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
-        f = new FamilyFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(Bytes.toBytes(family2)));
+        f = new FamilyFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
+            Bytes.toBytes(family2)));
         scan.setFilter(f);
         scanner = multiCfHTable.getScanner(scan);
 
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
-                );
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()), Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()), keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue()));
                 Assert.assertArrayEquals(family3.getBytes(), keyValue.getFamily());
                 res_count += 1;
             }
@@ -1393,20 +1392,20 @@ public abstract class HTableMultiCFTestBase {
         scan.addFamily(family2.getBytes());
         scan.addFamily(family3.getBytes());
         scan.setMaxVersions(10);
-        f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(Bytes.toBytes("family_with_group")));
+        f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(
+            Bytes.toBytes("family_with_group")));
         scan.setFilter(f);
         scanner = multiCfHTable.getScanner(scan);
 
         res_count = 0;
         for (Result result : scanner) {
             for (KeyValue keyValue : result.raw()) {
-                System.out.printf("Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-                        Bytes.toString(result.getRow()),
-                        Bytes.toString(keyValue.getFamily()),
-                        Bytes.toString(keyValue.getQualifier()),
-                        keyValue.getTimestamp(),
-                        Bytes.toString(keyValue.getValue())
-                );
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(result.getRow()), Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()), keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue()));
                 res_count += 1;
             }
         }
