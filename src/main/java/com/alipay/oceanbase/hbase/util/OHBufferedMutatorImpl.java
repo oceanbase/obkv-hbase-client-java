@@ -172,19 +172,16 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             if (execBuffer.isEmpty()) {
                 return;
             }
-            ohTable.batch(execBuffer);
+            Object[] results = new Object[execBuffer.size()];
+            ohTable.batch(execBuffer, results);
             // if commit all successfully, clean execBuffer
             execBuffer.clear();
         } catch (Exception ex) {
+            // do not recollect error operations, notify outside
             LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
                 LOGGER.error(tableName + ": One or more of the operations have failed after retries.");
                 RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
-                // recollect mutations
-                execBuffer.clear();
-                for (int i = 0; i < retryException.getNumExceptions(); ++i) {
-                    execBuffer.add((Mutation) retryException.getRow(i));
-                }
                 if (listener != null) {
                     listener.onException(retryException, this);
                 } else {
@@ -192,13 +189,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 }
             } else {
                 LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
-                throw ex;
-            }
-        } finally {
-            for (Mutation mutation : execBuffer) {
-                long size = mutation.heapSize();
-                currentAsyncBufferSize.addAndGet(size);
-                asyncWriteBuffer.add(mutation);
+                List<Throwable> errors = new ArrayList<>();
+                List<Row> actions = new ArrayList<>();
+                for (Mutation m : execBuffer) {
+                    errors.add(ex);
+                    actions.add(m);
+                }
+                throw new RetriesExhaustedWithDetailsException(errors, actions, null);
             }
         }
     }
