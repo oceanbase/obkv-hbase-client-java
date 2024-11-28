@@ -189,13 +189,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 }
             } else {
                 LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
-                List<Throwable> errors = new ArrayList<>();
-                List<Row> actions = new ArrayList<>();
-                for (Mutation m : execBuffer) {
-                    errors.add(ex);
-                    actions.add(m);
-                }
-                throw new RetriesExhaustedWithDetailsException(errors, actions, null);
+                throw ex;
             }
         }
     }
