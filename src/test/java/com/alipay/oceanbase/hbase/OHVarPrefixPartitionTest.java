@@ -1,5 +1,6 @@
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.junit.After;
 import org.junit.Before;
 

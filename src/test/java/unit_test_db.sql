@@ -212,3 +212,56 @@ CREATE TABLE `test_multi_cf$family_with_group3` (
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`) 
 ) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE DATABASE IF NOT EXISTS `n1`;
+USE `n1`;
+CREATE TABLE `n1:test$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLE `n1:test_t$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLEGROUP `n1:test` SHARDING = 'ADAPTIVE';
+CREATE TABLE `n1:test$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = `n1:test`;
+
+CREATE TABLE `n1:test$family_with_local_index` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    key `idx1`(T) local,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLE `n1:test$family_group` (
+      `K` varbinary(1024) NOT NULL,
+      `Q` varbinary(256) NOT NULL,
+      `T` bigint(20) NOT NULL,
+      `V` varbinary(1024) DEFAULT NULL,
+      PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = `n1:test`;
+
+CREATE TABLE `n1:test$partitionFamily1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+
