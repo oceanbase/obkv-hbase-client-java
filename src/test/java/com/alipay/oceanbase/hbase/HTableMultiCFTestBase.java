@@ -712,6 +712,8 @@ public abstract class HTableMultiCFTestBase {
         // put + get
         Put put = new Put(toBytes("Key1"));
         put.add(family1, family1_column1, family1_value);
+        put.add(family1, family1_column2, family2_value);
+        put.add(family1, family1_column3, family3_value);
         batchLsit.clear();
         batchLsit.add(put);
         batchLsit.add(get1);
@@ -731,7 +733,7 @@ public abstract class HTableMultiCFTestBase {
 
         // put + delete + get
         Get get2 = new Get("Key2".getBytes());
-        get1.setMaxVersions(10);
+        get2.setMaxVersions(10);
         get2.addColumn(family1, family1_column1);
         batchLsit.clear();
         batchLsit.add(delete);
@@ -743,7 +745,7 @@ public abstract class HTableMultiCFTestBase {
         results = multiCfHTable.batch(batchLsit);
         Assert.assertEquals(6, results.length);
         Result key1Result = (Result) results[2];
-        Assert.assertEquals(5, key1Result.raw().length);
+        Assert.assertEquals(3, key1Result.raw().length);
         for (KeyValue keyValue : key1Result.raw()) {
             System.out.printf("3. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
                     Bytes.toString(key1Result.getRow()),
@@ -833,11 +835,27 @@ public abstract class HTableMultiCFTestBase {
         results = multiCfHTable.batch(batchLsit);
         Assert.assertEquals(rows, results.length);
         for (int i = 0; i < rows; ++i) {
-            get = new Get(toBytes("Key" + i));
-            get.addFamily(family1);
-            get.setMaxVersions(10);
+            get = (Get) batchLsit.get(i);
             getResult = multiCfHTable.get(get);
+            for (KeyValue keyValue : getResult.raw()) {
+                System.out.printf("7. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(getResult.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+                );
+            }
             Result batchGetResult = (Result) results[i];
+            for (KeyValue keyValue : batchGetResult.raw()) {
+                System.out.printf("8. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(batchGetResult.getRow()),
+                        Bytes.toString(keyValue.getFamily()),
+                        Bytes.toString(keyValue.getQualifier()),
+                        keyValue.getTimestamp(),
+                        Bytes.toString(keyValue.getValue())
+                );
+            }
             if (Bytes.toString(get.getRow()).equals("Key1")) {
                 Assert.assertEquals(0, batchGetResult.raw().length);
             } else if (Bytes.toString(get.getRow()).equals("Key2")) {
@@ -856,197 +874,197 @@ public abstract class HTableMultiCFTestBase {
             }
         }
 
-//        // multi-cf test
-//        batchLsit.clear();
-//        for (int i = 0; i < rows; ++i) {
-//            put = new Put(toBytes("Key" + i));
-//            delete = new Delete(toBytes("Key" + i));
-//            batchLsit.add(delete);
-//            put.add(family1, family1_column1, family1_value);
-//            put.add(family1, family1_column2, family1_value);
-//            put.add(family1, family1_column3, family1_value);
-//            put.add(family2, family2_column1, family2_value);
-//            put.add(family2, family2_column2, family2_value);
-//            put.add(family3, family3_column1, family3_value);
-//            batchLsit.add(put);
-//        }
-//        multiCfHTable.batch(batchLsit);
-//        batchLsit.clear();
-//
-//        // get
-//        get1 = new Get("Key1".getBytes());
-//        get1.addFamily(family1);
-//        get1.addFamily(family2);
-//        batchLsit.add(get1);
-//        results = multiCfHTable.batch(batchLsit);
-//        getResult = (Result) results[0];
-//        for (KeyValue keyValue : getResult.raw()) {
-//            System.out.printf("1. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(getResult.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//            Assert.assertFalse(Bytes.toString(keyValue.getFamily()).equals("family_with_group3"));
-//        }
-//        // delete + get
-//        batchLsit.clear();
-//        delete = new Delete(toBytes("Key1"));
-//        batchLsit.add(delete);
-//        batchLsit.add(get1);
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(2, results.length);
-//        Assert.assertEquals(0, ((Result) results[1]).raw().length);
-//
-//        // put + get
-//        batchLsit.clear();
-//        put = new Put(toBytes("Key1"));
-//        put.add(family1, family1_column1, family1_value);
-//        put.add(family2, family2_column1, family2_value);
-//        put.add(family3, family3_column1, family3_value);
-//        batchLsit.add(put);
-//        get1.addFamily(family3);
-//        batchLsit.add(get1);
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(2, results.length);
-//        getResult = (Result) results[1];
-//        for (KeyValue keyValue : getResult.raw()) {
-//            System.out.printf("2. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(getResult.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//        }
-//
-//        // put + delete + get
-//        // get2 query all family
-//        get2 = new Get("Key2".getBytes());
-//        batchLsit.clear();
-//        batchLsit.add(delete);
-//        batchLsit.add(put);
-//        batchLsit.add(get1);
-//        batchLsit.add(delete);
-//        batchLsit.add(get1);
-//        batchLsit.add(get2);
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(6, results.length);
-//        key1Result = (Result) results[2];
-//        Assert.assertEquals(3, key1Result.raw().length);
-//        for (KeyValue keyValue : key1Result.raw()) {
-//            System.out.printf("3. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(key1Result.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//        }
-//        empResult = (Result) results[4];
-//        Assert.assertEquals(0, empResult.raw().length);
-//
-//        key2Result = (Result) results[5];
-//        Assert.assertEquals(6, key2Result.raw().length);
-//        for (KeyValue keyValue : key2Result.raw()) {
-//            System.out.printf("4. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(key2Result.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//        }
-//
-//        // set maxVersion
-//        batchLsit.clear();
-//        put = new Put(toBytes("Key2"));
-//        put.add(family1, family1_column1, family1_value);
-//        put.add(family2, family2_column1, family2_value);
-//        put.add(family3, family3_column1, family3_value);
-//        batchLsit.add(put);
-//        get2.setMaxVersions(10);
-//        batchLsit.add(get2);
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(2, results.length);
-//        key2Result = (Result) results[1];
-//        Assert.assertEquals(9, key2Result.raw().length);
-//        for (KeyValue keyValue : key2Result.raw()) {
-//            System.out.printf("5. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(key2Result.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//        }
-//        put = new Put(toBytes("Key2"));
-//        put.add(family1, family1_column1, family1_value);
-//        get2.setMaxVersions(2);
-//        get2All = new Get(toBytes("Key2"));
-//        get2All.setMaxVersions();
-//        batchLsit.clear();
-//        batchLsit.add(put);
-//        batchLsit.add(get2);
-//        batchLsit.add(get2All);
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(3, results.length);
-//        key2Result = (Result) results[1];
-//        key2AllResult = (Result) results[2];
-//        Assert.assertEquals(3, key2AllResult.getColumn(family1, family1_column1).size());
-//        Assert.assertEquals(2, key2Result.getColumn(family1, family1_column1).size());
-//        for (KeyValue keyValue : key2Result.raw()) {
-//            System.out.printf("6. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
-//                    Bytes.toString(key2Result.getRow()),
-//                    Bytes.toString(keyValue.getFamily()),
-//                    Bytes.toString(keyValue.getQualifier()),
-//                    keyValue.getTimestamp(),
-//                    Bytes.toString(keyValue.getValue())
-//            );
-//        }
-//
-//        // compare with get interface
-//        key2GetResult = multiCfHTable.get(get2);
-//        Assert.assertEquals(key2GetResult.raw().length, key2Result.raw().length);
-//        for (int i = 0; i < key2GetResult.size(); ++i) {
-//            Assert.assertEquals(Bytes.toString(key2Result.getRow()), Bytes.toString(key2GetResult.getRow()));
-//            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getFamily()), Bytes.toString(key2GetResult.raw()[i].getFamily()));
-//            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getQualifier()), Bytes.toString(key2GetResult.raw()[i].getQualifier()));
-//            Assert.assertEquals(key2Result.raw()[i].getTimestamp(), key2GetResult.raw()[i].getTimestamp());
-//            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getValue()), Bytes.toString(key2GetResult.raw()[i].getValue()));
-//        }
-//        // test batch get
-//        batchLsit.clear();
-//        for (int i = 0; i < rows; ++i) {
-//            get = new Get(toBytes("Key" + i));
-//            get.setMaxVersions(10);
-//            batchLsit.add(get);
-//        }
-//        results = multiCfHTable.batch(batchLsit);
-//        Assert.assertEquals(rows, results.length);
-//        for (int i = 0; i < rows; ++i) {
-//            get = new Get(toBytes("Key" + i));
-//            get.setMaxVersions(10);
-//            getResult = multiCfHTable.get(get);
-//            Result batchGetResult = (Result) results[i];
-//            if (Bytes.toString(get.getRow()).equals("Key1")) {
-//                Assert.assertEquals(0, batchGetResult.raw().length);
-//            } else if (Bytes.toString(get.getRow()).equals("Key2")) {
-//                // 6 + 3 + 1
-//                Assert.assertEquals(10, batchGetResult.raw().length);
-//            } else {
-//                Assert.assertEquals(6, batchGetResult.raw().length);
-//            }
-//            Assert.assertEquals(getResult.raw().length, batchGetResult.raw().length);
-//            for (int j = 0; j < getResult.size(); ++j) {
-//                Assert.assertEquals(Bytes.toString(getResult.getRow()), Bytes.toString(batchGetResult.getRow()));
-//                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getFamily()), Bytes.toString(batchGetResult.raw()[j].getFamily()));
-//                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getQualifier()), Bytes.toString(batchGetResult.raw()[j].getQualifier()));
-//                Assert.assertEquals(getResult.raw()[j].getTimestamp(), batchGetResult.raw()[j].getTimestamp());
-//                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getValue()), Bytes.toString(batchGetResult.raw()[j].getValue()));
-//            }
-//        }
+        // multi-cf test
+        batchLsit.clear();
+        for (int i = 0; i < rows; ++i) {
+            put = new Put(toBytes("Key" + i));
+            delete = new Delete(toBytes("Key" + i));
+            batchLsit.add(delete);
+            put.add(family1, family1_column1, family1_value);
+            put.add(family1, family1_column2, family1_value);
+            put.add(family1, family1_column3, family1_value);
+            put.add(family2, family2_column1, family2_value);
+            put.add(family2, family2_column2, family2_value);
+            put.add(family3, family3_column1, family3_value);
+            batchLsit.add(put);
+        }
+        multiCfHTable.batch(batchLsit);
+        batchLsit.clear();
+
+        // get
+        get1 = new Get("Key1".getBytes());
+        get1.addFamily(family1);
+        get1.addFamily(family2);
+        batchLsit.add(get1);
+        results = multiCfHTable.batch(batchLsit);
+        getResult = (Result) results[0];
+        for (KeyValue keyValue : getResult.raw()) {
+            System.out.printf("1. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(getResult.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+            Assert.assertFalse(Bytes.toString(keyValue.getFamily()).equals("family_with_group3"));
+        }
+        // delete + get
+        batchLsit.clear();
+        delete = new Delete(toBytes("Key1"));
+        batchLsit.add(delete);
+        batchLsit.add(get1);
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(2, results.length);
+        Assert.assertEquals(0, ((Result) results[1]).raw().length);
+
+        // put + get
+        batchLsit.clear();
+        put = new Put(toBytes("Key1"));
+        put.add(family1, family1_column1, family1_value);
+        put.add(family2, family2_column1, family2_value);
+        put.add(family3, family3_column1, family3_value);
+        batchLsit.add(put);
+        get1.addFamily(family3);
+        batchLsit.add(get1);
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(2, results.length);
+        getResult = (Result) results[1];
+        for (KeyValue keyValue : getResult.raw()) {
+            System.out.printf("2. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(getResult.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+        }
+
+        // put + delete + get
+        // get2 query all family
+        get2 = new Get("Key2".getBytes());
+        batchLsit.clear();
+        batchLsit.add(delete);
+        batchLsit.add(put);
+        batchLsit.add(get1);
+        batchLsit.add(delete);
+        batchLsit.add(get1);
+        batchLsit.add(get2);
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(6, results.length);
+        key1Result = (Result) results[2];
+        Assert.assertEquals(3, key1Result.raw().length);
+        for (KeyValue keyValue : key1Result.raw()) {
+            System.out.printf("3. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(key1Result.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+        }
+        empResult = (Result) results[4];
+        Assert.assertEquals(0, empResult.raw().length);
+
+        key2Result = (Result) results[5];
+        Assert.assertEquals(6, key2Result.raw().length);
+        for (KeyValue keyValue : key2Result.raw()) {
+            System.out.printf("4. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(key2Result.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+        }
+
+        // set maxVersion
+        batchLsit.clear();
+        put = new Put(toBytes("Key2"));
+        put.add(family1, family1_column1, family1_value);
+        put.add(family2, family2_column1, family2_value);
+        put.add(family3, family3_column1, family3_value);
+        batchLsit.add(put);
+        get2.setMaxVersions(10);
+        batchLsit.add(get2);
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(2, results.length);
+        key2Result = (Result) results[1];
+        Assert.assertEquals(9, key2Result.raw().length);
+        for (KeyValue keyValue : key2Result.raw()) {
+            System.out.printf("5. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(key2Result.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+        }
+        put = new Put(toBytes("Key2"));
+        put.add(family1, family1_column1, family1_value);
+        get2.setMaxVersions(2);
+        get2All = new Get(toBytes("Key2"));
+        get2All.setMaxVersions();
+        batchLsit.clear();
+        batchLsit.add(put);
+        batchLsit.add(get2);
+        batchLsit.add(get2All);
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(3, results.length);
+        key2Result = (Result) results[1];
+        key2AllResult = (Result) results[2];
+        Assert.assertEquals(3, key2AllResult.getColumn(family1, family1_column1).size());
+        Assert.assertEquals(2, key2Result.getColumn(family1, family1_column1).size());
+        for (KeyValue keyValue : key2Result.raw()) {
+            System.out.printf("6. Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                    Bytes.toString(key2Result.getRow()),
+                    Bytes.toString(keyValue.getFamily()),
+                    Bytes.toString(keyValue.getQualifier()),
+                    keyValue.getTimestamp(),
+                    Bytes.toString(keyValue.getValue())
+            );
+        }
+
+        // compare with get interface
+        key2GetResult = multiCfHTable.get(get2);
+        Assert.assertEquals(key2GetResult.raw().length, key2Result.raw().length);
+        for (int i = 0; i < key2GetResult.size(); ++i) {
+            Assert.assertEquals(Bytes.toString(key2Result.getRow()), Bytes.toString(key2GetResult.getRow()));
+            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getFamily()), Bytes.toString(key2GetResult.raw()[i].getFamily()));
+            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getQualifier()), Bytes.toString(key2GetResult.raw()[i].getQualifier()));
+            Assert.assertEquals(key2Result.raw()[i].getTimestamp(), key2GetResult.raw()[i].getTimestamp());
+            Assert.assertEquals(Bytes.toString(key2Result.raw()[i].getValue()), Bytes.toString(key2GetResult.raw()[i].getValue()));
+        }
+        // test batch get
+        batchLsit.clear();
+        for (int i = 0; i < rows; ++i) {
+            get = new Get(toBytes("Key" + i));
+            get.setMaxVersions(10);
+            batchLsit.add(get);
+        }
+        results = multiCfHTable.batch(batchLsit);
+        Assert.assertEquals(rows, results.length);
+        for (int i = 0; i < rows; ++i) {
+            get = new Get(toBytes("Key" + i));
+            get.setMaxVersions(10);
+            getResult = multiCfHTable.get(get);
+            Result batchGetResult = (Result) results[i];
+            if (Bytes.toString(get.getRow()).equals("Key1")) {
+                Assert.assertEquals(0, batchGetResult.raw().length);
+            } else if (Bytes.toString(get.getRow()).equals("Key2")) {
+                // 6 + 3 + 1
+                Assert.assertEquals(10, batchGetResult.raw().length);
+            } else {
+                Assert.assertEquals(6, batchGetResult.raw().length);
+            }
+            Assert.assertEquals(getResult.raw().length, batchGetResult.raw().length);
+            for (int j = 0; j < getResult.size(); ++j) {
+                Assert.assertEquals(Bytes.toString(getResult.getRow()), Bytes.toString(batchGetResult.getRow()));
+                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getFamily()), Bytes.toString(batchGetResult.raw()[j].getFamily()));
+                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getQualifier()), Bytes.toString(batchGetResult.raw()[j].getQualifier()));
+                Assert.assertEquals(getResult.raw()[j].getTimestamp(), batchGetResult.raw()[j].getTimestamp());
+                Assert.assertEquals(Bytes.toString(getResult.raw()[j].getValue()), Bytes.toString(batchGetResult.raw()[j].getValue()));
+            }
+        }
     }
 
     @Test
