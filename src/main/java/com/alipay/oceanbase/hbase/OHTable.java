@@ -944,7 +944,7 @@ public class OHTable implements HTableInterface {
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                            tableNameString, family, true);
+                            tableNameString, scan, true);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                             .entrySet()) {
@@ -971,7 +971,7 @@ public class OHTable implements HTableInterface {
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, false);
+                                tableNameString, scan, false);
                         }
                     }
                 } catch (Exception e) {
