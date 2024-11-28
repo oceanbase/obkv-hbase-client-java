@@ -253,8 +253,10 @@ public class HBaseFilterUtilsTest {
 
     @Test
     public void testFamilyFilter() throws IOException {
-        FamilyFilter filter = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(Bytes.toBytes("cf")));
-        Assert.assertArrayEquals("FamilyFilter(!=,'binary:cf')".getBytes(), HBaseFilterUtils.toParseableByteArray(filter));
+        FamilyFilter filter = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL,
+            new BinaryComparator(Bytes.toBytes("cf")));
+        Assert.assertArrayEquals("FamilyFilter(!=,'binary:cf')".getBytes(),
+            HBaseFilterUtils.toParseableByteArray(filter));
     }
 
     @Test
