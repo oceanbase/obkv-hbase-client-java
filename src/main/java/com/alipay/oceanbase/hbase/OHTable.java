@@ -514,20 +514,14 @@ public class OHTable implements Table {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        get.setCheckExistenceOnly(true);
-        return this.get(get).getExists();
+        Get newGet = new Get(get);
+        newGet.setCheckExistenceOnly(true);
+        return this.get(newGet).getExists();
     }
 
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
-        if (gets.isEmpty()) {
-            return new boolean[] {};
-        }
-        if (gets.size() == 1) {
-            return new boolean[] { exists(gets.get(0)) };
-        }
-        Result[] r = get(gets);
-        boolean[] ret = new boolean[r.length];
+        boolean[] ret = new boolean[gets.size()];
         for (int i = 0; i < gets.size(); ++i) {
             ret[i] = exists(gets.get(i));
         }
@@ -1752,20 +1746,12 @@ public class OHTable implements Table {
     private ObTableQuery buildObTableQuery(final Get get, Collection<byte[]> columnQualifiers)
                                                                                               throws IOException {
         ObTableQuery obTableQuery;
-        if (get.isClosestRowBefore()) {
-            PageFilter pageFilter = new PageFilter(1);
-            FilterList filterList = new FilterList(FilterList.Operator.MUST_PASS_ALL);
-            filterList.addFilter(pageFilter);
-            if (null != get.getFilter()) {
-                filterList.addFilter(get.getFilter());
-            }
-            get.setFilter(filterList);
-        }
         ObHTableFilter filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
             get.getMaxVersions(), columnQualifiers);
         if (get.isClosestRowBefore()) {
             obTableQuery = buildObTableQuery(filter, HConstants.EMPTY_BYTE_ARRAY, true,
                 get.getRow(), true, true);
+            obTableQuery.setLimit(1);
         } else {
             obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(), true, false);
         }
