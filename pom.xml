@@ -45,7 +45,7 @@
     </distributionManagement>
 
     <properties>
-        <hadoop.version>2.5.1</hadoop.version>
+        <hadoop.version>3.4.0</hadoop.version>
         <hbase.version>1.3.6</hbase.version>
         <java.source.version>1.8</java.source.version>
         <java.target.version>1.8</java.target.version>
