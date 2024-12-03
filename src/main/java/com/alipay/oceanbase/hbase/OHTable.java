@@ -583,9 +583,9 @@ public class OHTable implements HTableInterface {
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
         try {
-//            if (!CompatibilityUtil.isBatchSupport()) {
-//                compatOldServerBatch(actions, results);
-//            } else {
+            if (!CompatibilityUtil.isBatchSupport()) {
+                compatOldServerBatch(actions, results);
+            } else {
                 String realTableName = getTargetTableName(actions);
                 BatchOperation batch = buildBatchOperation(realTableName, actions,
                         tableNameString.equals(realTableName), resultMapSingleOp);
@@ -636,7 +636,7 @@ public class OHTable implements HTableInterface {
                         throw batchError.makeException();
                     }
                 }
-//            }
+            }
         } catch (Exception e) {
             logger.error(LCD.convert("01-000010"), tableNameString, actions, e);
             throw new IOException("batch table " + tableNameString + " error", e);
