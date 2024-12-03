@@ -597,36 +597,28 @@ public class OHTable implements HTableInterface {
                             results[i] = tmpResults.getResults().get(index);
                             batchError.add((ObTableException) results[i], actions.get(i), null);
                         } else if (actions.get(i) instanceof Get) {
-                            Get get = (Get) actions.get(i);
                             if (tmpResults.getResults().get(index) instanceof MutationResult) {
                                 MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
                                 ObPayload innerResult = mutationResult.getResult();
                                 if (innerResult instanceof ObTableSingleOpResult) {
                                     ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
                                     ObTableSingleOpEntity singleOpEntity = singleOpResult.getEntity();
-                                    List<ObObj> rowKey = singleOpEntity.getRowkey();
                                     List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
-                                    if (!get.isCheckExistenceOnly()) {
-                                        if (rowKey.size() != (propertiesValues.size() * 3)) {
-                                            throw new IllegalArgumentException("the length of rowKey and properties is not matched");
-                                        }
-                                    }
                                     List<Cell> cells = new ArrayList<>();
-                                    int rowKeyIdx = 0, valueIdx = 0;
-                                    while (rowKeyIdx < rowKey.size() && valueIdx < propertiesValues.size()) {
+                                    int  valueIdx = 0;
+                                    while (valueIdx < propertiesValues.size()) {
                                         byte[][] familyAndQualifier = new byte[2][];
                                         // split family and qualifier
                                         familyAndQualifier = OHBaseFuncUtils
-                                                .extractFamilyFromQualifier((byte[]) rowKey.get(rowKeyIdx + 1).getValue());
-                                        KeyValue kv = new KeyValue((byte[]) rowKey.get(rowKeyIdx).getValue(),//K
+                                                .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+                                        KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
                                                 familyAndQualifier[0], // family
                                                 familyAndQualifier[1], // qualifiermat
-                                                (Long) rowKey.get(rowKeyIdx + 2).getValue(), // T
-                                                (byte[]) propertiesValues.get(valueIdx).getValue()//  V
+                                                (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
+                                                (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
                                         );
                                         cells.add(kv);
-                                        rowKeyIdx += 3;
-                                        valueIdx++;
+                                        valueIdx += 4;
                                     }
                                     results[i] = Result.create(cells);
                                 } else {
