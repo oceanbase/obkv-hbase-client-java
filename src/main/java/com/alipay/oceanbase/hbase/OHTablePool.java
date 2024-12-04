@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.constants.OHConstants;
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.KeyDefiner;
 import com.alipay.oceanbase.hbase.util.OHTableFactory;
 import com.google.protobuf.Descriptors;
@@ -178,7 +177,6 @@ public class OHTablePool implements Closeable {
     /**
      * Get a reference to the specified table from the pool.
      * <p>
-     * <p>
      * Create a new one if one is not available.
      *
      * @param tableName table name
@@ -235,7 +233,6 @@ public class OHTablePool implements Closeable {
     /**
      * Puts the specified HTable back into the pool.
      * <p>
-     * <p>
      * If the pool already contains <i>maxSize</i> references to the table, then
      * the table instance gets closed after flushing buffered edits.
      *
@@ -260,10 +257,6 @@ public class OHTablePool implements Closeable {
     /**
      * Closes all the HTable instances , belonging to the given table, in the
      * table pool.
-     *
-     * Note: this is a 'shutdown' of the given table pool and different from
-     * {@link #putTable(HTableInterface)}, that is used to return the table
-     * instance to the pool for future re-use.
      *
      * @param tableName table name
      * @throws IOException if failed
@@ -436,8 +429,6 @@ public class OHTablePool implements Closeable {
     /**
      * Sets the autoFlush flag for the specified tables in this pool.
      * <p>
-     * See {@link OHTable#setAutoFlush(boolean, boolean)}
-     *
      * @param tableName         table name
      * @param autoFlush         Whether or not to enable 'auto-flush'.
      * @param clearBufferOnFail Whether to keep Put failures in the writeBuffer
@@ -473,8 +464,6 @@ public class OHTablePool implements Closeable {
     /**
      * Sets the size of the buffer in bytes for the specified tables in this pool.
      * <p>
-     * See {@link HTable#setWriteBufferSize(long)}
-     *
      * @param tableName table name
      * @param writeBufferSize The new write buffer size, in bytes.
      * @throws IOException if a remote or network exception occurs.

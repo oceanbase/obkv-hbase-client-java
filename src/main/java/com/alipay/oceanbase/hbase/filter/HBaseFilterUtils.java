@@ -46,7 +46,7 @@ public class HBaseFilterUtils {
         } else if (filter instanceof DependentColumnFilter) {
             toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else if (filter instanceof CompareFilter) {
-            // RowFilter, ValueFilter, QualifierFilter
+            // RowFilter, ValueFilter, QualifierFilter, FamilyFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
         } else if (filter instanceof SingleColumnValueExcludeFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueExcludeFilter) filter);
@@ -320,11 +320,11 @@ public class HBaseFilterUtils {
         for (int i = 0; i < fuzzyKeysData.size(); i ++) {
             Pair<byte[], byte[]> data = fuzzyKeysData.get(i);
             byteStream.write("'".getBytes());
-            byteStream.write(data.getFirst());
+            writeBytesWithEscape(byteStream, data.getFirst());
             byteStream.write("'".getBytes());
             byteStream.write(',');
             byteStream.write("'".getBytes());
-            byteStream.write(data.getSecond());
+            writeBytesWithEscape(byteStream, data.getSecond());
             byteStream.write("'".getBytes());
             if (i < fuzzyKeysData.size() - 1) {
                 byteStream.write(',');
@@ -360,9 +360,9 @@ public class HBaseFilterUtils {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write("'".getBytes());
-        byteStream.write(filter.getFamily());
+        writeBytesWithEscape(byteStream, filter.getFamily());
         byteStream.write("','".getBytes());
-        byteStream.write(filter.getQualifier());
+        writeBytesWithEscape(byteStream, filter.getQualifier());
         byteStream.write("',".getBytes());
         byteStream.write(toParseableByteArray(filter.getCompareOperator()));
         byteStream.write(',');
@@ -380,13 +380,13 @@ public class HBaseFilterUtils {
         for (int i = 0; i < ranges.size(); i++) {
             MultiRowRangeFilter.RowRange range = ranges.get(i);
             byteStream.write("'".getBytes());
-            byteStream.write(range.getStartRow());
+            writeBytesWithEscape(byteStream, range.getStartRow());
             byteStream.write("',".getBytes());
             byteStream.write(Boolean.toString(range.isStartRowInclusive()).getBytes());
             byteStream.write(',');
 
             byteStream.write("'".getBytes());
-            byteStream.write(range.getStopRow());
+            writeBytesWithEscape(byteStream, range.getStopRow());
             byteStream.write("',".getBytes());
             byteStream.write(Boolean.toString(range.isStopRowInclusive()).getBytes());
             if (i < ranges.size() - 1) {
@@ -402,7 +402,7 @@ public class HBaseFilterUtils {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write('\'');
-        byteStream.write(filter.getStopRowKey());
+        writeBytesWithEscape(byteStream, filter.getStopRowKey());
         byteStream.write('\'');
         byteStream.write(')');
     }
@@ -414,13 +414,13 @@ public class HBaseFilterUtils {
         byteStream.write('(');
 
         byteStream.write("'".getBytes());
-        byteStream.write(filter.getMinColumn());
+        writeBytesWithEscape(byteStream, filter.getMinColumn());
         byteStream.write("',".getBytes());
         byteStream.write(Boolean.toString(filter.getMinColumnInclusive()).getBytes());
         byteStream.write(',');
 
         byteStream.write("'".getBytes());
-        byteStream.write(filter.getMaxColumn());
+        writeBytesWithEscape(byteStream, filter.getMaxColumn());
         byteStream.write("',".getBytes());
         byteStream.write(Boolean.toString(filter.getMaxColumnInclusive()).getBytes());
         byteStream.write(')');
@@ -436,7 +436,7 @@ public class HBaseFilterUtils {
         for (int i = 0; i < ranges.length; i++) {
             byte[] range = ranges[i];
             byteStream.write("'".getBytes());
-            byteStream.write(range);
+            writeBytesWithEscape(byteStream, range);
             byteStream.write("'".getBytes());
             if (i < ranges.length - 1) {
                 byteStream.write(',');
@@ -470,7 +470,7 @@ public class HBaseFilterUtils {
         int i = 0;
         for (byte[] qualifier: qualifiers) {
             byteStream.write("'".getBytes());
-            byteStream.write(qualifier);
+            writeBytesWithEscape(byteStream, qualifier);
             byteStream.write("'".getBytes());
             if (i < qualifiers.size() - 1) {
                 byteStream.write(',');

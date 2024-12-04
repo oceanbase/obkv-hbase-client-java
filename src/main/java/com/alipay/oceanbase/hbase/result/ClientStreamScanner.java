@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase.result;
 
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
@@ -29,6 +28,7 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import java.io.IOException;
@@ -47,30 +47,38 @@ public class ClientStreamScanner extends AbstractClientScanner {
     private final String                    tableName;
 
     private byte[]                          family;
+    protected final Scan                    scan;
+    protected int                           lineCount    = 0;
 
     private boolean                         closed       = false;
 
     private boolean                         isTableGroup = false;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
-                               byte[] family, boolean isTableGroup) {
+                               Scan scan, boolean isTableGroup) {
         this.streamResult = streamResult;
         this.tableName = tableName;
-        this.family = family;
+        this.scan = scan;
+        family = isTableGroup ? null : scan.getFamilyMap().entrySet().iterator().next().getKey();
         this.isTableGroup = isTableGroup;
     }
 
     public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
-                               byte[] family, boolean isTableGroup) {
+                               Scan scan, boolean isTableGroup) {
         this.streamResult = streamResult;
         this.tableName = tableName;
-        this.family = family;
+        this.scan = scan;
+        family = isTableGroup ? null : scan.getFamilyMap().entrySet().iterator().next().getKey();
         this.isTableGroup = isTableGroup;
     }
 
     @Override
     public Result next() throws IOException {
         try {
+            if (scan.getLimit() > 0 && lineCount++ >= scan.getLimit()) {
+                close();
+                return null;
+            }
             checkStatus();
             List<ObObj> startRow;
             if (streamResult.next()) {

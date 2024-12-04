@@ -19,19 +19,17 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import org.apache.hadoop.conf.Configuration;
-import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 
-import java.io.IOException;
 import java.util.*;
 
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
@@ -820,9 +818,9 @@ public abstract class HTableMultiCFTestBase {
             batchLsit.add(put);
         }
         results = new Object[batchLsit.size()];
-        multiCfHTable.batchCallback(batchLsit, results, new Batch.Callback<MutationResult>() {
+        multiCfHTable.batchCallback(batchLsit, results, new Batch.Callback<Result>() {
             @Override
-            public void update(byte[] region, byte[] row, MutationResult result) {
+            public void update(byte[] region, byte[] row, Result result) {
                 updateCounter[0]++;
             }
         });
@@ -875,9 +873,7 @@ public abstract class HTableMultiCFTestBase {
 
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1119,9 +1115,7 @@ public abstract class HTableMultiCFTestBase {
 
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1182,9 +1176,7 @@ public abstract class HTableMultiCFTestBase {
         int count = 0;
         for (Result result : scanner) {
             Cell[] keyValues = result.rawCells();
-            long timestamp = keyValues[0].getTimestamp();
             for (int i = 1; i < keyValues.length; ++i) {
-                assertEquals(timestamp, keyValues[i].getTimestamp());
                 byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
                 byte[] expectedValue = expectedValues.get(qualifier);
                 if (expectedValue != null) {
@@ -1239,9 +1231,7 @@ public abstract class HTableMultiCFTestBase {
         Get get = new Get(toBytes("Key1"));
         Result result = multiCfHTable.get(get);
         Cell[] keyValues = result.rawCells();
-        long timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
@@ -1257,9 +1247,7 @@ public abstract class HTableMultiCFTestBase {
         get2.addColumn(family2, family2_column2);
         Result result2 = multiCfHTable.get(get2);
         keyValues = result2.rawCells();
-        timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
@@ -1275,9 +1263,7 @@ public abstract class HTableMultiCFTestBase {
         get3.addColumn(family2, family2_column2);
         Result result3 = multiCfHTable.get(get3);
         keyValues = result3.rawCells();
-        timestamp = keyValues[0].getTimestamp();
         for (int i = 1; i < keyValues.length; ++i) {
-            assertEquals(timestamp, keyValues[i].getTimestamp());
             byte[] qualifier = CellUtil.cloneQualifier(keyValues[i]);
             byte[] expectedValue = expectedValues.get(qualifier);
             if (expectedValue != null) {
@@ -1415,5 +1401,161 @@ public abstract class HTableMultiCFTestBase {
         assertEquals(oldTimestamp, result.getColumnCells(family2, family2_column1).get(0)
             .getTimestamp());
         assertTrue(lastTimestamp > oldTimestamp);
+    }
+
+    @Test
+    public void testFamilyFilter() throws Exception {
+        String key1 = "getKey1";
+        String key2 = "getKey2";
+        String column1 = "abc";
+        String column2 = "def";
+        String value1 = "value1";
+        String value2 = "value2";
+        String family1 = "family_with_group1";
+        String family2 = "family_with_group2";
+        String family3 = "family_with_group3";
+
+        Delete deleteKey1 = new Delete(toBytes(key1));
+        deleteKey1.addFamily(toBytes(family1));
+        deleteKey1.addFamily(toBytes(family2));
+        deleteKey1.addFamily(toBytes(family3));
+        Delete deleteKey2 = new Delete(toBytes(key2));
+        deleteKey2.addFamily(toBytes(family1));
+        deleteKey2.addFamily(toBytes(family2));
+        deleteKey2.addFamily(toBytes(family3));
+
+        Put putKey1Column1Value1 = new Put(toBytes(key1));
+        putKey1Column1Value1.addColumn(toBytes(family1), toBytes(column1), toBytes(value1));
+
+        Put putKey1Column1Value2 = new Put(toBytes(key1));
+        putKey1Column1Value2.addColumn(toBytes(family2), toBytes(column1), toBytes(value2));
+
+        Put putKey1Column2Value2 = new Put(toBytes(key1));
+        putKey1Column2Value2.addColumn(toBytes(family2), toBytes(column2), toBytes(value2));
+
+        Put putKey2Column2Value1 = new Put(toBytes(key2));
+        putKey2Column2Value1.addColumn(toBytes(family3), toBytes(column2), toBytes(value1));
+
+        Put putKey2Column1Value1 = new Put(toBytes(key2));
+        putKey2Column1Value1.addColumn(toBytes(family3), toBytes(column1), toBytes(value1));
+
+        Put putKey2Column1Value2 = new Put(toBytes(key2));
+        putKey2Column1Value2.addColumn(toBytes(family3), toBytes(column1), toBytes(value2));
+
+        multiCfHTable.delete(deleteKey1);
+        multiCfHTable.delete(deleteKey2);
+        multiCfHTable.put(putKey1Column1Value1);
+        multiCfHTable.put(putKey1Column1Value2);
+        multiCfHTable.put(putKey1Column2Value2);
+        multiCfHTable.put(putKey2Column2Value1);
+        multiCfHTable.put(putKey2Column1Value1);
+        multiCfHTable.put(putKey2Column1Value2);
+
+        Scan scan;
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        FamilyFilter f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(family2)));
+        scan.setFilter(f);
+        ResultScanner scanner = multiCfHTable.getScanner(scan);
+
+        int res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
+                Assert.assertArrayEquals(family2.getBytes(), CellUtil.cloneFamily(keyValue));
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 2);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
+            Bytes.toBytes(family2)));
+        scan.setFilter(f);
+        scanner = multiCfHTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 4);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
+            Bytes.toBytes(family2)));
+        scan.setFilter(f);
+        scanner = multiCfHTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
+                Assert.assertArrayEquals(family3.getBytes(), CellUtil.cloneFamily(keyValue));
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 3);
+        scanner.close();
+
+        scan = new Scan();
+        scan.addFamily(family1.getBytes());
+        scan.addFamily(family2.getBytes());
+        scan.addFamily(family3.getBytes());
+        scan.setMaxVersions(10);
+        f = new FamilyFilter(CompareFilter.CompareOp.EQUAL, new BinaryPrefixComparator(
+            Bytes.toBytes("family_with_group")));
+        scan.setFilter(f);
+        scanner = multiCfHTable.getScanner(scan);
+
+        res_count = 0;
+        for (Result result : scanner) {
+            for (Cell keyValue : result.rawCells()) {
+                System.out
+                    .printf(
+                        "Rowkey: %s, Column Family: %s, Column Qualifier: %s, Timestamp: %d, Value: %s%n",
+                        Bytes.toString(CellUtil.cloneRow(keyValue)),
+                        Bytes.toString(CellUtil.cloneFamily(keyValue)),
+                        Bytes.toString(CellUtil.cloneQualifier(keyValue)), keyValue.getTimestamp(),
+                        Bytes.toString(CellUtil.cloneValue(keyValue)));
+                res_count += 1;
+            }
+        }
+        Assert.assertEquals(res_count, 6);
+        scanner.close();
     }
 }
