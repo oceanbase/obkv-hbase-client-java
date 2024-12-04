@@ -128,6 +128,10 @@ public class ObTableClientManager {
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
     }
 
+    public static void clear() {
+        OB_TABLE_CLIENT_INSTANCE.clear();
+    }
+
     public static class ObTableClientKey {
         private String     paramUrl;
         private String     fullUserName;
