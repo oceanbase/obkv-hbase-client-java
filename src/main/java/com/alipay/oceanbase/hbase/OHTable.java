@@ -439,7 +439,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public TableName getName() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return TableName.valueOf(this.tableNameString);
     }
 
     @Override

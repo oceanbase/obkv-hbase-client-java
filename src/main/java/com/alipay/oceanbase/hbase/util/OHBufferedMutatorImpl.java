@@ -19,7 +19,6 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableBatchOperation;
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -48,9 +47,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private volatile Configuration        conf;
 
     private OHTable                       ohTable;
-    @VisibleForTesting
     final ConcurrentLinkedQueue<Mutation> asyncWriteBuffer       = new ConcurrentLinkedQueue<Mutation>();
-    @VisibleForTesting
     AtomicLong                            currentAsyncBufferSize = new AtomicLong(0);
 
     private long                          writeBufferSize;
@@ -166,7 +163,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     /**
-     * This execute only supports for server version of 4_3_5.
      * Send the operations in the buffer to the servers. Does not wait for the server's answer. If
      * there is an error, either throw the error, or use the listener to deal with the error.
      *
@@ -189,37 +185,24 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             if (execBuffer.isEmpty()) {
                 return;
             }
-            ohTable.batch(execBuffer);
+            Object[] results = new Object[execBuffer.size()];
+            ohTable.batch(execBuffer, results);
             // if commit all successfully, clean execBuffer
             execBuffer.clear();
         } catch (Exception ex) {
+            // do not recollect error operations, notify outside
+            LOGGER.error(LCD.convert("01-00026"), ex);
             if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
-                LOGGER.error(LCD.convert("01-00011"), tableName.getNameAsString()
-                        + ": One or more of the operations have failed after retries.", ex.getCause());
+                LOGGER.error(tableName + ": One or more of the operations have failed after retries.");
                 RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
-                // recollect mutations and log error information
-                execBuffer.clear();
-                for (int i = 0;  i < retryException.getNumExceptions(); ++i) {
-                    Row failedOp = retryException.getRow(i);
-                    execBuffer.add((Mutation) failedOp);
-                    LOGGER.error(LCD.convert("01-00011"), failedOp, tableName.getNameAsString(),
-                            currentAsyncBufferSize.get(), retryException.getCause(i));
-                }
                 if (listener != null) {
                     listener.onException(retryException, this);
                 } else {
                     throw retryException;
                 }
             } else {
-                LOGGER.error(LCD.convert("01-00011"), tableName.getNameAsString()
-                        + ": Errors unrelated to operations occur during mutation operation", ex);
+                LOGGER.error("Errors unrelated to operations occur during mutation operation", ex);
                 throw ex;
-            }
-        } finally {
-            for (Mutation mutation : execBuffer) {
-                long size = mutation.heapSize();
-                currentAsyncBufferSize.addAndGet(size);
-                asyncWriteBuffer.add(mutation);
             }
         }
     }
@@ -230,7 +213,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             return;
         }
         try {
-            flush();
+            batchExecute(true);
         } finally {
             // the pool in ObTableClient will be shut down too
             this.pool.shutdown();
