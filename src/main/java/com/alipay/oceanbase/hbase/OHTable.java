@@ -424,7 +424,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public TableName getName() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return TableName.valueOf(this.tableNameString);
     }
 
     @Override
@@ -1381,6 +1381,7 @@ public class OHTable implements HTableInterface {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
+        ObTableClientManager.clear();
     }
 
     @Override
