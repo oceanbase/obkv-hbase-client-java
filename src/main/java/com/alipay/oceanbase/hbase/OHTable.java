@@ -1465,11 +1465,6 @@ public class OHTable implements Table {
             executePool.shutdown();
         }
         ObTableClientManager.clear();
-        try {
-            obTableClient.close();
-        } catch (Exception e) {
-            throw new IOException("fail to close obTableClient", e);
-        }
     }
 
     @Override
