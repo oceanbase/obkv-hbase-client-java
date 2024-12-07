@@ -38,6 +38,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ALL;
 import static org.apache.hadoop.hbase.filter.FilterList.Operator.MUST_PASS_ONE;
@@ -50,6 +54,9 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     public ExpectedException expectedException = ExpectedException.none();
 
     protected static Table   hTable;
+
+    private static AtomicInteger count             = new AtomicInteger(0);
+    private static AtomicInteger idx               = new AtomicInteger(0);
 
     @Test
     public void testTableGroup() throws IOError, IOException {
@@ -118,6 +125,37 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
                                    + new String(keyValue.getQualifier()) + " timestamp:"
                                    + keyValue.getTimestamp() + " value:"
                                    + new String(keyValue.getValue()));
+            }
+        }
+
+        // test getScanners with non-partition and empty family
+        List<ResultScanner> scanners = null;
+        if (hTable instanceof OHTableClient) {
+            scanners = ((OHTableClient) hTable).getScanners(scan);
+        } else if (hTable instanceof OHTable) {
+            scanners = ((OHTable) hTable).getScanners(scan);
+        } else if (hTable instanceof OHTablePool.PooledOHTable) {
+            scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
+        } else {
+            throw new IllegalArgumentException(
+                "just support for OHTable, OHTableClient and PooledOHTable");
+        }
+        Assert.assertNotNull(scanners);
+        Assert.assertTrue(!scanners.isEmpty());
+        Assert.assertEquals(1, scanners.size());
+        for (ResultScanner singlePartScanner : scanners) {
+            for (Result result : singlePartScanner) {
+                for (KeyValue keyValue : result.raw()) {
+                    Assert.assertEquals(key, Bytes.toString(keyValue.getRow()));
+                    Assert.assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+                    Assert.assertEquals(timestamp, keyValue.getTimestamp());
+                    Assert.assertEquals(value + "1", Bytes.toString(keyValue.getValue()));
+                    System.out.println("rowKey: " + new String(keyValue.getRow()) + " family :"
+                                       + new String(keyValue.getFamily()) + " columnQualifier:"
+                                       + new String(keyValue.getQualifier()) + " timestamp:"
+                                       + keyValue.getTimestamp() + " value:"
+                                       + new String(keyValue.getValue()));
+                }
             }
         }
     }
@@ -254,6 +292,307 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             }
         }
 
+    }
+
+    /*
+    * CREATE TABLE `test$partitionFamily1` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) partition by key(`K`) partitions 17;
+    * */
+    @Test
+    public void testKeyPartWithGetScanners() throws Exception {
+        testKeyPartGetScannersOneThread("partitionFamily1");
+        testKeyPartGetScannersMultiThread("partitionFamily1");
+    }
+
+    private void testKeyPartGetScannersOneThread(String family) throws Exception {
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+        long timestamp = System.currentTimeMillis();
+        Delete delete = new Delete(key.getBytes());
+        delete.deleteFamily(family.getBytes());
+        hTable.delete(delete);
+
+        Put put = null;
+
+        try {
+            Set<String> keys = new HashSet<>();
+            for (int j = 0; j < 100; j++) {
+                String new_key = key + "_" + j;
+                keys.add(new_key);
+                put = new Put(new_key.getBytes());
+                put.add(family.getBytes(), column1.getBytes(), timestamp + 2, toBytes(value));
+                put.add(family.getBytes(), column2.getBytes(), timestamp + 2, toBytes(value));
+                hTable.put(put);
+            }
+
+            Scan scan = new Scan();
+            scan.addColumn(family.getBytes(), column1.getBytes());
+            scan.addColumn(family.getBytes(), column2.getBytes());
+
+            List<ResultScanner> scanners = null;
+            if (hTable instanceof OHTableClient) {
+                scanners = ((OHTableClient) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTable) {
+                scanners = ((OHTable) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
+            }
+            else {
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
+            }
+            Assert.assertEquals(17, scanners.size());
+
+            int count  = 0;
+            int idx = 0;
+            for (ResultScanner scanner : scanners) {
+                for (Result result : scanner) {
+                    boolean countAdd = true;
+                    for (KeyValue keyValue : result.raw()) {
+                        System.out.println("Partition No." + idx + ": rowKey: " + new String(keyValue.getRow())
+                                + " columnQualifier:" + new String(keyValue.getQualifier())
+                                + " timestamp:" + keyValue.getTimestamp() + " value:"
+                                + new String(keyValue.getValue()));
+                        Assert.assertTrue(keys.contains(Bytes.toString(keyValue.getRow())));
+                        Assert.assertTrue(column1.equals(Bytes.toString(keyValue.getQualifier()))
+                                || column2.equals(Bytes.toString(keyValue.getQualifier())));
+                        Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
+                        Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
+                        if (countAdd) {
+                            countAdd = false;
+                            count++;
+                        }
+                    }
+                }
+                idx++;
+            }
+            Assert.assertEquals(100, count);
+        } finally {
+            for (int j = 0; j < 100; j++) {
+                delete = new Delete(toBytes(key + "_" + j));
+                delete.deleteFamily(family.getBytes());
+                hTable.delete(delete);
+            }
+        }
+
+    }
+
+    private void testKeyPartGetScannersMultiThread(String family) throws Exception {
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+        long timestamp = System.currentTimeMillis();
+        Delete delete = new Delete(key.getBytes());
+        delete.deleteFamily(family.getBytes());
+        hTable.delete(delete);
+
+        Put put = null;
+
+        try {
+            Set<String> keys = new HashSet<>();
+            for (int j = 0; j < 100; j++) {
+                String new_key = key + "_" + j;
+                keys.add(new_key);
+                put = new Put(new_key.getBytes());
+                put.add(family.getBytes(), column1.getBytes(), timestamp + 2, toBytes(value));
+                put.add(family.getBytes(), column2.getBytes(), timestamp + 2, toBytes(value));
+                hTable.put(put);
+            }
+
+            Scan scan = new Scan();
+            scan.addColumn(family.getBytes(), column1.getBytes());
+            scan.addColumn(family.getBytes(), column2.getBytes());
+
+            List<ResultScanner> scanners = null;
+            if (hTable instanceof OHTableClient) {
+                scanners = ((OHTableClient) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTable) {
+                scanners = ((OHTable) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
+            } else {
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
+            }
+            // scanners' size is the number of partitions
+            Assert.assertEquals(17, scanners.size());
+
+            ExecutorService executorService = Executors.newFixedThreadPool(scanners.size());
+
+            for (ResultScanner scanner : scanners) {
+                executorService.submit(() -> {
+                    int localIdx = idx.getAndIncrement();
+                    for (Result result : scanner) {
+                        boolean countAdd = true;
+                        for (KeyValue keyValue : result.raw()) {
+                            System.out.println("Partition No." + localIdx + ": rowKey: " + new String(keyValue.getRow())
+                                    + " columnQualifier:" + new String(keyValue.getQualifier())
+                                    + " timestamp:" + keyValue.getTimestamp() + " value:"
+                                    + new String(keyValue.getValue()));
+                            Assert.assertTrue(keys.contains(Bytes.toString(keyValue.getRow())));
+                            Assert.assertTrue(column1.equals(Bytes.toString(keyValue.getQualifier()))
+                                    || column2.equals(Bytes.toString(keyValue.getQualifier())));
+                            Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
+                            Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
+                            if (countAdd) {
+                                countAdd = false;
+                                count.incrementAndGet();
+                            }
+                        }
+                    }
+                });
+            }
+
+            executorService.shutdown();
+            try {
+                // wait for all tasks done
+                if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
+                    executorService.shutdownNow();
+                    if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
+                        System.err.println("the thread pool did not shut down");
+                    }
+                }
+            } catch (InterruptedException ie) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
+            Assert.assertEquals(100, count.get());
+            idx = new AtomicInteger(0);
+            count = new AtomicInteger(0);
+        } finally {
+            for (int j = 0; j < 100; j++) {
+                delete = new Delete(toBytes(key + "_" + j));
+                delete.deleteFamily(family.getBytes());
+                hTable.delete(delete);
+            }
+        }
+
+    }
+
+    /*
+    * CREATE TABLE `test$familyRange` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) partition by range columns (`K`) (
+        PARTITION p0 VALUES LESS THAN ('d'),
+        PARTITION p1 VALUES LESS THAN ('j'),
+        PARTITION p2 VALUES LESS THAN MAXVALUE
+    );
+    * */
+    @Test
+    public void testRangePartWithGetScanners() throws Exception {
+        testRangePartGetScannersMultiThread("familyRange");
+    }
+
+    private void testRangePartGetScannersMultiThread(String family) throws Exception {
+        String key = null;
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+        long timestamp = System.currentTimeMillis();
+
+        Set<String> keys = new HashSet<>();
+        Put put = null;
+
+        try {
+            for (int j = 0; j < 26; j++) {
+                key = generateRandomStringByUUID(5);
+                keys.add(key);
+                put = new Put(key.getBytes());
+                put.add(family.getBytes(), column1.getBytes(), timestamp + 2, toBytes(value));
+                put.add(family.getBytes(), column2.getBytes(), timestamp + 2, toBytes(value));
+                hTable.put(put);
+            }
+
+            Scan scan = new Scan();
+            scan.addColumn(family.getBytes(), column1.getBytes());
+            scan.addColumn(family.getBytes(), column2.getBytes());
+
+            List<ResultScanner> scanners = null;
+            if (hTable instanceof OHTableClient) {
+                scanners = ((OHTableClient) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTable) {
+                scanners = ((OHTable) hTable).getScanners(scan);
+            } else if (hTable instanceof OHTablePool.PooledOHTable) {
+                scanners = ((OHTablePool.PooledOHTable) hTable).getScanners(scan);
+            } else {
+                throw new IllegalArgumentException("just support for OHTable, OHTableClient and PooledOHTable");
+            }
+            // scanners' size is the number of partitions
+            Assert.assertEquals(3, scanners.size());
+
+            ExecutorService executorService = Executors.newFixedThreadPool(scanners.size());
+
+            for (ResultScanner scanner : scanners) {
+                executorService.submit(() -> {
+                    int localIdx = idx.getAndIncrement();
+                    for (Result result : scanner) {
+                        boolean countAdd = true;
+                        for (KeyValue keyValue : result.raw()) {
+                            System.out.println("Partition No." + localIdx + ": rowKey: " + new String(keyValue.getRow())
+                                    + " columnQualifier:" + new String(keyValue.getQualifier())
+                                    + " timestamp:" + keyValue.getTimestamp() + " value:"
+                                    + new String(keyValue.getValue()));
+                            // 假设 keys, column1, column2, timestamp 和 value 是有效的变量
+                            Assert.assertTrue(keys.contains(Bytes.toString(keyValue.getRow())));
+                            Assert.assertTrue(column1.equals(Bytes.toString(keyValue.getQualifier()))
+                                    || column2.equals(Bytes.toString(keyValue.getQualifier())));
+                            Assert.assertEquals(timestamp + 2, keyValue.getTimestamp());
+                            Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
+                            if (countAdd) {
+                                countAdd = false;
+                                count.incrementAndGet();
+                            }
+                        }
+                    }
+                });
+            }
+
+            executorService.shutdown();
+            try {
+                // wait for all tasks done
+                if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
+                    executorService.shutdownNow();
+                    if (!executorService.awaitTermination(500L, TimeUnit.MILLISECONDS)) {
+                        System.err.println("the thread pool did not shut down");
+                    }
+                }
+            } catch (InterruptedException ie) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
+            Assert.assertEquals(26, count.get());
+            idx = new AtomicInteger(0);
+            count = new AtomicInteger(0);
+        } finally {
+            Object[] keyList = keys.toArray();
+            for (int j = 0; j < keyList.length; j++) {
+                key = (String) keyList[j];
+                Delete delete = new Delete(toBytes(key));
+                delete.deleteFamily(family.getBytes());
+                hTable.delete(delete);
+            }
+        }
+
+    }
+
+    private static String generateRandomStringByUUID(int times) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < times; i++) {
+            sb.append(UUID.randomUUID().toString().replaceAll("-", ""));
+        }
+        return sb.toString();
     }
 
     @Test
