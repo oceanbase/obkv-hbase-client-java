@@ -55,6 +55,9 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     protected static Table   hTable;
 
+    private static AtomicInteger count             = new AtomicInteger(0);
+    private static AtomicInteger idx               = new AtomicInteger(0);
+
     @Test
     public void testTableGroup() throws IOError, IOException {
         /*
@@ -381,8 +384,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
 
     private void testKeyPartGetScannersMultiThread(String family) throws Exception {
-        AtomicInteger count             = new AtomicInteger(0);
-        AtomicInteger idx               = new AtomicInteger(0);
         String key = "putKey";
         String column1 = "putColumn1";
         String column2 = "putColumn2";
@@ -425,10 +426,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             ExecutorService executorService = Executors.newFixedThreadPool(scanners.size());
 
             for (ResultScanner scanner : scanners) {
-                final AtomicInteger thrCount = count;
-                final AtomicInteger thrIdx = idx;
                 executorService.submit(() -> {
-                    int localIdx = thrIdx.getAndIncrement();
+                    int localIdx = idx.getAndIncrement();
                     for (Result result : scanner) {
                         boolean countAdd = true;
                         for (KeyValue keyValue : result.raw()) {
@@ -443,7 +442,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
                             Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
                             if (countAdd) {
                                 countAdd = false;
-                                thrCount.incrementAndGet();
+                                count.incrementAndGet();
                             }
                         }
                     }
@@ -496,8 +495,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
 
     private void testRangePartGetScannersMultiThread(String family) throws Exception {
-        AtomicInteger count             = new AtomicInteger(0);
-        AtomicInteger idx               = new AtomicInteger(0);
         String key = null;
         String column1 = "putColumn1";
         String column2 = "putColumn2";
@@ -537,10 +534,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             ExecutorService executorService = Executors.newFixedThreadPool(scanners.size());
 
             for (ResultScanner scanner : scanners) {
-                final AtomicInteger thrCount = count;
-                final AtomicInteger thrIdx = idx;
                 executorService.submit(() -> {
-                    int localIdx = thrIdx.getAndIncrement();
+                    int localIdx = idx.getAndIncrement();
                     for (Result result : scanner) {
                         boolean countAdd = true;
                         for (KeyValue keyValue : result.raw()) {
@@ -556,7 +551,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
                             Assert.assertEquals(value, Bytes.toString(keyValue.getValue()));
                             if (countAdd) {
                                 countAdd = false;
-                                thrCount.incrementAndGet();
+                                count.incrementAndGet();
                             }
                         }
                     }
