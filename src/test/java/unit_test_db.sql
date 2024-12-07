@@ -54,6 +54,15 @@ CREATE TABLE `test$partitionFamily1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
 
+CREATE TABLE `test_var_prefix_partition$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `K_PREFIX` varbinary(1024) generated always as (SUBSTRING_INDEX(`K`, '.', 1)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K_PREFIX`) partitions 15;
+
 CREATE TABLEGROUP test SHARDING = 'ADAPTIVE';
 CREATE TABLE `test$family_group` (
       `K` varbinary(1024) NOT NULL,
@@ -86,30 +95,6 @@ CREATE TABLE `test$family_ttl` (
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
-);
-
-CREATE TABLE `test$familyRange` (
-    `K` varbinary(1024) NOT NULL,
-    `Q` varbinary(256) NOT NULL,
-    `T` bigint(20) NOT NULL,
-    `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`)
-) partition by range columns (`K`) (
-    PARTITION p0 VALUES LESS THAN ('d'),
-    PARTITION p1 VALUES LESS THAN ('j'),
-    PARTITION p2 VALUES LESS THAN MAXVALUE
-);
-
-CREATE TABLE `test_t$familyRange` (
-    `K` varbinary(1024) NOT NULL,
-    `Q` varbinary(256) NOT NULL,
-    `T` bigint(20) NOT NULL,
-    `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`)
-) partition by range columns (`K`) (
-    PARTITION p0 VALUES LESS THAN ('d'),
-    PARTITION p1 VALUES LESS THAN ('j'),
-    PARTITION p2 VALUES LESS THAN MAXVALUE
 );
 
 CREATE TABLE `test$familyThrottle` (
@@ -209,7 +194,7 @@ CREATE TABLE `test_multi_cf$family_with_group1` (
     `Q` varbinary(256) NOT NULL,
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`) 
+    PRIMARY KEY (`K`, `Q`, `T`)
 ) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
 
 CREATE TABLE `test_multi_cf$family_with_group2` (
@@ -217,7 +202,7 @@ CREATE TABLE `test_multi_cf$family_with_group2` (
     `Q` varbinary(256) NOT NULL,
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`) 
+    PRIMARY KEY (`K`, `Q`, `T`)
 ) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
 
 CREATE TABLE `test_multi_cf$family_with_group3` (
@@ -225,5 +210,58 @@ CREATE TABLE `test_multi_cf$family_with_group3` (
     `Q` varbinary(256) NOT NULL,
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`) 
+    PRIMARY KEY (`K`, `Q`, `T`)
 ) TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE DATABASE IF NOT EXISTS `n1`;
+USE `n1`;
+CREATE TABLE `n1:test$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLE `n1:test_t$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLEGROUP `n1:test` SHARDING = 'ADAPTIVE';
+CREATE TABLE `n1:test$family'1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = `n1:test`;
+
+CREATE TABLE `n1:test$family_with_local_index` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    key `idx1`(T) local,
+    PRIMARY KEY (`K`, `Q`, `T`)
+);
+
+CREATE TABLE `n1:test$family_group` (
+      `K` varbinary(1024) NOT NULL,
+      `Q` varbinary(256) NOT NULL,
+      `T` bigint(20) NOT NULL,
+      `V` varbinary(1024) DEFAULT NULL,
+      PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = `n1:test`;
+
+CREATE TABLE `n1:test$partitionFamily1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) partition by key(`K`) partitions 17;
+

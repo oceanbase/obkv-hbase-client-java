@@ -20,12 +20,14 @@ package com.alipay.oceanbase.hbase.filter;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 
 import java.lang.reflect.Field;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 @InterfaceAudience.Private
 public class HBaseFilterUtils {
@@ -40,15 +42,21 @@ public class HBaseFilterUtils {
                                                                                              throws IOException {
         if (filter == null) {
             throw new IllegalArgumentException("Filter is null");
+        } else if (filter instanceof DependentColumnFilter) {
+            toParseableByteArray(byteStream, (DependentColumnFilter) filter);
         } else if (filter instanceof CompareFilter) {
-            // RowFilter, ValueFilter, QualifierFilter
+            // RowFilter, ValueFilter, QualifierFilter, FamilyFilter
             toParseableByteArray(byteStream, (CompareFilter) filter);
+        } else if (filter instanceof SingleColumnValueExcludeFilter) {
+            toParseableByteArray(byteStream, (SingleColumnValueExcludeFilter) filter);
         } else if (filter instanceof SingleColumnValueFilter) {
             toParseableByteArray(byteStream, (SingleColumnValueFilter) filter);
         } else if (filter instanceof PageFilter) {
             toParseableByteArray(byteStream, (PageFilter) filter);
         } else if (filter instanceof ColumnCountGetFilter) {
             toParseableByteArray(byteStream, (ColumnCountGetFilter) filter);
+        } else if (filter instanceof FirstKeyValueMatchingQualifiersFilter) {
+            toParseableByteArray(byteStream, (FirstKeyValueMatchingQualifiersFilter) filter);
         } else if (filter instanceof PrefixFilter) {
             toParseableByteArray(byteStream, (PrefixFilter) filter);
         } else if (filter instanceof FilterList) {
@@ -63,8 +71,18 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (FirstKeyOnlyFilter) filter);
         } else if (filter instanceof KeyOnlyFilter) {
             toParseableByteArray(byteStream, (KeyOnlyFilter) filter);
+        } else if (filter instanceof FuzzyRowFilter) {
+            toParseableByteArray(byteStream, (FuzzyRowFilter) filter);
         } else if (filter instanceof TimestampsFilter) {
             toParseableByteArray(byteStream, (TimestampsFilter) filter);
+        } else if (filter instanceof MultiRowRangeFilter) {
+            toParseableByteArray(byteStream, (MultiRowRangeFilter) filter);
+        } else if (filter instanceof InclusiveStopFilter) {
+            toParseableByteArray(byteStream, (InclusiveStopFilter) filter);
+        } else if (filter instanceof ColumnRangeFilter) {
+            toParseableByteArray(byteStream, (ColumnRangeFilter) filter);
+        } else if (filter instanceof MultipleColumnPrefixFilter) {
+            toParseableByteArray(byteStream, (MultipleColumnPrefixFilter) filter);
         } else if (filter instanceof SkipFilter) {
             toParseableByteArray(byteStream, (SkipFilter) filter);
         } else if (filter instanceof WhileMatchFilter) {
@@ -149,6 +167,26 @@ public class HBaseFilterUtils {
         byteStream.write(')');
     }
 
+    // SingleColumnValueExcludeFilter('cf1','col1',=,'binary:123',true,true)
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             SingleColumnValueExcludeFilter filter)
+                                                                                   throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write("('".getBytes());
+        writeBytesWithEscape(byteStream, filter.getFamily());
+        byteStream.write("','".getBytes());
+        writeBytesWithEscape(byteStream, filter.getQualifier());
+        byteStream.write("',".getBytes());
+        byteStream.write(toParseableByteArray(filter.getOperator()));
+        byteStream.write(',');
+        toParseableByteArray(byteStream, filter.getComparator());
+        byteStream.write(',');
+        byteStream.write(Boolean.toString(filter.getFilterIfMissing()).getBytes());
+        byteStream.write(',');
+        byteStream.write(Boolean.toString(filter.getLatestVersionOnly()).getBytes());
+        byteStream.write(')');
+    }
+
     // PageFilter(100);
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, PageFilter filter)
                                                                                                  throws IOException {
@@ -165,6 +203,34 @@ public class HBaseFilterUtils {
         byteStream.write(Integer.toString(Bytes.toInt(Bytes.toBytes(filter.getChance())))
             .getBytes());
         byteStream.write(')');
+    }
+
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             DependentColumnFilter filter) throws IOException {
+        // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ')'
+        if (filter.getComparator() == null) {
+            byteStream.write(filter.getClass().getSimpleName().getBytes());
+            byteStream.write("('".getBytes());
+            writeBytesWithEscape(byteStream, filter.getFamily());
+            byteStream.write("','".getBytes());
+            writeBytesWithEscape(byteStream, filter.getQualifier());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
+            byteStream.write(')');
+        } else { // DependentColumnFilter '(' family ',' qualifier ',' BOOL_VALUE ',' compare_op ',' comparator ')'
+            byteStream.write(filter.getClass().getSimpleName().getBytes());
+            byteStream.write("('".getBytes());
+            writeBytesWithEscape(byteStream, filter.getFamily());
+            byteStream.write("','".getBytes());
+            writeBytesWithEscape(byteStream, filter.getQualifier());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(filter.getDropDependentColumn()).getBytes());
+            byteStream.write(',');
+            byteStream.write(toParseableByteArray(filter.getOperator()));
+            byteStream.write(',');
+            toParseableByteArray(byteStream, filter.getComparator());
+            byteStream.write(')');
+        }
     }
 
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
@@ -213,6 +279,35 @@ public class HBaseFilterUtils {
         byteStream.write(')');
     }
 
+    // FuzzyRowFilter('abc','101','ddd','010');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream, FuzzyRowFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        List<Pair<byte[], byte[]>> fuzzyKeysData;
+        try {
+            Field field = filter.getClass().getDeclaredField("fuzzyKeysData");
+            field.setAccessible(true);
+            fuzzyKeysData = (List<Pair<byte[], byte[]>>)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        for (int i = 0; i < fuzzyKeysData.size(); i ++) {
+            Pair<byte[], byte[]> data = fuzzyKeysData.get(i);
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, data.getFirst());
+            byteStream.write("'".getBytes());
+            byteStream.write(',');
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, data.getSecond());
+            byteStream.write("'".getBytes());
+            if (i < fuzzyKeysData.size() - 1) {
+                byteStream.write(',');
+            }
+        }
+        byteStream.write(')');
+    }
+
     private static void toParseableByteArray(ByteArrayOutputStream byteStream, TimestampsFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
@@ -234,12 +329,113 @@ public class HBaseFilterUtils {
         byteStream.write(')');
     }
 
+    // MultiRowRangeFilter('a',true,'b',false,'c',true,'d',false);
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             MultiRowRangeFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        List<MultiRowRangeFilter.RowRange> ranges = filter.getRowRanges();
+        for (int i = 0; i < ranges.size(); i++) {
+            MultiRowRangeFilter.RowRange range = ranges.get(i);
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, range.getStartRow());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(range.isStartRowInclusive()).getBytes());
+            byteStream.write(',');
+
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, range.getStopRow());
+            byteStream.write("',".getBytes());
+            byteStream.write(Boolean.toString(range.isStopRowInclusive()).getBytes());
+            if (i < ranges.size() - 1) {
+                byteStream.write(',');
+            }
+        }
+        byteStream.write(')');
+    }
+
+    // InclusiveStopFilter('aaa');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             InclusiveStopFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        byteStream.write('\'');
+        writeBytesWithEscape(byteStream, filter.getStopRowKey());
+        byteStream.write('\'');
+        byteStream.write(')');
+    }
+
+    // ColumnRangeFilter('a',true,'b',false);
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             ColumnRangeFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        byteStream.write("'".getBytes());
+        writeBytesWithEscape(byteStream, filter.getMinColumn());
+        byteStream.write("',".getBytes());
+        byteStream.write(Boolean.toString(filter.getMinColumnInclusive()).getBytes());
+        byteStream.write(',');
+
+        byteStream.write("'".getBytes());
+        writeBytesWithEscape(byteStream, filter.getMaxColumn());
+        byteStream.write("',".getBytes());
+        byteStream.write(Boolean.toString(filter.getMaxColumnInclusive()).getBytes());
+        byteStream.write(')');
+    }
+
+    // MultipleColumnPrefixFilter('a','b','d');
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             MultipleColumnPrefixFilter filter) throws IOException {
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+
+        byte[][] ranges = filter.getPrefix();
+        for (int i = 0; i < ranges.length; i++) {
+            byte[] range = ranges[i];
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, range);
+            byteStream.write("'".getBytes());
+            if (i < ranges.length - 1) {
+                byteStream.write(',');
+            }
+        }
+        byteStream.write(')');
+    }
+
     // ColumnCountGetFilter(100)
     private static void toParseableByteArray(ByteArrayOutputStream byteStream,
                                              ColumnCountGetFilter filter) throws IOException {
         byteStream.write(filter.getClass().getSimpleName().getBytes());
         byteStream.write('(');
         byteStream.write(Long.toString(filter.getLimit()).getBytes());
+        byteStream.write(')');
+    }
+
+    // FirstKeyValueMatchingQualifiersFilter('q1','q2')
+    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
+                                             FirstKeyValueMatchingQualifiersFilter filter) throws IOException {
+        Set<byte[]> qualifiers;
+        try {
+            Field field = filter.getClass().getDeclaredField("qualifiers");
+            field.setAccessible(true);
+            qualifiers = (Set<byte[]>)field.get(filter);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        byteStream.write(filter.getClass().getSimpleName().getBytes());
+        byteStream.write('(');
+        int i = 0;
+        for (byte[] qualifier: qualifiers) {
+            byteStream.write("'".getBytes());
+            writeBytesWithEscape(byteStream, qualifier);
+            byteStream.write("'".getBytes());
+            if (i < qualifiers.size() - 1) {
+                byteStream.write(',');
+            }
+            i++;
+        }
         byteStream.write(')');
     }
 
