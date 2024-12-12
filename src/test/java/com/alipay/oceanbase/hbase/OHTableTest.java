@@ -47,7 +47,7 @@ public class OHTableTest extends HTableTestBase {
         multiCfHTable = new OHTable(c, "test_multi_cf");
         List<String> tableGroups = new LinkedList<>();
         tableGroups.add("test");
-//        tableGroups.add("test_multi_cf");
+        tableGroups.add("test_multi_cf");
         ObHTableTestUtil.prepareClean(tableGroups);
     }
 
