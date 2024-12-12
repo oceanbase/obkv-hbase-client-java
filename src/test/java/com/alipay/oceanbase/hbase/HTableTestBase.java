@@ -5109,6 +5109,243 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
 
     @Test
+    public void testCellTTL() throws Exception {
+        String key1 = "key1";
+        String column1 = "cf1";
+        String column2 = "cf2";
+        String column3 = "cf3";
+        String family = "cellTTLFamily";
+        String value1 = "v1";
+        String value2 = "v2";
+        String app = "app";
+
+        Result r;
+        Put put1 = new Put(key1.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put1.setTTL(5000);
+        Put put2 = new Put(key1.getBytes());
+        put2.addColumn(family.getBytes(), column1.getBytes(), toBytes(22L));
+        put2.addColumn(family.getBytes(), column2.getBytes(), toBytes(33L));
+        put2.setTTL(10000);
+        Put put3 = new Put(key1.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put3.setTTL(-3000);
+        Put put4 = new Put(key1.getBytes());
+        put4.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put4.setTTL(0);
+        Put errorPut = new Put(key1.getBytes());
+        errorPut.addColumn("family1".getBytes(), column1.getBytes(), toBytes(11L));
+        errorPut.setTTL(10);
+
+        Get get = new Get(key1.getBytes());
+        get.addFamily(family.getBytes());
+        get.setMaxVersions(10);
+        try {
+            tryPut(hTable, errorPut);
+        } catch (Exception e) {
+            assertTrue(e.getCause().toString().contains("Unknown column 'TTL'"));
+        }
+        // test put and get
+        tryPut(hTable, put1);
+        tryPut(hTable, put2);
+        tryPut(hTable, put3);
+        tryPut(hTable, put4);
+        r = hTable.get(get);
+        assertEquals(3, r.size());
+        Thread.sleep(5000);
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        Thread.sleep(5000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        // test increment
+        tryPut(hTable, put1);
+        tryPut(hTable, put2);
+        Thread.sleep(1000);
+        Increment increment = new Increment(key1.getBytes());
+        increment.addColumn(family.getBytes(), column1.getBytes(), 1L);
+        increment.addColumn(family.getBytes(), column2.getBytes(), 2L);
+        increment.addColumn(family.getBytes(), column3.getBytes(), 5L);
+        increment.setTTL(-5000);
+        hTable.increment(increment);
+        increment.setTTL(5000);
+        hTable.increment(increment);
+        get.setMaxVersions(1);
+        r = hTable.get(get);
+
+        assertEquals(3, r.size());
+        assertEquals(23L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(35L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+        assertEquals(5L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column3.getBytes()).get(0))));
+
+        Thread.sleep(10000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        increment = new Increment(key1.getBytes());
+        increment.addColumn(family.getBytes(), column1.getBytes(), 1L);
+        increment.addColumn(family.getBytes(), column2.getBytes(), 2L);
+        increment.setTTL(5000);
+        hTable.increment(increment);
+        r = hTable.get(get);
+
+        assertEquals(2, r.size());
+        assertEquals(1L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(2L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+
+        Thread.sleep(5000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        tryPut(hTable, put1);
+        tryPut(hTable, put2);
+        increment.addColumn(family.getBytes(), column1.getBytes(), 4L);
+        hTable.increment(increment);
+
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        assertEquals(26L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(35L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+
+        // test append
+        Thread.sleep(10000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        put3 = new Put(key1.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), toBytes(value1));
+        put3.addColumn(family.getBytes(), column2.getBytes(), toBytes(value2));
+        put3.setTTL(10000);
+        tryPut(hTable, put3);
+
+        Append append = new Append(key1.getBytes());
+        KeyValue kv = new KeyValue(key1.getBytes(), family.getBytes(), column1.getBytes(),
+            app.getBytes());
+        append.add(kv);
+        append.setTTL(-3000);
+        hTable.append(append);
+        append.setTTL(3000);
+        hTable.append(append);
+
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        assertEquals(
+            value1 + app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
+
+        Thread.sleep(3000);
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        assertEquals(
+            value1,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
+
+        Thread.sleep(7000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        append.add(family.getBytes(), column1.getBytes(), app.getBytes());
+        hTable.append(append);
+        r = hTable.get(get);
+        assertEquals(1, r.size());
+        assertEquals(
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
+
+        Thread.sleep(3000);
+        append.add(family.getBytes(), column2.getBytes(), app.getBytes());
+        hTable.append(append);
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        assertEquals(
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
+        assertEquals(
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column2.getBytes()).get(0))));
+
+        // test checkAndMutate
+        Thread.sleep(3000);
+        r = hTable.get(get);
+        assertEquals(0, r.size());
+
+        tryPut(hTable, put1);
+        RowMutations rowMutations = new RowMutations(key1.getBytes());
+        rowMutations.add(put2);
+        Delete delete = new Delete(key1.getBytes());
+        delete.addColumn(family.getBytes(), column1.getBytes());
+        rowMutations.add(delete);
+        boolean succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(),
+            column1.getBytes(), CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
+        assertTrue(succ);
+        r = hTable.get(get);
+        assertEquals(r.size(), 2);
+        assertEquals(11L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+
+        Thread.sleep(10000);
+        r = hTable.get(get);
+        assertEquals(r.size(), 0);
+
+        tryPut(hTable, put1);
+        rowMutations = new RowMutations(key1.getBytes());
+        put4 = new Put(key1.getBytes());
+        put4.addColumn(family.getBytes(), column1.getBytes(), toBytes(22L));
+        put4.addColumn(family.getBytes(), column2.getBytes(), toBytes(33L));
+        put4.setTTL(10000);
+        rowMutations.add(put4);
+        succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.EQUAL, toBytes(1L), rowMutations);
+        assertFalse(succ);
+        succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(), column1.getBytes(),
+            CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
+        assertTrue(succ);
+
+        r = hTable.get(get);
+        assertEquals(r.size(), 2);
+        assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+
+        Thread.sleep(5000);
+        r = hTable.get(get);
+        assertEquals(2, r.size());
+        assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column1.getBytes()).get(0))));
+        assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+            column2.getBytes()).get(0))));
+
+        Thread.sleep(5000);
+        r = hTable.get(get);
+        assertEquals(r.size(), 0);
+        put1 = new Put(key1.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        tryPut(hTable, put1);
+
+        increment = new Increment(key1.getBytes());
+        increment.addColumn(family.getBytes(), column1.getBytes(), 1L);
+        hTable.increment(increment);
+        r = hTable.get(get);
+        assertEquals(r.size(), 1);
+    }
+
+    @Test
     public void testIncrement() throws IOException {
         String column = "incrementColumn";
         String key = "incrementKey";
@@ -5372,8 +5609,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         try {
             hTable.append(append);
             fail();
-        } catch (FeatureNotSupportedException e) {
-            Assert.assertTrue(e.getMessage().contains("family is empty"));
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("zero columns specified"));
         }
 
         Increment increment = new Increment(key.getBytes());
@@ -5381,8 +5618,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         try {
             hTable.increment(increment);
             fail();
-        } catch (FeatureNotSupportedException e) {
-            Assert.assertTrue(e.getMessage().contains("family is empty"));
+        } catch (IllegalArgumentException e) {
+            Assert.assertTrue(e.getMessage().contains("zero columns specified"));
         }
     }
 
