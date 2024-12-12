@@ -451,8 +451,9 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        get.setCheckExistenceOnly(true);
-        return this.get(get).getExists();
+        Get newGet = new Get(get);
+        newGet.setCheckExistenceOnly(true);
+        return this.get(newGet).getExists();
     }
 
     @Override
@@ -1542,6 +1543,7 @@ public class OHTable implements HTableInterface {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
+        ObTableClientManager.clear();
     }
 
     @Override
