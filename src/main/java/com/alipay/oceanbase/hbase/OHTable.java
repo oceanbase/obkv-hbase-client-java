@@ -1457,6 +1457,7 @@ public class OHTable implements HTableInterface {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
+        ObTableClientManager.clear();
     }
 
     @Override
