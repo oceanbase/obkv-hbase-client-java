@@ -25,6 +25,7 @@ import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
+import com.alipay.oceanbase.rpc.location.model.partition.Partition;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
@@ -701,7 +702,6 @@ public class OHTable implements HTableInterface {
         return results;
     }
 
-    @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
@@ -784,8 +784,8 @@ public class OHTable implements HTableInterface {
         return tableNameString;
     }
 
-    // To enable the server to identify the column family to which a qualifier belongs,  
-    // the client writes the column family name into the qualifier.  
+    // To enable the server to identify the column family to which a qualifier belongs,
+    // the client writes the column family name into the qualifier.
     // The server then parses this information to determine the table that needs to be operated on.
     private void processColumnFilters(NavigableSet<byte[]> columnFilters,
                                       Map<byte[], NavigableSet<byte[]>> familyMap) {
@@ -821,8 +821,8 @@ public class OHTable implements HTableInterface {
                     if (get.getFamilyMap().keySet() == null
                             || get.getFamilyMap().keySet().isEmpty()
                             || get.getFamilyMap().size() > 1) {
-                        // In a Get operation where the family map is greater than 1 or equal to 0,  
-                        // we handle this by appending the column family to the qualifier on the client side.  
+                        // In a Get operation where the family map is greater than 1 or equal to 0,
+                        // we handle this by appending the column family to the qualifier on the client side.
                         // The server can then use this information to filter the appropriate column families and qualifiers.
                         if (!get.getColumnFamilyTimeRange().isEmpty()) {
                             throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
@@ -928,8 +928,8 @@ public class OHTable implements HTableInterface {
                     if (scan.getFamilyMap().keySet() == null
                         || scan.getFamilyMap().keySet().isEmpty()
                         || scan.getFamilyMap().size() > 1) {
-                        // In a Scan operation where the family map is greater than 1 or equal to 0,  
-                        // we handle this by appending the column family to the qualifier on the client side.  
+                        // In a Scan operation where the family map is greater than 1 or equal to 0,
+                        // we handle this by appending the column family to the qualifier on the client side.
                         // The server can then use this information to filter the appropriate column families and qualifiers.
                         if (!scan.getColumnFamilyTimeRange().isEmpty()) {
                             throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
@@ -973,6 +973,92 @@ public class OHTable implements HTableInterface {
                                 .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
                                 tableNameString, family, false);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
+                        e);
+                    throw new IOException("scan table:" + tableNameString + " family "
+                                          + Bytes.toString(family) + " error.", e);
+                }
+
+                throw new IOException("scan table:" + tableNameString + "has no family");
+            }
+        };
+        return executeServerCallable(serverCallable);
+    }
+
+    public List<ResultScanner> getScanners(final Scan scan) throws IOException {
+
+        if (scan.getFamilyMap().keySet().isEmpty()) {
+            // check nothing, use table group;
+        } else {
+            checkFamilyViolation(scan.getFamilyMap().keySet(), false);
+        }
+
+        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
+        ServerCallable<List<ResultScanner>> serverCallable = new ServerCallable<List<ResultScanner>>(
+            configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+            operationTimeout) {
+            public List<ResultScanner> call() throws IOException {
+                byte[] family = new byte[] {};
+                ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
+                ObTableQueryAsyncRequest request;
+                ObTableQuery obTableQuery;
+                ObHTableFilter filter;
+                try {
+                    if (scan.getFamilyMap().keySet() == null
+                            || scan.getFamilyMap().keySet().isEmpty()
+                            || scan.getFamilyMap().size() > 1) {
+                        // In a Scan operation where the family map is greater than 1 or equal to 0,
+                        // we handle this by appending the column family to the qualifier on the client side.
+                        // The server can then use this information to filter the appropriate column families and qualifiers.
+                        NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                        processColumnFilters(columnFilters, scan.getFamilyMap());
+                        filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                scan.getMaxVersions(), columnFilters);
+                        obTableQuery = buildObTableQuery(filter, scan);
+                        List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                            getTargetTableName(tableNameString));
+                        String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
+                            request.getObTableQueryRequest(), tableNameString);
+                        List<Partition> partitions = obTableClient.getPartition(phyTableName, false);
+                        for (Partition partition : partitions) {
+                            request.getObTableQueryRequest().setTableQueryPartId(
+                                partition.getPartId());
+                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                .execute(request);
+                            ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                clientQueryAsyncStreamResult, tableNameString, family, true);
+                            resultScanners.add(clientScanner);
+                        }
+                        return resultScanners;
+                    } else {
+                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
+                            .entrySet()) {
+                            family = entry.getKey();
+                            filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                    scan.getMaxVersions(), entry.getValue());
+                            obTableQuery = buildObTableQuery(filter, scan);
+
+                            List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration);
+                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            List<Partition> partitions = obTableClient
+                                .getPartition(targetTableName, false);
+                            for (Partition partition : partitions) {
+                                request.getObTableQueryRequest().setTableQueryPartId(
+                                    partition.getPartId());
+                                clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                    .execute(request);
+                                ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                    clientQueryAsyncStreamResult, tableNameString, family, false);
+                                resultScanners.add(clientScanner);
+                            }
+                            return resultScanners;
                         }
                     }
                 } catch (Exception e) {
@@ -1901,7 +1987,7 @@ public class OHTable implements HTableInterface {
         byte[] value = original.getValue();
         long timestamp = original.getTimestamp();
         byte type = original.getTypeByte();
-        // Create a new KeyValue with the modified qualifier  
+        // Create a new KeyValue with the modified qualifier
         return new KeyValue(row, family, newQualifier, timestamp, KeyValue.Type.codeToType(type),
             value);
     }
@@ -2059,8 +2145,8 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    // This method is currently only used for append and increment operations.  
-    // It restricts these two methods to use multi-column family operations.  
+    // This method is currently only used for append and increment operations.
+    // It restricts these two methods to use multi-column family operations.
     // Note: After completing operations on multiple column families, they are deleted using the method described above.
     public static void checkFamilyViolationForOneFamily(Collection<byte[]> families) {
         if (families == null || families.size() == 0) {
