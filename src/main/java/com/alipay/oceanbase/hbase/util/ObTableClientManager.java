@@ -128,17 +128,6 @@ public class ObTableClientManager {
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
     }
 
-    public static void clear() throws IOException {
-        try {
-            for (Map.Entry<ObTableClientKey, ObTableClient> pair : OB_TABLE_CLIENT_INSTANCE.entrySet()) {
-                pair.getValue().close();
-            }
-        } catch (Exception e) {
-            throw new IOException("fail to close tableClient" , e);
-        }
-        OB_TABLE_CLIENT_INSTANCE.clear();
-    }
-
     public static class ObTableClientKey {
         private String     paramUrl;
         private String     fullUserName;
