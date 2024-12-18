@@ -21,14 +21,11 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.ConnectionConfiguration;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
@@ -127,18 +124,6 @@ public class ObTableClientManager {
             }
         }
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
-    }
-
-    public static void clear() throws IOException {
-        try {
-            for (Map.Entry<ObTableClientKey, ObTableClient> pair : OB_TABLE_CLIENT_INSTANCE.entrySet()) {
-                pair.getValue().close();
-            }
-        }
-        catch (Exception e) {
-            throw new IOException("fail to close tableClient" , e);
-        }
-        OB_TABLE_CLIENT_INSTANCE.clear();
     }
 
     public static class ObTableClientKey {
