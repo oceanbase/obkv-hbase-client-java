@@ -431,7 +431,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public TableName getName() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return TableName.valueOf(this.tableNameString);
     }
 
     @Override
@@ -457,20 +457,14 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        get.setCheckExistenceOnly(true);
-        return this.get(get).getExists();
+        Get newGet = new Get(get);
+        newGet.setCheckExistenceOnly(true);
+        return this.get(newGet).getExists();
     }
 
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
-        if (gets.isEmpty()) {
-            return new boolean[] {};
-        }
-        if (gets.size() == 1) {
-            return new boolean[] { exists(gets.get(0)) };
-        }
-        Result[] r = get(gets);
-        boolean[] ret = new boolean[r.length];
+        boolean[] ret = new boolean[gets.size()];
         for (int i = 0; i < gets.size(); ++i) {
             ret[i] = exists(gets.get(i));
         }
