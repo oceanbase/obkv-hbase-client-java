@@ -217,7 +217,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             return;
         }
         try {
-            flush();
+            batchExecute(true);
         } finally {
             // the pool in ObTableClient will be shut down too
             this.pool.shutdown();
