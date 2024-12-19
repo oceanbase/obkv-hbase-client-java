@@ -73,16 +73,6 @@ public final class OHConstants {
     public static final String   HBASE_OCEANBASE_DATABASE                    = "hbase.oceanbase.database";
 
     /**
-     * ocenbase hbase model is consist of following columns
-     * K hbase row key
-     * Q hbase qualifier
-     * T hbase timeStamp
-     * V hbase value
-     */
-    public static final String[] ALL_COLUMNS                                 = new String[] { "K",
-            "Q", "T", "V"                                                   };
-
-    /**
      * ocenbase hbase model rowkey column is consist of following column
      * K, Q, T hbase value
      */
@@ -94,6 +84,8 @@ public final class OHConstants {
      * V hbase value
      */
     public static final String[] V_COLUMNS                                   = new String[] { "V" };
+    public static final String[] PROPERTY_COLUMNS                            = new String[] { "V",
+            "TTL"                                                           };
 
     public static final String   HBASE_HTABLE_POOL_SEPERATOR                 = "$";
 
