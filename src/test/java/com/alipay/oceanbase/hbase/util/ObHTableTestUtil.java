@@ -43,7 +43,7 @@ public class ObHTableTestUtil {
     public static String       SYS_PASSWORD   = "";
     public static String       ODP_ADDR       = "";
     public static int          ODP_PORT       = 0;
-    public static boolean      ODP_MODE       = false;
+    public static boolean      ODP_MODE       = true;
     public static String       DATABASE       = "";
     public static String       JDBC_IP        = "";
     public static String       JDBC_PORT      = "";
