@@ -464,16 +464,17 @@ public class OHTable implements HTableInterface {
 
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
-        if (gets.isEmpty()) {
-            return new boolean[] {};
-        }
-        if (gets.size() == 1) {
-            return new boolean[] { exists(gets.get(0)) };
-        }
-        Result[] r = get(gets);
-        boolean[] ret = new boolean[r.length];
-        for (int i = 0; i < gets.size(); ++i) {
-            ret[i] = exists(gets.get(i));
+        boolean[] ret = new boolean[gets.size()];
+        if (CompatibilityUtil.isBatchSupport()) {
+            Result[] results = new Result[gets.size()];
+            batch(gets, results);
+            for (int i = 0; i < gets.size(); ++i) {
+                ret[i] = !results[i].isEmpty();
+            }
+        } else {
+            for (int i = 0; i < gets.size(); ++i) {
+                ret[i] = exists(gets.get(i));
+            }
         }
         return ret;
     }
@@ -933,17 +934,21 @@ public class OHTable implements HTableInterface {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
-        List<Future<Result>> futures = new LinkedList<>();
-        for (int i = 0; i < gets.size(); i++) {
-            int index = i;
-            Future<Result> future = executePool.submit(() -> get(gets.get(index)));
-            futures.add(future);
-        }
-        for (int i = 0; i < gets.size(); i++) {
-            try {
-                results[i] = futures.get(i).get();
-            } catch (Exception e) {
-                throw new RuntimeException("gets occur error. index:{" + i + "}", e);
+        if (CompatibilityUtil.isBatchSupport()) { // get only supported in BatchSupport version
+            batch(gets, results);
+        } else {
+            List<Future<Result>> futures = new LinkedList<>();
+            for (int i = 0; i < gets.size(); i++) {
+                int index = i;
+                Future<Result> future = executePool.submit(() -> get(gets.get(index)));
+                futures.add(future);
+            }
+            for (int i = 0; i < gets.size(); i++) {
+                try {
+                    results[i] = futures.get(i).get();
+                } catch (Exception e) {
+                    throw new RuntimeException("gets occur error. index:{" + i + "}", e);
+                }
             }
         }
         return results;
