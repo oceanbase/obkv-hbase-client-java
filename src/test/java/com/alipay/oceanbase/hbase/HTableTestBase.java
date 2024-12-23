@@ -51,9 +51,9 @@ import static org.junit.Assert.*;
 public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Rule
-    public ExpectedException expectedException = ExpectedException.none();
+    public ExpectedException     expectedException = ExpectedException.none();
 
-    protected static Table   hTable;
+    protected static Table       hTable;
 
     private static AtomicInteger count             = new AtomicInteger(0);
     private static AtomicInteger idx               = new AtomicInteger(0);
