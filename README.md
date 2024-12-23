@@ -6,13 +6,14 @@ OBKV HBase Client is Java Library that can be used to access data from [OceanBas
 Create table in the OceanBase database:
 
 ``` sql
+CREATE TABLEGROUP test1;
 CREATE TABLE `test1$family1` (
     `K` varbinary(1024) NOT NULL,
     `Q` varbinary(256) NOT NULL,
     `T` bigint(20) NOT NULL,
     `V` varbinary(1024) DEFAULT NULL,
-    PRIMARY KEY (`K`, `Q`, `T`)
-);
+    PRIMARY KEY (`K`, `Q`, `T`))
+TABLEGROUP =  test1;
 ```
 **Note:**
 * test1: HBase table name;
@@ -23,7 +24,7 @@ Import the dependency for your maven project:
 <dependency>
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>0.1.5</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 **Note:**
