@@ -701,7 +701,7 @@ public class OHTable implements Table {
         List<Integer> resultMapSingleOp = new LinkedList<>();
         try {
             if (!CompatibilityUtil.isBatchSupport()) {
-                compatOldServerBatch(actions, results);
+                compatOldServerBatch(actions, results, batchError);
             } else {
                 String realTableName = getTargetTableName(actions);
                 BatchOperation batch = buildBatchOperation(realTableName, actions,
