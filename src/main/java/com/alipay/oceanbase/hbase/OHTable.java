@@ -23,6 +23,7 @@ import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
+import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
@@ -530,7 +531,7 @@ public class OHTable implements Table {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
-        if (CompatibilityUtil.isBatchSupport()) {
+        if (ObGlobal.isHBaseBatchGetSupport()) {
             Result[] results = new Result[gets.size()];
             batch(gets, results);
             for (int i = 0; i < gets.size(); ++i) {
@@ -708,7 +709,7 @@ public class OHTable implements Table {
         BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!CompatibilityUtil.isBatchSupport()) {
+        if (!ObGlobal.isHBaseBatchGetSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
@@ -982,7 +983,7 @@ public class OHTable implements Table {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
-        if (CompatibilityUtil.isBatchSupport()) { // get only supported in BatchSupport version
+        if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
             batch(gets, results);
         } else {
             for (int i = 0; i < gets.size(); i++) {
