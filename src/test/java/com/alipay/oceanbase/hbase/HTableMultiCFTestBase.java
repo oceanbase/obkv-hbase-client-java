@@ -27,7 +27,6 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.checkerframework.checker.units.qual.C;
 import org.junit.*;
 import org.junit.rules.ExpectedException;
 

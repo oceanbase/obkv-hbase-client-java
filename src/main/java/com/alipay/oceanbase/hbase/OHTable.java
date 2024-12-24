@@ -60,7 +60,6 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.slf4j.Logger;
 
@@ -1531,7 +1530,6 @@ public class OHTable implements Table {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
-        ObTableClientManager.clear();
     }
 
     @Override
