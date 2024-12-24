@@ -708,7 +708,7 @@ public class OHTable implements Table {
         BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!ObGlobal.isHBaseBatchGetSupport()) {
+        if (!ObGlobal.isHBaseBatchSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
@@ -1915,6 +1915,9 @@ public class OHTable implements Table {
             singleOpResultNum = 0;
             posInList++;
             if (row instanceof Get) {
+                if (!ObGlobal.isHBaseBatchGetSupport()) {
+                    throw new FeatureNotSupportedException("server does not support batch get");
+                }
                 ++singleOpResultNum;
                 Get get = (Get) row;
                 ObTableQuery obTableQuery;
