@@ -23,6 +23,7 @@ import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
+import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.location.model.partition.Partition;
@@ -49,6 +50,7 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
+import jdk.nashorn.internal.objects.Global;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
@@ -465,7 +467,7 @@ public class OHTable implements HTableInterface {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
-        if (CompatibilityUtil.isBatchSupport()) {
+        if (ObGlobal.isHBaseBatchGetSupport()) {
             Result[] results = new Result[gets.size()];
             batch(gets, results);
             for (int i = 0; i < gets.size(); ++i) {
@@ -644,7 +646,7 @@ public class OHTable implements HTableInterface {
         BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!CompatibilityUtil.isBatchSupport()) {
+        if (!ObGlobal.isHBaseBatchGetSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
@@ -934,7 +936,7 @@ public class OHTable implements HTableInterface {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
-        if (CompatibilityUtil.isBatchSupport()) { // get only supported in BatchSupport version
+        if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
             batch(gets, results);
         } else {
             List<Future<Result>> futures = new LinkedList<>();
