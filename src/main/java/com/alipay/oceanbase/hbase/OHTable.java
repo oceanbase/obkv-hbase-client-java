@@ -467,16 +467,18 @@ public class OHTable implements HTableInterface {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
-        if (ObGlobal.isHBaseBatchGetSupport()) {
-            Result[] results = new Result[gets.size()];
-            batch(gets, results);
-            for (int i = 0; i < gets.size(); ++i) {
-                ret[i] = !results[i].isEmpty();
-            }
-        } else {
-            for (int i = 0; i < gets.size(); ++i) {
-                ret[i] = exists(gets.get(i));
-            }
+        List<Get> newGets = new ArrayList<>();
+        // if just checkExistOnly, batch get will not return any result or row count
+        // therefore we have to set checkExistOnly as false and so the result can be returned
+        // TODO: adjust ExistOnly in server when using batch get
+        for (Get get : gets) {
+            Get newGet = new Get(get);
+            newGet.setCheckExistenceOnly(false);
+            newGets.add(newGet);
+        }
+        Result[] results = get(newGets);
+        for (int i = 0; i < results.length; ++i) {
+            ret[i] = !results[i].isEmpty();
         }
         return ret;
     }
@@ -671,33 +673,13 @@ public class OHTable implements HTableInterface {
                     batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
                 } else if (actions.get(i) instanceof Get) {
                     if (results != null) {
+                        // get results have been wrapped in MutationResult, need to fetch it
                         if (tmpResults.getResults().get(index) instanceof MutationResult) {
                             MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
                             ObPayload innerResult = mutationResult.getResult();
                             if (innerResult instanceof ObTableSingleOpResult) {
                                 ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
-                                ObTableSingleOpEntity singleOpEntity = singleOpResult.getEntity();
-                                List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
-                                List<Cell> cells = new ArrayList<>();
-                                int valueIdx = 0;
-                                while (valueIdx < propertiesValues.size()) {
-                                    byte[][] familyAndQualifier = new byte[2][];
-                                    try {
-                                        // split family and qualifier
-                                        familyAndQualifier = OHBaseFuncUtils
-                                                .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
-                                    } catch (Exception e) {
-                                        throw new IOException(e);
-                                    }
-                                    KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
-                                            familyAndQualifier[0], // family
-                                            familyAndQualifier[1], // qualifiermat
-                                            (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
-                                            (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
-                                    );
-                                    cells.add(kv);
-                                    valueIdx += 4;
-                                }
+                                List<Cell> cells = generateGetResult(singleOpResult);
                                 results[i] = Result.create(cells);
                             } else {
                                 throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
@@ -718,6 +700,37 @@ public class OHTable implements HTableInterface {
             throw batchError.makeException();
         }
     }
+
+    private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
+        List<Cell> cells = new ArrayList<>();
+        ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
+        // all values queried by this get are contained in properties
+        // qualifier in batch get result is always appended after family
+        List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
+        int valueIdx = 0;
+        while (valueIdx < propertiesValues.size()) {
+            // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
+            // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
+            byte[][] familyAndQualifier = new byte[2][];
+            try {
+                // split family and qualifier
+                familyAndQualifier = OHBaseFuncUtils
+                        .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+            KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
+                    familyAndQualifier[0], // family
+                    familyAndQualifier[1], // qualifiermat
+                    (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
+                    (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
+            );
+            cells.add(kv);
+            valueIdx += 4;
+        }
+        return cells;
+    }
+
 
     private String getTargetTableName(List<? extends Row> actions) {
         byte[] family = null;
