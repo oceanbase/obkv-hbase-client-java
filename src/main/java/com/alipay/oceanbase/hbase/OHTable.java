@@ -23,11 +23,15 @@ import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
+import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.location.model.partition.Partition;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
+import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
+import com.alipay.oceanbase.rpc.protocol.payload.ObPayload;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -40,11 +44,13 @@ import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
+import com.alipay.oceanbase.rpc.table.ObTableClientQueryImpl;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
+import jdk.nashorn.internal.objects.Global;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
@@ -67,6 +73,8 @@ import java.util.concurrent.*;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
+import static com.alipay.oceanbase.rpc.mutation.MutationFactory.colVal;
+import static com.alipay.oceanbase.rpc.mutation.MutationFactory.row;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
 import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_POOL_LOGGING_CAPABILITY;
@@ -458,16 +466,19 @@ public class OHTable implements HTableInterface {
 
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
-        if (gets.isEmpty()) {
-            return new boolean[] {};
+        boolean[] ret = new boolean[gets.size()];
+        List<Get> newGets = new ArrayList<>();
+        // if just checkExistOnly, batch get will not return any result or row count
+        // therefore we have to set checkExistOnly as false and so the result can be returned
+        // TODO: adjust ExistOnly in server when using batch get
+        for (Get get : gets) {
+            Get newGet = new Get(get);
+            newGet.setCheckExistenceOnly(false);
+            newGets.add(newGet);
         }
-        if (gets.size() == 1) {
-            return new boolean[] { exists(gets.get(0)) };
-        }
-        Result[] r = get(gets);
-        boolean[] ret = new boolean[r.length];
-        for (int i = 0; i < gets.size(); ++i) {
-            ret[i] = exists(gets.get(i));
+        Result[] results = get(newGets);
+        for (int i = 0; i < results.length; ++i) {
+            ret[i] = !results[i].isEmpty();
         }
         return ret;
     }
@@ -625,7 +636,7 @@ public class OHTable implements HTableInterface {
     }
 
     @Override
-    public void batch(final List<? extends Row> actions, final Object[] results) throws IOException{
+    public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
         if (actions == null) {
             return;
         }
@@ -637,7 +648,7 @@ public class OHTable implements HTableInterface {
         BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!CompatibilityUtil.isBatchSupport()) {
+        if (!ObGlobal.isHBaseBatchSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
@@ -660,6 +671,23 @@ public class OHTable implements HTableInterface {
                         results[i] = tmpResults.getResults().get(index);
                     }
                     batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
+                } else if (actions.get(i) instanceof Get) {
+                    if (results != null) {
+                        // get results have been wrapped in MutationResult, need to fetch it
+                        if (tmpResults.getResults().get(index) instanceof MutationResult) {
+                            MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
+                            ObPayload innerResult = mutationResult.getResult();
+                            if (innerResult instanceof ObTableSingleOpResult) {
+                                ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
+                                List<Cell> cells = generateGetResult(singleOpResult);
+                                results[i] = Result.create(cells);
+                            } else {
+                                throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
+                            }
+                        } else {
+                            throw new ObTableUnexpectedException("Unexpected type of result in batch");
+                        }
+                    }
                 } else {
                     if (results != null) {
                         results[i] = new Result();
@@ -673,17 +701,58 @@ public class OHTable implements HTableInterface {
         }
     }
 
+    private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
+        List<Cell> cells = new ArrayList<>();
+        ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
+        // all values queried by this get are contained in properties
+        // qualifier in batch get result is always appended after family
+        List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
+        int valueIdx = 0;
+        while (valueIdx < propertiesValues.size()) {
+            // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
+            // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
+            byte[][] familyAndQualifier = new byte[2][];
+            try {
+                // split family and qualifier
+                familyAndQualifier = OHBaseFuncUtils
+                        .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+            KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
+                    familyAndQualifier[0], // family
+                    familyAndQualifier[1], // qualifiermat
+                    (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
+                    (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
+            );
+            cells.add(kv);
+            valueIdx += 4;
+        }
+        return cells;
+    }
+
+
     private String getTargetTableName(List<? extends Row> actions) {
         byte[] family = null;
         for (Row action : actions) {
             if (action instanceof RowMutations || action instanceof RegionCoprocessorServiceExec) {
                 throw new FeatureNotSupportedException("not supported yet'");
             } else {
-                Mutation mutation = (Mutation) action;
-                if (mutation.getFamilyCellMap().size() != 1) {
+                Set<byte[]> familySet = null;
+                if (action instanceof Get) {
+                    Get get = (Get) action;
+                    familySet = get.familySet();
+                } else {
+                    Mutation mutation = (Mutation) action;
+                    familySet = mutation.getFamilyCellMap().keySet();
+                }
+                if (familySet == null) {
+                    throw new ObTableUnexpectedException("Fail to get family set in action");
+                }
+                if (familySet.size() != 1) {
                     return getTargetTableName(tableNameString);
                 } else {
-                    byte[] nextFamily = mutation.getFamilyCellMap().keySet().iterator().next();
+                    byte[] nextFamily = familySet.iterator().next();
                     if (family != null && !Arrays.equals(family, nextFamily)) {
                         return getTargetTableName(tableNameString);
                     } else if (family == null) {
@@ -702,6 +771,7 @@ public class OHTable implements HTableInterface {
         return results;
     }
 
+    @Override
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
@@ -879,17 +949,21 @@ public class OHTable implements HTableInterface {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
-        List<Future<Result>> futures = new LinkedList<>();
-        for (int i = 0; i < gets.size(); i++) {
-            int index = i;
-            Future<Result> future = executePool.submit(() -> get(gets.get(index)));
-            futures.add(future);
-        }
-        for (int i = 0; i < gets.size(); i++) {
-            try {
-                results[i] = futures.get(i).get();
-            } catch (Exception e) {
-                throw new RuntimeException("gets occur error. index:{" + i + "}", e);
+        if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
+            batch(gets, results);
+        } else {
+            List<Future<Result>> futures = new LinkedList<>();
+            for (int i = 0; i < gets.size(); i++) {
+                int index = i;
+                Future<Result> future = executePool.submit(() -> get(gets.get(index)));
+                futures.add(future);
+            }
+            for (int i = 0; i < gets.size(); i++) {
+                try {
+                    results[i] = futures.get(i).get();
+                } catch (Exception e) {
+                    throw new RuntimeException("gets occur error. index:{" + i + "}", e);
+                }
             }
         }
         return results;
@@ -1668,6 +1742,8 @@ public class OHTable implements HTableInterface {
     @Override
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
+        this.obTableClient.setRuntimeMaxWait(operationTimeout);
+        this.obTableClient.setRuntimeBatchMaxWait(operationTimeout);
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -1994,14 +2070,55 @@ public class OHTable implements HTableInterface {
     private BatchOperation buildBatchOperation(String tableName, List<? extends Row> actions,
                                                boolean isTableGroup, List<Integer> resultMapSingleOp)
                                                                                                      throws FeatureNotSupportedException,
-                                                                                                     IllegalArgumentException {
+                                                                                                     IllegalArgumentException,
+                                                                                                     IOException {
         BatchOperation batch = obTableClient.batchOperation(tableName);
         int posInList = -1;
         int singleOpResultNum;
         for (Row row : actions) {
             singleOpResultNum = 0;
             posInList++;
-            if (row instanceof Put) {
+            if (row instanceof Get) {
+                if (!ObGlobal.isHBaseBatchGetSupport()) {
+                    throw new FeatureNotSupportedException("server does not support batch get");
+                }
+                ++singleOpResultNum;
+                Get get = (Get) row;
+                ObTableQuery obTableQuery;
+                // In a Get operation in ls batch, we need to determine whether the get is a table-group operation or not,
+                // we handle this by appending the column family to the qualifier on the client side.
+                // The server can then use this information to filter the appropriate column families and qualifiers.
+                if ((get.getFamilyMap().keySet().isEmpty()
+                        || get.getFamilyMap().size() > 1) &&
+                        !get.getColumnFamilyTimeRange().isEmpty()) {
+                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                } else if (get.getFamilyMap().size() == 1 && !get.getColumnFamilyTimeRange().isEmpty()) {
+                    byte[] family = get.getFamilyMap().keySet().iterator().next();
+                    Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
+                    if (colFamTimeRangeMap.size() > 1) {
+                        throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                    } else if (colFamTimeRangeMap.get(family) == null) {
+                        throw new IllegalArgumentException("Get family is not matched in ColumnFamilyTimeRange");
+                    } else {
+                        TimeRange tr = colFamTimeRangeMap.get(family);
+                        get.setTimeRange(tr.getMin(), tr.getMax());
+                    }
+                }
+                NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                // in batch get, we need to carry family in qualifier to server even this get is a single-cf operation
+                // because the entire batch may be a multi-cf batch so do not carry family
+                // family in qualifier helps us to know which table to query
+                processColumnFilters(columnFilters, get.getFamilyMap());
+                obTableQuery = buildObTableQuery(get, columnFilters);
+                ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
+                try {
+                    query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", null)));
+                } catch (Exception e) {
+                    logger.error("unexpected error occurs when set row key", e);
+                    throw new IOException(e);
+                }
+                batch.addOperation(query);
+            } else if (row instanceof Put) {
                 Put put = (Put) row;
                 if (put.isEmpty()) {
                     throw new IllegalArgumentException("No columns to insert for #"
@@ -2049,7 +2166,7 @@ public class OHTable implements HTableInterface {
                 }
             } else {
                 throw new FeatureNotSupportedException(
-                    "not supported other type in batch yet,only support put and delete");
+                    "not supported other type in batch yet,only support get, put and delete");
             }
             resultMapSingleOp.add(singleOpResultNum);
         }
