@@ -530,13 +530,16 @@ public class OHTable implements Table {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
+        List<Get> newGets = new ArrayList<>();
         // if just checkExistOnly, batch get will not return any result or row count
         // therefore we have to set checkExistOnly as false and so the result can be returned
         // TODO: adjust ExistOnly in server when using batch get
         for (Get get : gets) {
-            get.setCheckExistenceOnly(false);
+            Get newGet = new Get(get);
+            newGet.setCheckExistenceOnly(false);
+            newGets.add(newGet);
         }
-        Result[] results = get(gets);
+        Result[] results = get(newGets);
         for (int i = 0; i < results.length; ++i) {
             ret[i] = !results[i].isEmpty();
         }
