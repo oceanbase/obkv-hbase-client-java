@@ -735,7 +735,6 @@ public class OHTable implements Table {
                     batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
                 } else if (actions.get(i) instanceof Get) {
                     if (results != null) {
-                        Get get = (Get) actions.get(i);
                         // get results have been wrapped in MutationResult, need to fetch it
                         if (tmpResults.getResults().get(index) instanceof MutationResult) {
                             MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
