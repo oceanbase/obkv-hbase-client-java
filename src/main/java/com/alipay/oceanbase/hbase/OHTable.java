@@ -2103,6 +2103,9 @@ public class OHTable implements HTableInterface {
                     }
                 }
                 NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                // in batch get, we need to carry family in qualifier to server even this get is a single-cf operation
+                // because the entire batch may be a multi-cf batch so do not carry family
+                // family in qualifier helps us to know which table to query
                 processColumnFilters(columnFilters, get.getFamilyMap());
                 obTableQuery = buildObTableQuery(get, columnFilters);
                 ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
