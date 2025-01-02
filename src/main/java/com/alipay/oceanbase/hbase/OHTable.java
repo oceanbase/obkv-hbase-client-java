@@ -530,16 +530,15 @@ public class OHTable implements Table {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
-        if (ObGlobal.isHBaseBatchGetSupport()) {
-            Result[] results = new Result[gets.size()];
-            batch(gets, results);
-            for (int i = 0; i < gets.size(); ++i) {
-                ret[i] = !results[i].isEmpty();
-            }
-        } else {
-            for (int i = 0; i < gets.size(); ++i) {
-                ret[i] = exists(gets.get(i));
-            }
+        List<Get> newGets = new ArrayList<>();
+        for (Get get : gets) {
+            Get newGet = new Get(get);
+            newGet.setCheckExistenceOnly(true);
+            newGets.add(newGet);
+        }
+        Result[] results = get(newGets);
+        for (int i = 0; i < results.length; ++i) {
+            ret[i] = results[i].getExists();
         }
         return ret;
     }
@@ -696,7 +695,7 @@ public class OHTable implements Table {
     }
 
     @Override
-    public void batch(final List<? extends Row> actions, final Object[] results) throws IOException{
+    public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
         if (actions == null) {
             return;
         }
@@ -733,34 +732,19 @@ public class OHTable implements Table {
                     batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
                 } else if (actions.get(i) instanceof Get) {
                     if (results != null) {
+                        Get get = (Get) actions.get(i);
+                        // get results have been wrapped in MutationResult, need to fetch it
                         if (tmpResults.getResults().get(index) instanceof MutationResult) {
                             MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
                             ObPayload innerResult = mutationResult.getResult();
                             if (innerResult instanceof ObTableSingleOpResult) {
                                 ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
-                                ObTableSingleOpEntity singleOpEntity = singleOpResult.getEntity();
-                                List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
-                                List<Cell> cells = new ArrayList<>();
-                                int valueIdx = 0;
-                                while (valueIdx < propertiesValues.size()) {
-                                    byte[][] familyAndQualifier = new byte[2][];
-                                    try {
-                                        // split family and qualifier
-                                        familyAndQualifier = OHBaseFuncUtils
-                                                .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
-                                    } catch (Exception e) {
-                                        throw new IOException(e);
-                                    }
-                                    KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
-                                            familyAndQualifier[0], // family
-                                            familyAndQualifier[1], // qualifiermat
-                                            (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
-                                            (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
-                                    );
-                                    cells.add(kv);
-                                    valueIdx += 4;
+                                List<Cell> cells = generateGetResult(singleOpResult);
+                                if (get.isCheckExistenceOnly()) {
+                                    results[i] = Result.create(null, !cells.isEmpty());
+                                } else {
+                                    results[i] = Result.create(cells);
                                 }
-                                results[i] = Result.create(cells);
                             } else {
                                 throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
                             }
@@ -779,6 +763,36 @@ public class OHTable implements Table {
         if (batchError.hasErrors()) {
             throw batchError.makeException();
         }
+    }
+
+    private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
+        List<Cell> cells = new ArrayList<>();
+        ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
+        // all values queried by this get are contained in properties
+        // qualifier in batch get result is always appended after family
+        List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
+        int valueIdx = 0;
+        while (valueIdx < propertiesValues.size()) {
+            // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
+            // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
+            byte[][] familyAndQualifier = new byte[2][];
+            try {
+                // split family and qualifier
+                familyAndQualifier = OHBaseFuncUtils
+                        .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+            KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
+                    familyAndQualifier[0], // family
+                    familyAndQualifier[1], // qualifiermat
+                    (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
+                    (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
+            );
+            cells.add(kv);
+            valueIdx += 4;
+        }
+        return cells;
     }
 
     private String getTargetTableName(List<? extends Row> actions) {
@@ -1941,6 +1955,9 @@ public class OHTable implements Table {
                     }
                 }
                 NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                // in batch get, we need to carry family in qualifier to server even this get is a single-cf operation
+                // because the entire batch may be a multi-cf batch so do not carry family
+                // family in qualifier helps us to know which table to query
                 processColumnFilters(columnFilters, get.getFamilyMap());
                 obTableQuery = buildObTableQuery(get, columnFilters);
                 ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
