@@ -530,15 +530,15 @@ public class OHTable implements Table {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         boolean[] ret = new boolean[gets.size()];
-        List<Get> newGets = new ArrayList<>();
+        // if just checkExistOnly, batch get will not return any result or row count
+        // therefore we have to set checkExistOnly as false and so the result can be returned
+        // TODO: adjust ExistOnly in server when using batch get
         for (Get get : gets) {
-            Get newGet = new Get(get);
-            newGet.setCheckExistenceOnly(true);
-            newGets.add(newGet);
+            get.setCheckExistenceOnly(false);
         }
-        Result[] results = get(newGets);
+        Result[] results = get(gets);
         for (int i = 0; i < results.length; ++i) {
-            ret[i] = results[i].getExists();
+            ret[i] = !results[i].isEmpty();
         }
         return ret;
     }
@@ -740,11 +740,7 @@ public class OHTable implements Table {
                             if (innerResult instanceof ObTableSingleOpResult) {
                                 ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
                                 List<Cell> cells = generateGetResult(singleOpResult);
-                                if (get.isCheckExistenceOnly()) {
-                                    results[i] = Result.create(null, !cells.isEmpty());
-                                } else {
-                                    results[i] = Result.create(cells);
-                                }
+                                results[i] = Result.create(cells);
                             } else {
                                 throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
                             }
