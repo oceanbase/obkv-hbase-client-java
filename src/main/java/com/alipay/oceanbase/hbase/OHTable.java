@@ -1591,6 +1591,8 @@ public class OHTable implements Table {
     @Override
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
+        this.obTableClient.setRuntimeMaxWait(operationTimeout);
+        this.obTableClient.setRuntimeBatchMaxWait(operationTimeout);
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
