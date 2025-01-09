@@ -27,6 +27,7 @@ import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
+import com.alipay.oceanbase.rpc.location.model.partition.Partition;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
@@ -1078,6 +1079,92 @@ public class OHTable implements Table {
                         e);
                     throw new IOException("scan table:" + tableNameString + " family "
                                           + Bytes.toString(family) + " error.", e);
+                }
+
+                throw new IOException("scan table:" + tableNameString + "has no family");
+            }
+        };
+        return executeServerCallable(serverCallable);
+    }
+
+    public List<ResultScanner> getScanners(final Scan scan) throws IOException {
+
+        if (scan.getFamilyMap().keySet().isEmpty()) {
+            // check nothing, use table group;
+        } else {
+            checkFamilyViolation(scan.getFamilyMap().keySet(), false);
+        }
+
+        //be careful about the packet size ,may the packet exceed the max result size ,leading to error
+        ServerCallable<List<ResultScanner>> serverCallable = new ServerCallable<List<ResultScanner>>(
+                configuration, obTableClient, tableNameString, scan.getStartRow(), scan.getStopRow(),
+                operationTimeout) {
+            public List<ResultScanner> call() throws IOException {
+                byte[] family = new byte[] {};
+                ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
+                ObTableQueryAsyncRequest request;
+                ObTableQuery obTableQuery;
+                ObHTableFilter filter;
+                try {
+                    if (scan.getFamilyMap().keySet() == null
+                            || scan.getFamilyMap().keySet().isEmpty()
+                            || scan.getFamilyMap().size() > 1) {
+                        // In a Scan operation where the family map is greater than 1 or equal to 0,
+                        // we handle this by appending the column family to the qualifier on the client side.
+                        // The server can then use this information to filter the appropriate column families and qualifiers.
+                        NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+                        processColumnFilters(columnFilters, scan.getFamilyMap());
+                        filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                scan.getMaxVersions(), columnFilters);
+                        obTableQuery = buildObTableQuery(filter, scan);
+                        List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+
+                        request = buildObTableQueryAsyncRequest(obTableQuery,
+                                getTargetTableName(tableNameString));
+                        String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
+                                request.getObTableQueryRequest(), tableNameString);
+                        List<Partition> partitions = obTableClient.getPartition(phyTableName, false);
+                        for (Partition partition : partitions) {
+                            request.getObTableQueryRequest().setTableQueryPartId(
+                                    partition.getPartId());
+                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                    .execute(request);
+                            ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                    clientQueryAsyncStreamResult, tableNameString, scan, true);
+                            resultScanners.add(clientScanner);
+                        }
+                        return resultScanners;
+                    } else {
+                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
+                                .entrySet()) {
+                            family = entry.getKey();
+                            filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                    scan.getMaxVersions(), entry.getValue());
+                            obTableQuery = buildObTableQuery(filter, scan);
+
+                            List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
+                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration);
+                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            List<Partition> partitions = obTableClient
+                                    .getPartition(targetTableName, false);
+                            for (Partition partition : partitions) {
+                                request.getObTableQueryRequest().setTableQueryPartId(
+                                        partition.getPartId());
+                                clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                        .execute(request);
+                                ClientStreamScanner clientScanner = new ClientStreamScanner(
+                                        clientQueryAsyncStreamResult, tableNameString, scan, false);
+                                resultScanners.add(clientScanner);
+                            }
+                            return resultScanners;
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
+                            e);
+                    throw new IOException("scan table:" + tableNameString + " family "
+                            + Bytes.toString(family) + " error.", e);
                 }
 
                 throw new IOException("scan table:" + tableNameString + "has no family");

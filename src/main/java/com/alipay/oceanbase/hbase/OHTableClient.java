@@ -290,6 +290,11 @@ public class OHTableClient implements Table, Lifecycle {
         return ohTable.getScanner(family, qualifier);
     }
 
+    public List<ResultScanner> getScanners(Scan scan) throws IOException {
+        checkStatus();
+        return ohTable.getScanners(scan);
+    }
+
     @Override
     public void put(Put put) throws IOException {
         checkStatus();

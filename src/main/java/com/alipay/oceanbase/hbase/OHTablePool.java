@@ -769,6 +769,16 @@ public class OHTablePool implements Closeable {
             return table.getScanner(family, qualifier);
         }
 
+        public List<ResultScanner> getScanners(Scan scan) throws IOException {
+            if (table instanceof OHTableClient) {
+                return ((OHTableClient) table).getScanners(scan);
+            } else if (table instanceof OHTable) {
+                return ((OHTable) table).getScanners(scan);
+            }
+
+            throw new IllegalArgumentException("just support for OHTable and OHTableClient");
+        }
+
         @Override
         public void put(Put put) throws IOException {
             table.put(put);
