@@ -1101,6 +1101,7 @@ public class OHTable implements Table {
                 operationTimeout) {
             public List<ResultScanner> call() throws IOException {
                 byte[] family = new byte[] {};
+                List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
                 ObTableClientQueryAsyncStreamResult clientQueryAsyncStreamResult;
                 ObTableQueryAsyncRequest request;
                 ObTableQuery obTableQuery;
@@ -1112,12 +1113,14 @@ public class OHTable implements Table {
                         // In a Scan operation where the family map is greater than 1 or equal to 0,
                         // we handle this by appending the column family to the qualifier on the client side.
                         // The server can then use this information to filter the appropriate column families and qualifiers.
+                        if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                            throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                        }
                         NavigableSet<byte[]> columnFilters = new TreeSet<>(Bytes.BYTES_COMPARATOR);
                         processColumnFilters(columnFilters, scan.getFamilyMap());
                         filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                 scan.getMaxVersions(), columnFilters);
                         obTableQuery = buildObTableQuery(filter, scan);
-                        List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString));
@@ -1138,11 +1141,21 @@ public class OHTable implements Table {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                                 .entrySet()) {
                             family = entry.getKey();
+                            if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                                Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
+                                if (colFamTimeRangeMap.size() > 1) {
+                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                } else if (colFamTimeRangeMap.get(family) == null) {
+                                    throw new IllegalArgumentException("Scan family is not matched in ColumnFamilyTimeRange");
+                                } else {
+                                    TimeRange tr = colFamTimeRangeMap.get(family);
+                                    scan.setTimeRange(tr.getMin(), tr.getMax());
+                                }
+                            }
                             filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
                                     scan.getMaxVersions(), entry.getValue());
                             obTableQuery = buildObTableQuery(filter, scan);
 
-                            List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
