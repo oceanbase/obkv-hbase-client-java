@@ -24,14 +24,15 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQuer
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.mortbay.util.SingletonList;
 import org.slf4j.Logger;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
@@ -101,7 +102,6 @@ public class ClientStreamScanner extends AbstractClientScanner {
             byte[] sq = familyAndQualifier[1];
             long st = (Long) startRow.get(2).getValue();
             byte[] sv = (byte[]) startRow.get(3).getValue();
-
             KeyValue startKeyValue = new KeyValue(sk, family, sq, st, sv);
             List<Cell> keyValues = new ArrayList<Cell>();
             keyValues.add(startKeyValue);
