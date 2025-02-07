@@ -56,7 +56,10 @@ public class SimpleHBaseClientDemo {
         Get get = new Get(rowKey);
         get.addColumn(family, column);
         Result r = hTable.get(get);
-        System.out.printf("column1: " + r.getColumn(family, column));
+        if (!r.isEmpty()) {
+            Cell cell = r.rawCells()[0];
+            System.out.printf("column1: " + CellUtil.cloneQualifier(r));
+        }
 
         // 4. close
         hTable.close();

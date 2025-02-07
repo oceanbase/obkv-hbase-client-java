@@ -801,7 +801,7 @@ public class OHTable implements Table {
                 throw new FeatureNotSupportedException("not supported yet'");
             } else {
                 Set<byte[]> familySet = null;
-                if (action instanceof Get){
+                if (action instanceof Get) {
                     Get get = (Get) action;
                     familySet = get.familySet();
                 } else {
@@ -921,7 +921,7 @@ public class OHTable implements Table {
 
     @Override
     public Result get(final Get get) throws IOException {
-        if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().isEmpty()) {
+        if (get.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
             checkFamilyViolation(get.getFamilyMap().keySet(), false);
@@ -934,8 +934,7 @@ public class OHTable implements Table {
                 byte[] family = new byte[] {};
                 ObTableQuery obTableQuery;
                 try {
-                    if (get.getFamilyMap().keySet() == null
-                            || get.getFamilyMap().keySet().isEmpty()
+                    if (get.getFamilyMap().keySet().isEmpty()
                             || get.getFamilyMap().size() > 1) {
                         // In a Get operation where the family map is greater than 1 or equal to 0,
                         // we handle this by appending the column family to the qualifier on the client side.
@@ -1024,8 +1023,7 @@ public class OHTable implements Table {
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
                 try {
-                    if (scan.getFamilyMap().keySet() == null
-                        || scan.getFamilyMap().keySet().isEmpty()
+                    if (scan.getFamilyMap().keySet().isEmpty()
                         || scan.getFamilyMap().size() > 1) {
                         // In a Scan operation where the family map is greater than 1 or equal to 0,
                         // we handle this by appending the column family to the qualifier on the client side.
@@ -1107,8 +1105,7 @@ public class OHTable implements Table {
                 ObTableQuery obTableQuery;
                 ObHTableFilter filter;
                 try {
-                    if (scan.getFamilyMap().keySet() == null
-                            || scan.getFamilyMap().keySet().isEmpty()
+                    if (scan.getFamilyMap().keySet().isEmpty()
                             || scan.getFamilyMap().size() > 1) {
                         // In a Scan operation where the family map is greater than 1 or equal to 0,
                         // we handle this by appending the column family to the qualifier on the client side.
@@ -1950,20 +1947,20 @@ public class OHTable implements Table {
         Map<String, Integer> indexMap = new HashMap<>();
         for (Mutation row : rowList) {
             if (row instanceof Put) {
-                opType = OHOpType.INSERT_OR_UPDATE;
+                opType = OHOpType.Put;
             } else if (row instanceof Delete) {
                 opType = OHOpType.Delete;
             } else if (row instanceof Increment) {
                 opType = OHOpType.Increment;
             } else if (row instanceof Append) {
-                opType = OHOpType.APPEND;
+                opType = OHOpType.Append;
             } else {
                 throw new FeatureNotSupportedException("not supported other type");
             }
             Set<Map.Entry<byte[], List<Cell>>> familyCellMap = row.getFamilyCellMap().entrySet();
 
             for (Map.Entry<byte[], List<Cell>> familyWithCells : familyCellMap) {
-                if (opType == OHOpType.Increment || opType == OHOpType.APPEND) {
+                if (opType == OHOpType.Increment || opType == OHOpType.Append) {
                     indexMap.clear();
                     for (int i = 0; i < familyWithCells.getValue().size(); i++) {
                         Cell cell = familyWithCells.getValue().get(i);
@@ -2002,12 +1999,12 @@ public class OHTable implements Table {
             property = new Object[] { CellUtil.cloneValue(new_cell), TTL };
         }
         switch (operationType) {
-            case INSERT_OR_UPDATE:
+            case Put:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(INSERT_OR_UPDATE,
                     ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(new_cell), CellUtil.cloneQualifier(new_cell),
                             new_cell.getTimestamp() }, property_columns, property);
-            case APPEND:
+            case Append:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(APPEND,
                     ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(new_cell), CellUtil.cloneQualifier(new_cell),
@@ -2116,7 +2113,7 @@ public class OHTable implements Table {
                     List<Cell> keyValueList = entry.getValue();
                     for (Cell kv : keyValueList) {
                         singleOpResultNum++;
-                        batch.addOperation(buildMutation(kv, OHOpType.INSERT_OR_UPDATE,
+                        batch.addOperation(buildMutation(kv, OHOpType.Put,
                             isTableGroup, family, put.getTTL()));
                     }
                 }
@@ -2156,37 +2153,40 @@ public class OHTable implements Table {
             property = new Object[] { CellUtil.cloneValue(kv), TTL };
         }
         switch (operationType) {
-            case INSERT_OR_UPDATE:
-                return getInstance(
-                    INSERT_OR_UPDATE,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            kv.getTimestamp() }, property_columns, property);
+            case Put:
             case Increment:
+            case Append:
+                ObTableOperationType type;
+                if (operationType == OHOpType.Put) {
+                    type = INSERT_OR_UPDATE;
+                } else if (operationType == OHOpType.Increment) {
+                    type = INCREMENT;
+                } else {
+                    type = APPEND;
+                }
                 return getInstance(
-                    INCREMENT,
-                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            kv.getTimestamp() }, property_columns, property);
-            case APPEND:
-                return getInstance(
-                    APPEND,
+                    type,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
                             kv.getTimestamp() }, property_columns, property);
             case Delete:
-                Cell.Type type = kv.getType();
-                if (type == Cell.Type.Delete) {
+                Cell.Type delType = kv.getType();
+                if (delType == Cell.Type.Delete) {
                     return getInstance(
                         DEL,
                         new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
                                 kv.getTimestamp() }, null, null);
-                } else if (type == Cell.Type.DeleteColumn) {
+                } else if (delType == Cell.Type.DeleteColumn) {
                     return getInstance(
                         DEL,
                         new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
                                 -kv.getTimestamp() }, null, null);
+                } else if (delType == Cell.Type.DeleteFamily) {
+                    return getInstance(DEL,
+                        new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() }, null,
+                        null);
+                } else {
+                    throw new IllegalArgumentException("illegal delete type " + operationType);
                 }
-            case DeleteFamily:
-                return getInstance(DEL,
-                    new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -2212,16 +2212,6 @@ public class OHTable implements Table {
         asyncRequest.setTableName(targetTableName);
         asyncRequest.setObTableQueryRequest(request);
         return asyncRequest;
-    }
-
-    public static ObTableBatchOperationRequest buildObTableBatchOperationRequest(ObTableBatchOperation obTableBatchOperation,
-                                                                                 String targetTableName) {
-        ObTableBatchOperationRequest request = new ObTableBatchOperationRequest();
-        request.setTableName(targetTableName);
-        request.setReturningAffectedRows(true);
-        request.setEntityType(ObTableEntityType.HKV);
-        request.setBatchOperation(obTableBatchOperation);
-        return request;
     }
 
     private ObTableQueryAndMutateRequest buildObTableQueryAndMutateRequest(ObTableQuery obTableQuery,
@@ -2310,7 +2300,7 @@ public class OHTable implements Table {
     }
 
     public static enum OHOpType {
-        INSERT_OR_UPDATE, APPEND, Delete, DeleteAll, DeleteColumn, DeleteFamily, DeleteFamilyVersion, Increment
+        Put, Append, Delete, DeleteAll, DeleteColumn, DeleteFamily, DeleteFamilyVersion, Increment
     }
 
     public static OHOpType getDeleteType(Cell.Type type) {
