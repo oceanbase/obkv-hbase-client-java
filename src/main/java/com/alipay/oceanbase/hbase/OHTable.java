@@ -647,7 +647,7 @@ public class OHTable implements HTableInterface {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
-                throw new IOException(e);
+                throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
         } else {
             String realTableName = getTargetTableName(actions);
@@ -657,7 +657,7 @@ public class OHTable implements HTableInterface {
             try {
                 tmpResults = batch.execute();
             } catch (Exception e) {
-                throw new IOException(e);
+                throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
             int index = 0;
             for (int i = 0; i != actions.size(); ++i) {
@@ -1266,7 +1266,6 @@ public class OHTable implements HTableInterface {
             batch(Collections.singletonList(delete));
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
-            throw new IOException("delete table " + tableNameString + " error.", e);
         }
     }
 
@@ -1553,9 +1552,6 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
                     writeBuffer.size(), e);
-                throw new IOException("put table " + tableNameString + " error codes " + null
-                                      + "auto flush " + autoFlush + " current buffer size "
-                                      + writeBuffer.size(), e);
             } finally {
                 // mutate list so that it is empty for complete success, or contains
                 // only failed records results are returned in the same order as the
