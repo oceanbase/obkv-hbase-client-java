@@ -5619,6 +5619,52 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     }
 
     @Test
+    public void testHbasePutDeleteCell() throws Exception {
+        final byte[] rowKey = Bytes.toBytes("12345");
+        final byte[] family = Bytes.toBytes("family1");
+
+        Put put = new Put(rowKey);
+        put.addColumn(family, Bytes.toBytes("A"), Bytes.toBytes("a"));
+        put.addColumn(family, Bytes.toBytes("B"), Bytes.toBytes("b"));
+        put.addColumn(family, Bytes.toBytes("C"), Bytes.toBytes("c"));
+        put.addColumn(family, Bytes.toBytes("D"), Bytes.toBytes("d"));
+        hTable.put(put);
+        // get row back and assert the values
+        Get get = new Get(rowKey);
+        get.addFamily(family);
+        Result result = hTable.get(get);
+        assertTrue("Column A value should be a",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("A"))).equals("a"));
+        assertTrue("Column B value should be b",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("B"))).equals("b"));
+        assertTrue("Column C value should be c",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("C"))).equals("c"));
+        assertTrue("Column D value should be d",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("D"))).equals("d"));
+        // put the same row again with C column deleted
+        put = new Put(rowKey);
+        put.addColumn(family, Bytes.toBytes("A"), Bytes.toBytes("a1"));
+        put.addColumn(family, Bytes.toBytes("B"), Bytes.toBytes("b1"));
+        KeyValue marker = new KeyValue(rowKey, family, Bytes.toBytes("C"),
+            HConstants.LATEST_TIMESTAMP, KeyValue.Type.DeleteColumn);
+        put.addColumn(family, Bytes.toBytes("D"), Bytes.toBytes("d1"));
+        put.add(marker);
+        hTable.put(put);
+        // get row back and assert the values
+        get = new Get(rowKey);
+        get.addFamily(family);
+        result = hTable.get(get);
+        assertTrue("Column A value should be a1",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("A"))).equals("a1"));
+        assertTrue("Column B value should be b1",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("B"))).equals("b1"));
+        System.out.println(result.getValue(family, Bytes.toBytes("C")));
+        assertTrue("Column C should not exist", result.getValue(family, Bytes.toBytes("C")) == null);
+        assertTrue("Column D value should be d1",
+            Bytes.toString(result.getValue(family, Bytes.toBytes("D"))).equals("d1"));
+    }
+
+    @Test
     public void testCellTTL() throws Exception {
         String key1 = "key1";
         String column1 = "cf1";
