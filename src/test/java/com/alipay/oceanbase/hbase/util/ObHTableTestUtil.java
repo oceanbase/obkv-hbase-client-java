@@ -70,7 +70,7 @@ public class ObHTableTestUtil {
 
     public static void prepareClean(List<String> tableGroupList) throws Exception {
         for (String tableGroup : tableGroupList) {
-            tableNameList.addAll(getOTableNameList(tableGroup));
+            tableNameList.addAll(getOHTableNameList(tableGroup));
         }
     }
 
@@ -120,30 +120,30 @@ public class ObHTableTestUtil {
         return new OHTableClient(tableName, newConfiguration());
     }
 
-    static public List<String> getOTableNameList(String tableGroup) throws IOException {
-            // 读取建表语句
-            List<String> res = new LinkedList<>();
-            String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
-            String[] sqlList = sql.split(";");
-            Map<String, HTableDescriptor> tableMap = new LinkedHashMap<>();
-            for (String singleSql : sqlList) {
-                String realTableName;
-                if (singleSql.contains("CREATE TABLE ")) {
-                    singleSql.trim();
-                    String[] splits = singleSql.split(" ");
-                    String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
-                    if (tableGroupName.contains(":")) {
-                        String[] tmpStr = tableGroupName.split(":", 2);
-                        tableGroupName = tmpStr[1];
-                    }
-                    realTableName = tableGroupName.split("\\$", 2)[0];
-                    if (realTableName.equals(tableGroup)) {
-                        res.add(tableGroupName);
-                    }
+    static public List<String> getOHTableNameList(String tableGroup) throws IOException {
+        // 读取建表语句
+        List<String> res = new LinkedList<>();
+        String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
+        String[] sqlList = sql.split(";");
+        Map<String, HTableDescriptor> tableMap = new LinkedHashMap<>();
+        for (String singleSql : sqlList) {
+            String realTableName;
+            if (singleSql.contains("CREATE TABLE ")) {
+                singleSql.trim();
+                String[] splits = singleSql.split(" ");
+                String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
+                if (tableGroupName.contains(":")) {
+                    String[] tmpStr = tableGroupName.split(":", 2);
+                    tableGroupName = tmpStr[1];
+                }
+                realTableName = tableGroupName.split("\\$", 2)[0];
+                if (realTableName.equals(tableGroup)) {
+                    res.add(tableGroupName);
                 }
             }
-            return res;
         }
+        return res;
+    }
 
     static public Connection getConnection() {
         try {
