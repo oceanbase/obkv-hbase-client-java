@@ -238,16 +238,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
-    private ObTableBatchOperation buildObTableBatchOperation(List<? extends Mutation> execBuffer) {
-        List<KeyValue> keyValueList = new LinkedList<>();
-        for (Mutation mutation : execBuffer) {
-            for (Map.Entry<byte[], List<KeyValue>> entry : mutation.getFamilyMap().entrySet()) {
-                keyValueList.addAll(entry.getValue());
-            }
-        }
-        return OHTable.buildObTableBatchOperation(keyValueList, false, null);
-    }
-
     /**
      * Only 4_2_5 BP1 - 4_3_0 and after 4_3_4 support multi-cf
      * */
