@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+import org.apache.hadoop.hbase.regionserver.NoSuchColumnFamilyException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.Threads;
@@ -1342,8 +1343,9 @@ public class OHTable implements HTableInterface {
                                                 + mutation.getClass().getName());
             }
             checkFamilyViolationForOneFamily(mutation.getFamilyCellMap().keySet());
-            checkArgument(Arrays.equals(family, mutation.getFamilyCellMap().firstEntry().getKey()),
-                "mutation family is not equal check family");
+            if (!Arrays.equals(family, mutation.getFamilyCellMap().firstEntry().getKey())) {
+                throw new NoSuchColumnFamilyException("mutation family is not equal check family");
+            }
         }
         byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
         ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
