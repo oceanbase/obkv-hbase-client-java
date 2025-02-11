@@ -1966,24 +1966,23 @@ public class OHTable implements HTableInterface {
     public static ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
                                                                    List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
-        OHOpType opType;
+        ObTableOperationType opType;
         Map<String, Integer> indexMap = new HashMap<>();
         for (Mutation row : rowList) {
             if (row instanceof Put) {
-                opType = OHOpType.Put;
+                opType = INSERT_OR_UPDATE;
             } else if (row instanceof Delete) {
-                opType = OHOpType.Delete;
+                opType = DEL;
             } else if (row instanceof Increment) {
-                opType = OHOpType.Increment;
+                opType = INCREMENT;
             } else if (row instanceof Append) {
-                opType = OHOpType.Append;
+                opType = APPEND;
             } else {
                 throw new FeatureNotSupportedException("not supported other type");
             }
             Set<Map.Entry<byte[], List<KeyValue>>> familyCellMap = row.getFamilyMap().entrySet();
-
             for (Map.Entry<byte[], List<KeyValue>> familyWithCells : familyCellMap) {
-                if (opType == OHOpType.Increment || opType == OHOpType.Append) {
+                if (opType == INCREMENT || opType == APPEND) {
                     indexMap.clear();
                     for (int i = 0; i < familyWithCells.getValue().size(); i++) {
                         Cell cell = familyWithCells.getValue().get(i);
@@ -1992,15 +1991,17 @@ public class OHTable implements HTableInterface {
                     }
                     for (Map.Entry<String, Integer> entry : indexMap.entrySet()) {
                         qualifiers.add(entry.getKey().getBytes());
-                        batch.addTableOperation(buildObTableOperation(familyWithCells.getValue().get(entry.getValue()), opType, row.getTTL()));
+                        batch.addTableOperation(buildObTableOperation(
+                                familyWithCells.getValue().get(entry.getValue()), opType,
+                                row.getTTL()));
                     }
                 } else {
                     for (KeyValue cell : familyWithCells.getValue()) {
-                        batch.addTableOperation(buildObTableOperation(cell, opType, row.getTTL()));
+                        batch.addTableOperation(
+                                buildObTableOperation(cell, opType, row.getTTL()));
                     }
                 }
             }
-
         }
         batch.setSamePropertiesNames(true);
         return batch;
@@ -2010,10 +2011,8 @@ public class OHTable implements HTableInterface {
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup, Long TTL) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
-        switch (operationType) {
-            case INSERT_OR_UPDATE:
-            case APPEND:
-            case INCREMENT:
+        switch (kvType) {
+            case Put:
                 String[] property_columns = V_COLUMNS;
                 Object[] property = new Object[] { CellUtil.cloneValue(kv) };
                 if (TTL != Long.MAX_VALUE) {
@@ -2024,36 +2023,29 @@ public class OHTable implements HTableInterface {
                     ROW_KEY_COLUMNS,
                     new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
                     property_columns, property);
-            case DEL:
-                switch (kvType) {
-                    case Delete:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
-                            null, null);
-                    case Maximum:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
-                    case DeleteColumn:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() },
-                            null, null);
-                    case DeleteFamily:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
-                                    -kv.getTimestamp() }, null, null);
-                    case DeleteFamilyVersion:
-                        return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
-                            DEL,
-                            ROW_KEY_COLUMNS,
-                            new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
-                                    kv.getTimestamp() }, null, null);
-                    default:
-                        throw new IllegalArgumentException("illegal mutation type " + kvType);
-                }
+            case Delete:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() }, null, null);
+            case Maximum:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), null, -kv.getTimestamp() }, null, null);
+            case DeleteColumn:
+                return com.alipay.oceanbase.rpc.mutation.Mutation
+                    .getInstance(DEL, ROW_KEY_COLUMNS,
+                        new Object[] { kv.getRow(), kv.getQualifier(), -kv.getTimestamp() }, null,
+                        null);
+            case DeleteFamily:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    DEL,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
+                            -kv.getTimestamp() }, null, null);
+            case DeleteFamilyVersion:
+                return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
+                    DEL,
+                    ROW_KEY_COLUMNS,
+                    new Object[] { kv.getRow(), isTableGroup ? kv.getQualifier() : null,
+                            kv.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -2178,48 +2170,35 @@ public class OHTable implements HTableInterface {
         return batch;
     }
 
-    public static ObTableOperation buildObTableOperation(KeyValue kv, OHOpType operationType,
+    public static ObTableOperation buildObTableOperation(KeyValue kv,
+                                                         ObTableOperationType operationType,
                                                          Long TTL) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
         String[] property_columns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
         if (TTL != Long.MAX_VALUE) {
             property_columns = PROPERTY_COLUMNS;
             property = new Object[] { CellUtil.cloneValue(kv), TTL };
         }
-        switch (operationType) {
+        switch (kvType) {
             case Put:
-            case Increment:
-            case Append:
-                ObTableOperationType type;
-                if (operationType == OHOpType.Put) {
-                    type = INSERT_OR_UPDATE;
-                } else if (operationType == OHOpType.Increment) {
-                    type = INCREMENT;
-                } else {
-                    type = APPEND;
-                }
                 return getInstance(
-                    type,
+                    operationType,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
                             kv.getTimestamp() }, property_columns, property);
             case Delete:
-                KeyValue.Type delType = KeyValue.Type.codeToType(kv.getTypeByte());
-                if (delType == KeyValue.Type.Delete) {
-                    return getInstance(
-                        DEL,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                                kv.getTimestamp() }, null, null);
-                } else if (delType == KeyValue.Type.DeleteColumn) {
-                    return getInstance(
-                        DEL,
-                        new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                                -kv.getTimestamp() }, null, null);
-                } else if (delType == KeyValue.Type.DeleteFamily) {
-                    return getInstance(DEL, new Object[] { kv.getRow(), null, -kv.getTimestamp() },
-                        null, null);
-                } else {
-                    throw new IllegalArgumentException("illegal delete type " + operationType);
-                }
+                return getInstance(
+                    DEL,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            kv.getTimestamp() }, null, null);
+            case DeleteColumn:
+                return getInstance(
+                    DEL,
+                    new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
+                            -kv.getTimestamp() }, null, null);
+            case DeleteFamily:
+                return getInstance(DEL, new Object[] { kv.getRow(), null, -kv.getTimestamp() },
+                    null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -2330,9 +2309,5 @@ public class OHTable implements HTableInterface {
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
         return new Pair<>(getStartKeys(), getEndKeys());
-    }
-
-    public enum OHOpType {
-        Put, Append, Delete, Increment
     }
 }
