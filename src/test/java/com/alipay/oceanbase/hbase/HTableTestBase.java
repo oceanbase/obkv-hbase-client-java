@@ -5189,7 +5189,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         try {
             tryPut(hTable, errorPut);
         } catch (Exception e) {
-            assertTrue(e.getCause().toString().contains("Unknown column 'TTL'"));
+            assertTrue(e.getCause().getCause().toString().contains("Unknown column 'TTL'"));
         }
         // test put and get
         tryPut(hTable, put1);
