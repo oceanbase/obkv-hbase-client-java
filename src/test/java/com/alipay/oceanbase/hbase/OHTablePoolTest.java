@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.remoting.util.ConcurrentHashSet;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.util.PoolMap;
 import org.junit.*;
@@ -37,7 +38,7 @@ public class OHTablePoolTest extends HTableTestBase {
     protected static OHTablePool ohTablePool;
 
     private static OHTablePool newOHTablePool(final int maxSize, final PoolMap.PoolType poolType) {
-        OHTablePool pool = new OHTablePool(new Configuration(), maxSize, poolType);
+        OHTablePool pool = new OHTablePool(HBaseConfiguration.create(), maxSize, poolType);
         pool.setFullUserName("test", ObHTableTestUtil.FULL_USER_NAME);
         pool.setPassword("test", ObHTableTestUtil.PASSWORD);
         if (ObHTableTestUtil.ODP_MODE) {
@@ -55,7 +56,7 @@ public class OHTablePoolTest extends HTableTestBase {
 
     @BeforeClass
     public static void setup() throws Exception {
-        Configuration c = new Configuration();
+        Configuration c = HBaseConfiguration.create();
         ohTablePool = newOHTablePool(10, null);
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
         hTable = ohTablePool.getTable("test");

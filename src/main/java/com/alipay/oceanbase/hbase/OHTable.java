@@ -304,7 +304,7 @@ public class OHTable implements HTableInterface {
         this.cleanupConnectionOnClose = false;
         this.executePool = executePool;
         this.obTableClient = obTableClient;
-        this.configuration = new Configuration();
+        this.configuration = HBaseConfiguration.create();
         finishSetUp();
     }
 

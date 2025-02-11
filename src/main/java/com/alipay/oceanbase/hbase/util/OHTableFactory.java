@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTablePool;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableFactory;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -170,7 +171,7 @@ public class OHTableFactory extends HTableFactory {
     }
 
     private Configuration copyConfiguration(Configuration origin) {
-        Configuration copy = new Configuration();
+        Configuration copy = HBaseConfiguration.create();
 
         for (Map.Entry<String, String> entry : origin) {
             copy.set(entry.getKey(), entry.getValue());
