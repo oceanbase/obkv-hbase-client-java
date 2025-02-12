@@ -2262,10 +2262,6 @@ public class OHTable implements HTableInterface {
         return new Pair<>(getStartKeys(), getEndKeys());
     }
 
-    public enum OHOpType {
-        Put, Append, Delete, Increment
-    }
-
     private BufferedMutator getBufferedMutator() throws IOException {
         if (this.mutator == null) {
             this.mutator = (OHBufferedMutatorImpl) this.connection.getBufferedMutator(
