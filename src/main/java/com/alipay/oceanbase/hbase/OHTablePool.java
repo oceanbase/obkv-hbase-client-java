@@ -26,6 +26,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -67,7 +68,7 @@ public class OHTablePool implements Closeable {
      * Default Constructor. Default HBaseConfiguration and no limit on pool size.
      */
     public OHTablePool() {
-        this(new Configuration(), Integer.MAX_VALUE);
+        this(HBaseConfiguration.create(), Integer.MAX_VALUE);
     }
 
     /**
