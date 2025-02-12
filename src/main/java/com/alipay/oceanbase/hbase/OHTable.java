@@ -148,11 +148,6 @@ public class OHTable implements HTableInterface {
     private long                  writeBufferSize;
 
     /**
-     * decide whether clear the buffer when meet exception.the default
-     * value is true. Be careful about the correctness when set it false
-     */
-
-    /**
      * whether flush the put automatically
      */
     private boolean               autoFlush              = true;
