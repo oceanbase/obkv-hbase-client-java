@@ -1266,6 +1266,7 @@ public class OHTable implements HTableInterface {
             batch(Collections.singletonList(delete));
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
+            throw e;
         }
     }
 
@@ -1552,6 +1553,9 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
                     writeBuffer.size(), e);
+                if (e instanceof IOException) {
+                    throw (IOException) e;
+                }
             } finally {
                 // mutate list so that it is empty for complete success, or contains
                 // only failed records results are returned in the same order as the
