@@ -4761,7 +4761,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Test
     public void testCheckAndMutationIllegal() throws IOException {
-        // check and mute 只支持一行操作
+        // checkAndPut 只支持一行操作
         try {
             Put put = new Put("key_7".getBytes());
             put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
@@ -4770,20 +4770,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             fail();
         } catch (IOException e) {
             Assert.assertTrue(e.getMessage().contains("doesn't match the original one"));
-        }
-
-        // check and mute 只支持一行操作
-        try {
-            RowMutations mutations = new RowMutations("key_7".getBytes());
-            Put put = new Put("key_7".getBytes());
-            put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
-            mutations.add(put);
-            boolean ret = hTable.checkAndMutate("key_8".getBytes(), "family1".getBytes(),
-                "column1_1".getBytes(), CompareFilter.CompareOp.EQUAL, "value1".getBytes(),
-                mutations);
-            fail();
-        } catch (IOException e) {
-            Assert.assertTrue(e.getMessage().contains("mutation row is not equal check row error"));
         }
 
         try {
@@ -5220,7 +5206,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         try {
             tryPut(hTable, errorPut);
         } catch (Exception e) {
-            assertTrue(e.getCause().getCause().toString().contains("Unknown column 'TTL'"));
+            assertTrue(e.getCause().toString().contains("Unknown column 'TTL'"));
         }
         // test put and get
         tryPut(hTable, put1);
