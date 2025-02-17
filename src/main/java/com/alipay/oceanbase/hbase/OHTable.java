@@ -809,12 +809,12 @@ public class OHTable implements HTableInterface {
 
     private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
                                      List<KeyValue> keyValueList, boolean isTableGroup,
-                                     byte[] family) throws Exception {
+                                     byte[] family, boolean checkExistenceOnly) throws Exception {
         byte[][] familyAndQualifier = new byte[2][];
         KeyValue kv = null;
         while (clientQueryStreamResult.next()) {
             List<ObObj> row = clientQueryStreamResult.getRow();
-            if (row.isEmpty()) {
+            if (checkExistenceOnly) {
                 // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
                 keyValueList.add(new KeyValue());
                 return;
@@ -904,7 +904,7 @@ public class OHTable implements HTableInterface {
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
+                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family, get.isCheckExistenceOnly());
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
@@ -927,7 +927,7 @@ public class OHTable implements HTableInterface {
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
-                                family);
+                                family, get.isCheckExistenceOnly());
                         }
                     }
                 } catch (Exception e) {
