@@ -4942,6 +4942,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     public void testCheckAndMutate() throws IOException {
         // Mutate 只支持操作一行数据
         String key = "checkAndMutateKey";
+        String key1 = "checkAndMutateKey1";
         String column1 = "checkAndMutateColumn";
         String column2 = "checkAndMutateColumn2";
         String value1 = "value1";
@@ -5080,6 +5081,36 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(Integer.MAX_VALUE);
         r = hTable.get(get);
         Assert.assertEquals(10, r.raw().length);
+
+        // test different row operations
+        put1 = new Put(key1.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key1.getBytes());
+        put2.add(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.add(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key1.getBytes());
+        put3.add(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.add(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+
+        rowMutations = new RowMutations(key1.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // check specific row in server and execute different row operations
+        assertTrue(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+                CompareFilter.CompareOp.EQUAL, value1.getBytes(), rowMutations));
+
+        assertTrue(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column2.getBytes(),
+                CompareFilter.CompareOp.GREATER, value1.getBytes(), rowMutations));
+
+        assertFalse(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+                CompareFilter.CompareOp.LESS, value1.getBytes(), rowMutations));
+
+        assertFalse(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column2.getBytes(),
+                CompareFilter.CompareOp.GREATER, value2.getBytes(), rowMutations));
     }
 
     @Test
