@@ -4761,7 +4761,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
     @Test
     public void testCheckAndMutationIllegal() throws IOException {
-        // check and mute 只支持一行操作
+        // checkAndPut 只支持一行操作
         try {
             Put put = new Put("key_7".getBytes());
             put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
@@ -4770,20 +4770,6 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             fail();
         } catch (IOException e) {
             Assert.assertTrue(e.getMessage().contains("doesn't match the original one"));
-        }
-
-        // check and mute 只支持一行操作
-        try {
-            RowMutations mutations = new RowMutations("key_7".getBytes());
-            Put put = new Put("key_7".getBytes());
-            put.add("family1".getBytes(), "column1_1".getBytes(), "value2".getBytes());
-            mutations.add(put);
-            boolean ret = hTable.checkAndMutate("key_8".getBytes(), "family1".getBytes(),
-                "column1_1".getBytes(), CompareFilter.CompareOp.EQUAL, "value1".getBytes(),
-                mutations);
-            fail();
-        } catch (IOException e) {
-            Assert.assertTrue(e.getMessage().contains("mutation row is not equal check row error"));
         }
 
         try {
@@ -4942,6 +4928,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
     public void testCheckAndMutate() throws IOException {
         // Mutate 只支持操作一行数据
         String key = "checkAndMutateKey";
+        String key1 = "checkAndMutateKey1";
         String column1 = "checkAndMutateColumn";
         String column2 = "checkAndMutateColumn2";
         String value1 = "value1";
@@ -5080,6 +5067,36 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(Integer.MAX_VALUE);
         r = hTable.get(get);
         Assert.assertEquals(10, r.raw().length);
+
+        // test different row operations
+        put1 = new Put(key1.getBytes());
+        put1.add(family.getBytes(), column1.getBytes(), t, value1.getBytes());
+        put1.add(family.getBytes(), column2.getBytes(), t, value2.getBytes());
+
+        put2 = new Put(key1.getBytes());
+        put2.add(family.getBytes(), column1.getBytes(), t + 3, value2.getBytes());
+        put2.add(family.getBytes(), column2.getBytes(), t + 3, value1.getBytes());
+
+        put3 = new Put(key1.getBytes());
+        put3.add(family.getBytes(), column1.getBytes(), t + 5, value1.getBytes());
+        put3.add(family.getBytes(), column2.getBytes(), t + 5, value2.getBytes());
+
+        rowMutations = new RowMutations(key1.getBytes());
+        rowMutations.add(put1);
+        rowMutations.add(put2);
+        rowMutations.add(put3);
+        // check specific row in server and execute different row operations
+        assertTrue(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+                CompareFilter.CompareOp.EQUAL, value1.getBytes(), rowMutations));
+
+        assertTrue(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column2.getBytes(),
+                CompareFilter.CompareOp.GREATER, value1.getBytes(), rowMutations));
+
+        assertFalse(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
+                CompareFilter.CompareOp.LESS, value1.getBytes(), rowMutations));
+
+        assertFalse(hTable.checkAndMutate(key.getBytes(), family.getBytes(), column2.getBytes(),
+                CompareFilter.CompareOp.GREATER, value2.getBytes(), rowMutations));
     }
 
     @Test
@@ -5189,7 +5206,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         try {
             tryPut(hTable, errorPut);
         } catch (Exception e) {
-            assertTrue(e.getCause().getCause().toString().contains("Unknown column 'TTL'"));
+            assertTrue(e.getCause().toString().contains("Unknown column 'TTL'"));
         }
         // test put and get
         tryPut(hTable, put1);

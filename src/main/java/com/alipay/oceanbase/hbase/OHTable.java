@@ -1324,8 +1324,6 @@ public class OHTable implements HTableInterface {
                                      RowMutations rowMutations) throws Exception {
         checkArgument(row != null, "row is null");
         checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
-        checkArgument(Bytes.equals(row, rowMutations.getRow()),
-            "mutation row is not equal check row");
         checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
         List<Mutation> mutations = rowMutations.getMutations();
         // only one family operation is allowed
