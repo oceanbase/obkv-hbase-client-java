@@ -813,12 +813,12 @@ public class OHTable implements HTableInterface {
         byte[][] familyAndQualifier = new byte[2][];
         KeyValue kv = null;
         while (clientQueryStreamResult.next()) {
-            List<ObObj> row = clientQueryStreamResult.getRow();
             if (checkExistenceOnly) {
                 // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
                 keyValueList.add(new KeyValue());
                 return;
             } else {
+                List<ObObj> row = clientQueryStreamResult.getRow();
                 if (kv == null
                     || compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) <= 0) {
                     if (kv != null
