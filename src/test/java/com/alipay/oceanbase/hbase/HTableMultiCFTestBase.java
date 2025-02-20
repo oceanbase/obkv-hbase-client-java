@@ -1522,6 +1522,38 @@ public abstract class HTableMultiCFTestBase {
             }
         }
         assertEquals(5, keyValues.length);
+
+        // test multi-cf get checkExistenceOnly
+        Delete delKey1 = new Delete(toBytes("Key1"));
+        multiCfHTable.delete(delKey1);
+        get = new Get(toBytes("Key1"));
+        Result allKey1Result = multiCfHTable.get(get);
+        Assert.assertEquals(0, allKey1Result.size());
+
+        boolean exist = multiCfHTable.exists(get);
+        assertFalse(exist);
+        Put put = new Put(toBytes("Key1"));
+        put.add(family1, family1_column1, family1_value);
+        multiCfHTable.put(put);
+        exist = multiCfHTable.exists(get);
+        assertTrue(exist);
+
+        // test existsAll
+        multiCfHTable.delete(delKey1);
+        allKey1Result = multiCfHTable.get(get);
+        Assert.assertEquals(0, allKey1Result.size());
+
+        get = new Get(toBytes("Key0"));
+        get2 = new Get(toBytes("Key1"));
+        get3 = new Get(toBytes("Key2"));
+        ArrayList<Get> gets = new ArrayList<>();
+        gets.add(get);
+        gets.add(get2);
+        gets.add(get3);
+        boolean[] exists = multiCfHTable.existsAll(gets);
+        Assert.assertTrue(exists[0]);
+        Assert.assertFalse(exists[1]);
+        Assert.assertTrue(exists[2]);
     }
 
     @Test
