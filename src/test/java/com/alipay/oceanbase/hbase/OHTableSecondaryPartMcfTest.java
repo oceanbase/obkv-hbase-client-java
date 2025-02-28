@@ -50,7 +50,7 @@ public class OHTableSecondaryPartMcfTest {
                     "  `V` varbinary(1024) DEFAULT NULL," +
                     "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
                     "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 9 (" +
+                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3 (" +
                     "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
                     "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
@@ -63,7 +63,7 @@ public class OHTableSecondaryPartMcfTest {
                     "  `V` varbinary(1024) DEFAULT NULL," +
                     "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
                     "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 9 (" +
+                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3 (" +
                     "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
                     "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
@@ -78,7 +78,7 @@ public class OHTableSecondaryPartMcfTest {
                     "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
                     "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
                     "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 9 (" +
+                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 3 (" +
                     "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
                     "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
@@ -92,7 +92,7 @@ public class OHTableSecondaryPartMcfTest {
                     "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
                     "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
                     "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 9 (" +
+                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 3 (" +
                     "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
                     "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
@@ -112,7 +112,7 @@ public class OHTableSecondaryPartMcfTest {
                     "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
                     "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 9;",
+                    ") PARTITIONS 3;",
             "CREATE TABLE IF NOT EXISTS `" + tableNames[2][1] + "` (" +
                     "    `K` varbinary(1024) NOT NULL," +
                     "    `Q` varbinary(1024) NOT NULL," +
@@ -125,7 +125,7 @@ public class OHTableSecondaryPartMcfTest {
                     "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
                     "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 9;"
+                    ") PARTITIONS 3;"
 
             },
             {"CREATE TABLE IF NOT EXISTS `" + tableNames[3][0] + "` (" +
@@ -141,7 +141,7 @@ public class OHTableSecondaryPartMcfTest {
                     "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
                     "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 9;",
+                    ") PARTITIONS 3;",
             "CREATE TABLE IF NOT EXISTS `" + tableNames[3][1] + "` (" +
                     "  `K` varbinary(1024) NOT NULL," +
                     "  `Q` varbinary(1024) NOT NULL," +
@@ -155,7 +155,7 @@ public class OHTableSecondaryPartMcfTest {
                     "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
                     "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
                     "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 9;"
+                    ") PARTITIONS 3;"
 
             }
     };
