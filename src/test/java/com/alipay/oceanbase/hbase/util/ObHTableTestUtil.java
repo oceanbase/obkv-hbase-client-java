@@ -196,4 +196,41 @@ public class ObHTableTestUtil {
             consumer.accept(entry);
         }
     }
+    
+    public static void Assert(String tableName, Runnable assertMethod) throws SQLException {
+        try {
+            assertMethod.run();
+        } catch (AssertionError e) {
+            Connection conn = ObHTableTestUtil.getConnection();
+            String selectSql = "select * from " + tableName;
+            System.out.println("assert fail, execute sql: " + selectSql);
+            java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
+            ResultSetPrinter.print(resultSet);
+            throw e;
+        }
+    }
+    
+    public static void Assert(List<String> tableNames, Runnable assertMethod) throws SQLException {
+        try {
+            assertMethod.run();
+        } catch (AssertionError e) {
+            for (String tableName : tableNames) {
+                Connection conn = ObHTableTestUtil.getConnection();
+                String selectSql = "select * from " + tableName;
+                System.out.println("assert fail, execute sql: " + selectSql);
+                java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
+                ResultSetPrinter.print(resultSet);
+            }
+            throw e;
+        }
+    }
+    
+    
+    public static boolean secureCompare(byte[] a, byte[] b) {
+        int diff = a.length ^ b.length;
+        for (int i = 0; i < a.length && i < b.length; i++) {
+            diff |= a[i] ^ b[i];
+        }
+        return diff == 0;
+    }
 }
