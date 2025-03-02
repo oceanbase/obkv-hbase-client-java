@@ -40,6 +40,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
+import com.alipay.oceanbase.rpc.queryandmutate.QueryAndMutate;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
@@ -78,6 +79,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static com.alipay.oceanbase.hbase.filter.HBaseFilterUtils.writeBytesWithEscape;
+import static org.apache.hadoop.hbase.KeyValue.Type.*;
 
 public class OHTable implements HTableInterface {
 
@@ -552,8 +554,8 @@ public class OHTable implements HTableInterface {
             boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()).anyMatch(
                             kv -> KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamily || KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamilyVersion);
+                                    kv.getType()) == DeleteFamily || KeyValue.Type.codeToType(
+                                    kv.getType()) == DeleteFamilyVersion);
             if (!has_delete_family) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
@@ -1266,6 +1268,7 @@ public class OHTable implements HTableInterface {
             batch(Collections.singletonList(delete));
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
+            throw e;
         }
     }
 
@@ -2006,7 +2009,50 @@ public class OHTable implements HTableInterface {
         batch.setSamePropertiesNames(true);
         return batch;
     }
+    private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
+                                                     ObTableOperationType operationType,
+                                                     boolean isTableGroup, Long TTL) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
+        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType, isTableGroup, TTL);
+        ObNewRange range = new ObNewRange();
+        ObTableQuery tableQuery = new ObTableQuery();
+        tableQuery.setObKVParams(buildOBKVParams((Scan)null));
+        switch (kvType) {
+            case Delete:
+            setRangeAndFilter(range, tableQuery, tableMutation, isTableGroup, kv.getQualifier(), null);
+            break;
+            case DeleteColumn:
+            setRangeAndFilter(range, tableQuery, tableMutation, isTableGroup, kv.getQualifier(), new TimeRange((long) tableMutation.getRowKey().getValues()[2], (long) tableMutation.getRowKey().getValues()[2]));
+            break;
+            case DeleteFamily:
+            setRangeAndFilter(range, tableQuery, tableMutation, isTableGroup, new byte[]{}, new TimeRange(-1, (long) tableMutation.getRowKey().getValues()[2]));
+            break;
+        case DeleteFamilyVersion:
+            setRangeAndFilter(range, tableQuery, tableMutation, isTableGroup, new byte[]{}, new TimeRange((long) tableMutation.getRowKey().getValues()[2], (long) tableMutation.getRowKey().getValues()[2]));
+            break;
+        default:
+            return null;
+        }
+        tableQuery.addKeyRange(range);
+        return new QueryAndMutate(tableQuery, tableMutation);
+}
 
+private void setRangeAndFilter(ObNewRange range,
+                               ObTableQuery tableQuery, 
+                               com.alipay.oceanbase.rpc.mutation.Mutation tableMutation,
+                               boolean isTableGroup, byte[] qualifier, TimeRange timeRange) {
+    Object[] rowKeyValues = tableMutation.getRowKey().getValues();
+                if (!isTableGroup) {
+        range.setStartKey(ObRowKey.getInstance(rowKeyValues));
+        range.setEndKey(ObRowKey.getInstance(rowKeyValues[0], ObObj.getMax(), Long.MAX_VALUE));
+                } else {
+        range.setStartKey(ObRowKey.getInstance(rowKeyValues[0], ObObj.getMin(), Long.MIN_VALUE));
+        range.setEndKey(ObRowKey.getInstance(rowKeyValues[0], ObObj.getMax(), Long.MAX_VALUE));
+    }
+    ObHTableFilter filter = buildObHTableFilter(null, timeRange, timeRange == null ? Integer.MAX_VALUE : 1, qualifier);
+                    tableQuery.sethTableFilter(filter);
+}
+    
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup, Long TTL) {
@@ -2118,7 +2164,7 @@ public class OHTable implements HTableInterface {
                 Put put = (Put) row;
                 if (put.isEmpty()) {
                     throw new IllegalArgumentException("No columns to insert for #"
-                                                       + (posInList + 1) + " item");
+                            + (posInList + 1) + " item");
                 }
                 for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
                     byte[] family = entry.getKey();
@@ -2142,7 +2188,7 @@ public class OHTable implements HTableInterface {
                     singleOpResultNum++;
                     KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
                         KeyValue.Type.Maximum);
-                    batch.addOperation(buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE));
+                    batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, isTableGroup, Long.MAX_VALUE));
                 } else {
                     for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         byte[] family = entry.getKey();
@@ -2153,9 +2199,9 @@ public class OHTable implements HTableInterface {
                                 KeyValue new_kv = modifyQualifier(kv,
                                     (Bytes.toString(family) + "." + Bytes.toString(kv
                                         .getQualifier())).getBytes());
-                                batch.addOperation(buildMutation(new_kv, DEL, true, Long.MAX_VALUE));
+                                batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
                             } else {
-                                batch.addOperation(buildMutation(kv, DEL, false, Long.MAX_VALUE));
+                                batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, false, Long.MAX_VALUE));
                             }
                         }
                     }
