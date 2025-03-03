@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableBatchOperation;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -85,6 +86,33 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         } else {
             this.ohTable = new OHTable(tableName, ohConnection, connectionConfig, pool);
         }
+    }
+
+    /**
+     * only used for OHTable get bufferedMutator
+     * */
+    public OHBufferedMutatorImpl(Configuration conf, BufferedMutatorParams params, OHTable ohTable)
+                                                                                                   throws IOException {
+        // create an OHTable object to do batch work
+        if (ohTable == null) {
+            throw new ObTableUnexpectedException("The ohTable is null.");
+        }
+        this.ohTable = ohTable;
+        // init params in OHBufferedMutatorImpl
+        this.tableName = params.getTableName();
+        this.conf = conf;
+        this.listener = params.getListener();
+
+        OHConnectionConfiguration connectionConfig = new OHConnectionConfiguration(conf);
+        this.pool = params.getPool();
+        this.rpcTimeout = connectionConfig.getRpcTimeout();
+        this.operationTimeout = connectionConfig.getOperationTimeout();
+
+        this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+            .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
+        this.maxKeyValueSize = params.getMaxKeyValueSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
+            .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
+
     }
 
     @Override
