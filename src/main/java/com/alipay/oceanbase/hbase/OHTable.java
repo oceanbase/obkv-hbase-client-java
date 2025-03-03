@@ -2238,11 +2238,9 @@ public class OHTable implements HTableInterface {
 
     private BufferedMutator getBufferedMutator() throws IOException {
         if (this.mutator == null) {
-            this.mutator = new OHBufferedMutatorImpl(
-                    this.configuration,
-                    new BufferedMutatorParams(TableName.valueOf(this.tableNameString))
-                            .pool(this.executePool).writeBufferSize(this.writeBufferSize)
-                            .maxKeyValueSize(this.maxKeyValueSize), this);
+            this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
+                TableName.valueOf(this.tableNameString)).pool(this.executePool)
+                .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
         }
         return this.mutator;
     }

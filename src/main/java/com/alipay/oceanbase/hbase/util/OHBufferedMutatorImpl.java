@@ -88,8 +88,11 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
-    public OHBufferedMutatorImpl(Configuration conf, BufferedMutatorParams params,
-                                 OHTable ohTable) throws IOException {
+    /**
+     * only used for OHTable get bufferedMutator
+     * */
+    public OHBufferedMutatorImpl(Configuration conf, BufferedMutatorParams params, OHTable ohTable)
+                                                                                                   throws IOException {
         // create an OHTable object to do batch work
         if (ohTable == null) {
             throw new ObTableUnexpectedException("The ohTable is null.");
@@ -106,9 +109,9 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.operationTimeout = connectionConfig.getOperationTimeout();
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
-                .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
+            .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
         this.maxKeyValueSize = params.getMaxKeyValueSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
-                .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
+            .getMaxKeyValueSize() : connectionConfig.getMaxKeyValueSize();
 
     }
 
