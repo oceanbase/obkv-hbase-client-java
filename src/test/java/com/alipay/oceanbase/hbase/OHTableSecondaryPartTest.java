@@ -34,6 +34,7 @@ import java.util.List;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.getConnection;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class OHTableSecondaryPartTest {
     private static String tableNames[] = new String[] {"test$cf1", "test$cf2", "test$cf3", "test$cf4"};
@@ -323,6 +324,46 @@ public class OHTableSecondaryPartTest {
                 }
             }
             System.out.println("get table " + tableNames[i] + " begin");
+
+            hTable.close();
+        }
+    }
+
+    @Test
+    public void testScan() throws Exception {
+        long rowSize = 10;
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
+            hTable.init();
+
+            System.out.println("put table " + tableNames[i] + " begin");
+            String key = "putKey";
+            String family = getColumnFamilyName(tableNames[i]);
+            String column = "Column";
+            String value = "value";
+            long timestamp = System.currentTimeMillis();
+            for (int j = 0; j < rowSize; j++) {
+                Put put = new Put(toBytes(key));
+                String qualify = column + j;
+                put.add(family.getBytes(), qualify.getBytes(), timestamp, toBytes(value));
+                hTable.put(put);
+            }
+            System.out.println("put table " + tableNames[i] + " done");
+
+            System.out.println("scan table " + tableNames[i] + " begin");
+            Scan scan = new Scan(toBytes(key));
+            scan.addFamily(family.getBytes());
+            ResultScanner scanner = hTable.getScanner(scan);
+            int count = 0;
+            for (Result result : scanner) {
+                for (KeyValue keyValue : result.raw()) {
+                    assertEquals(column + count, Bytes.toString(keyValue.getQualifier()));
+                    assertEquals(value, Bytes.toString(keyValue.getValue()));
+                    count++;
+                }
+            }
+            assertEquals(rowSize, count);
+            System.out.println("scan table " + tableNames[i] + " end");
 
             hTable.close();
         }
