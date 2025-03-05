@@ -18,15 +18,16 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.*;
 
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -250,6 +251,78 @@ public class OHTableSecondaryPartTest {
                     column.getBytes(), CompareFilter.CompareOp.EQUAL, value.getBytes(),
                     mutations);
             System.out.println("checkAndMutate table " + tableNames[i] + " done");
+
+            hTable.close();
+        }
+    }
+
+    @Test
+    public void testGet() throws Exception {
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
+            hTable.init();
+
+            System.out.println("put table " + tableNames[i] + " begin");
+            String family = getColumnFamilyName(tableNames[i]);
+            String key = "putKey";
+            String column = "putColumn";
+            String value = "value";
+            long timestamp = System.currentTimeMillis();
+            Put put = new Put(toBytes(key));
+            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+            hTable.put(put);
+            System.out.println("put table " + tableNames[i] + " done");
+
+            System.out.println("get table " + tableNames[i] + " begin");
+            Get get = new Get(key.getBytes());
+            get.setMaxVersions(Integer.MAX_VALUE);
+            get.addColumn(family.getBytes(), column.getBytes());
+            Result r = hTable.get(get);
+            Assert.assertEquals(1, r.raw().length);
+            System.out.println("get table " + tableNames[i] + " begin");
+
+            hTable.close();
+        }
+    }
+
+    @Test
+    public void testBatchGet() throws Exception {
+        long batchSize = 10;
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
+            hTable.init();
+
+            System.out.println("put table " + tableNames[i] + " begin");
+            String family = getColumnFamilyName(tableNames[i]);
+            String column = "putColumn";
+            String value = "value";
+            long timestamp = System.currentTimeMillis();
+            for (int j = 0; j < batchSize; j++) {
+                String key = "putKey" + j;
+                Put put = new Put(toBytes(key));
+                put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+                hTable.put(put);
+            }
+            System.out.println("put table " + tableNames[i] + " done");
+
+            System.out.println("get table " + tableNames[i] + " begin");
+            List<Get> gets = new ArrayList<>();
+            for (int j = 0; j < batchSize; j++) {
+                String key = "putKey" + j;
+                Get get = new Get(key.getBytes());
+                get.setMaxVersions(Integer.MAX_VALUE);
+                get.addColumn(family.getBytes(), column.getBytes());
+                gets.add(get);
+            }
+            Result[] results = hTable.get(gets);
+            for (Result result : results) {
+                for (Cell cell : result.listCells()) {
+                    String Q = Bytes.toString(CellUtil.cloneQualifier(cell));
+                    String V = Bytes.toString(CellUtil.cloneValue(cell));
+                    System.out.println("Column: " + Q + ", Value: " + V);
+                }
+            }
+            System.out.println("get table " + tableNames[i] + " begin");
 
             hTable.close();
         }

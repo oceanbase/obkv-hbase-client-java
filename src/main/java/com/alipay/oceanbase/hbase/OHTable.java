@@ -2108,7 +2108,7 @@ public class OHTable implements HTableInterface {
                 obTableQuery = buildObTableQuery(get, columnFilters);
                 ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
                 try {
-                    query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", null)));
+                    query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
                 } catch (Exception e) {
                     logger.error("unexpected error occurs when set row key", e);
                     throw new IOException(e);

@@ -18,12 +18,10 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Table;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.junit.*;
 
 import java.sql.Connection;
 
@@ -283,4 +281,75 @@ public class OHTableSecondaryPartMcfTest {
             hTable.close();
         }
     }
+
+    @Test
+    public void testIncrement() throws Exception {
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
+            hTable.init();
+
+            String key = "Key";
+            String column = "Column";
+            Increment increment = new Increment(key.getBytes());
+            for (int j = 0; j < tableNames[i].length; j++) {
+                String family = getColumnFamilyName(tableNames[i][j]);
+                increment.addColumn(family.getBytes(), column.getBytes(), 1L);
+            }
+            hTable.increment(increment);
+
+            hTable.close();
+        }
+    }
+
+    @Test
+    public void testAppend() throws Exception {
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
+            hTable.init();
+
+            String key = "Key";
+            String column = "Column";
+            String value = "app";
+            Append append = new Append(key.getBytes());
+            for (int j = 0; j < tableNames[i].length; j++) {
+                String family = getColumnFamilyName(tableNames[i][j]);
+                KeyValue kv1 = new KeyValue(key.getBytes(), family.getBytes(), column.getBytes(), value.getBytes());
+                append.add(kv1);
+            }
+            hTable.append(append);
+
+            hTable.close();
+        }
+    }
+
+    @Test
+    public void testGet() throws Exception {
+        for (int i = 0; i < tableNames.length; i++) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
+            hTable.init();
+
+            String key = "putKey";
+            String column = "putColumn";
+            String value = "value";
+            long timestamp = System.currentTimeMillis();
+            Put put = new Put(toBytes(key));
+            for (int j = 0; j < tableNames[i].length; j++) {
+                String family = getColumnFamilyName(tableNames[i][j]);
+                put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+            }
+            hTable.put(put);
+
+            Get get = new Get(key.getBytes());
+            get.setMaxVersions(Integer.MAX_VALUE);
+            for (int j = 0; j < tableNames[i].length; j++) {
+                String family = getColumnFamilyName(tableNames[i][j]);
+                get.addColumn(family.getBytes(), column.getBytes());
+            }
+            Result r = hTable.get(get);
+            Assert.assertEquals(1, r.raw().length);
+
+            hTable.close();
+        }
+    }
+
 }
