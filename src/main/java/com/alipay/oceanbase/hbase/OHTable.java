@@ -123,13 +123,6 @@ public class OHTable implements HTableInterface {
     private boolean               closeClientOnClose     = true;
 
     /**
-     * If the connection this ObTable obtains is created by the ObTable itself,
-     * should set true and close the connection when this ObTable closes;
-     * otherwise set false
-     */
-    private final boolean         cleanupConnectionOnClose;
-
-    /**
      * when the operationExecuteInPool is true the <code>Get</code>
      * will be executed in the pool.
      */
@@ -167,11 +160,6 @@ public class OHTable implements HTableInterface {
     private int                   scannerTimeout;
 
     /**
-     * the connection to obtain bufferedMutator for Put operations
-     */
-    private OHConnectionImpl      connection;
-
-    /**
      * the bufferedMutator to execute Puts
      */
     private OHBufferedMutatorImpl mutator;
@@ -199,8 +187,6 @@ public class OHTable implements HTableInterface {
         this.configuration = configuration;
         this.tableName = tableName.getBytes();
         this.tableNameString = tableName;
-        this.connection = (OHConnectionImpl) ConnectionFactory.createConnection(configuration);
-        this.cleanupConnectionOnClose = true;
 
         int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
             DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
@@ -258,8 +244,6 @@ public class OHTable implements HTableInterface {
         this.configuration = configuration;
         this.tableName = tableName;
         this.tableNameString = Bytes.toString(tableName);
-        this.connection = (OHConnectionImpl) ConnectionFactory.createConnection(configuration);
-        this.cleanupConnectionOnClose = true;
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
@@ -296,7 +280,6 @@ public class OHTable implements HTableInterface {
         this.tableNameString = Bytes.toString(tableName);
         this.cleanupPoolOnClose = false;
         this.closeClientOnClose = false;
-        this.cleanupConnectionOnClose = false;
         this.executePool = executePool;
         this.obTableClient = obTableClient;
         this.configuration = HBaseConfiguration.create();
@@ -314,8 +297,6 @@ public class OHTable implements HTableInterface {
         this.tableNameString = Bytes.toString(tableName.getName());
         this.configuration = connection.getConfiguration();
         this.executePool = executePool;
-        this.connection = (OHConnectionImpl) connection;
-        this.cleanupConnectionOnClose = false;
         if (executePool == null) {
             int maxThreads = configuration.getInt(HBASE_HTABLE_PRIVATE_THREADS_MAX,
                 DEFAULT_HBASE_HTABLE_PRIVATE_THREADS_MAX);
@@ -1531,11 +1512,6 @@ public class OHTable implements HTableInterface {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
-        if (cleanupConnectionOnClose) {
-            if (this.connection != null) {
-                this.connection.close();
-            }
-        }
         this.isClosed = true;
     }
 
@@ -2262,10 +2238,9 @@ public class OHTable implements HTableInterface {
 
     private BufferedMutator getBufferedMutator() throws IOException {
         if (this.mutator == null) {
-            this.mutator = (OHBufferedMutatorImpl) this.connection.getBufferedMutator(
-                new BufferedMutatorParams(TableName.valueOf(this.tableNameString))
-                    .pool(this.executePool).writeBufferSize(this.writeBufferSize)
-                    .maxKeyValueSize(this.maxKeyValueSize), this);
+            this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
+                TableName.valueOf(this.tableNameString)).pool(this.executePool)
+                .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
         }
         return this.mutator;
     }
