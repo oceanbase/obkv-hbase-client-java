@@ -18,204 +18,67 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import com.alipay.oceanbase.hbase.util.TableTemplateManager;
+import com.alipay.oceanbase.hbase.util.TimeGenerator;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 
 import java.sql.Connection;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
+import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartMcfTest {
-    private static String tableGroupNames[] = {
-            "test_table_group1",
-            "test_table_group2",
-            "test_table_group3",
-            "test_table_group4",
-    };
-    private static String tableNames[][] = new String[][] {
-            {tableGroupNames[0] + "$cf1", tableGroupNames[0] + "$cf2"},
-            {tableGroupNames[1] + "$cf1", tableGroupNames[1] + "$cf2"},
-            {tableGroupNames[2] + "$cf1", tableGroupNames[2] + "$cf2"},
-            {tableGroupNames[3] + "$cf1", tableGroupNames[3] + "$cf2"}
-    };
-    private static String createTableStmts[][] = {
-            {"CREATE TABLE IF NOT EXISTS `" + tableNames[0][0] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3 (" +
-                    "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ");",
-            "CREATE TABLE IF NOT EXISTS `" + tableNames[0][1] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[0] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3 (" +
-                    "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ");"
-            },
-            {"CREATE TABLE IF NOT EXISTS `" + tableNames[1][0] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 3 (" +
-                    "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ");",
-            "CREATE TABLE IF NOT EXISTS `" + tableNames[1][1] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[1] +" PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 3 (" +
-                    "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ");"
-
-            },
-            {"CREATE TABLE IF NOT EXISTS `" + tableNames[2][0] + "` (" +
-                    "    `K` varbinary(1024) NOT NULL," +
-                    "    `Q` varbinary(1024) NOT NULL," +
-                    "    `T` bigint(20) NOT NULL," +
-                    "    `V` varbinary(1024) DEFAULT NULL," +
-                    "    `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "    PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[2] +" PARTITION BY KEY(`K`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-                    "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 3;",
-            "CREATE TABLE IF NOT EXISTS `" + tableNames[2][1] + "` (" +
-                    "    `K` varbinary(1024) NOT NULL," +
-                    "    `Q` varbinary(1024) NOT NULL," +
-                    "    `T` bigint(20) NOT NULL," +
-                    "    `V` varbinary(1024) DEFAULT NULL," +
-                    "    `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "    PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[2] +" PARTITION BY KEY(`K`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-                    "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 3;"
-
-            },
-            {"CREATE TABLE IF NOT EXISTS `" + tableNames[3][0] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[3] +" PARTITION BY KEY(`K_PREFIX`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-                    "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 3;",
-            "CREATE TABLE IF NOT EXISTS `" + tableNames[3][1] + "` (" +
-                    "  `K` varbinary(1024) NOT NULL," +
-                    "  `Q` varbinary(1024) NOT NULL," +
-                    "  `T` bigint(20) NOT NULL," +
-                    "  `V` varbinary(1024) DEFAULT NULL," +
-                    "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-                    "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-                    "  PRIMARY KEY (`K`, `Q`, `T`)" +
-                    ") TABLEGROUP = "+ tableGroupNames[3] +" PARTITION BY KEY(`K_PREFIX`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-                    "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-                    "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-                    "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-                    "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-                    ") PARTITIONS 3;"
-
-            }
-    };
-
-    public static void createTableGroups() throws Exception {
-        System.out.print("create table group start");
-        Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableGroupNames.length; i++) {
-            System.out.print(".");
-            String stmt = "CREATE TABLEGROUP IF NOT EXISTS `"+ tableGroupNames[i] +"` SHARDING = 'ADAPTIVE';";
-            conn.createStatement().execute(stmt);
-        }
-        System.out.println("end");
-    }
-
-    public static void dropTableGroups() throws Exception {
-        System.out.print("drop table group start");
-        Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableGroupNames.length; i++) {
-            System.out.print(".");
-            String stmt = "DROP TABLEGROUP IF EXISTS " + tableGroupNames[i] + ";";
-            conn.createStatement().execute(stmt);
-        }
-        System.out.println("end");
-    }
+    private static Map<String, List<String>> tableNames = new LinkedHashMap<>();
 
     public static void dropTables() throws Exception {
-        System.out.print("drop table start");
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableNames.length; i++) {
-            for (int j = 0; j < tableNames[i].length; j++) {
-                System.out.print(".");
-                String stmt = "DROP TABLE IF EXISTS " + tableNames[i][j] + ";";
+        for (Map.Entry<String, List<String >> entry : tableNames.entrySet()) {
+            for (String tableName : entry.getValue()) {
+                String stmt = "DROP TABLE IF EXISTS " + tableName + ";";
                 conn.createStatement().execute(stmt);
+                System.out.println("============= drop table " + tableName + " done =============");
             }
+            String stmt = "DROP TABLEGROUP IF EXISTS " + entry.getKey() + ";";
+            conn.createStatement().execute(stmt);
+            System.out.println("============= drop tablegroup " + entry.getKey() + " done =============");
         }
-        System.out.println("end");
     }
-
-    public static void createTables() throws Exception {
-        System.out.print("create table start");
+    public static void createMultiCFTables(TableTemplateManager.TableType type, boolean printSql) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < createTableStmts.length; i++) {
-            for (int j = 0; j < createTableStmts[i].length; j++) {
-                System.out.print(".");
-                conn.createStatement().execute(createTableStmts[i][j]);
-            }
+        TimeGenerator.TimeRange timeRange = TimeGenerator.generateTestTimeRange();
+        String tableGroup = TableTemplateManager.getTableGroupName(type);
+        String tableGroupSql = TableTemplateManager.generateTableGroupSQL(tableGroup);
+        conn.createStatement().execute(tableGroupSql);
+        tableNames.put(tableGroup, new LinkedList<>());
+        for (int i = 1; i <= 3; ++i) {
+            String tableName = TableTemplateManager.generateTableName(tableGroup, true, i);
+            String sql = TableTemplateManager.getCreateTableSQL(type, tableName, timeRange);
+            conn.createStatement().execute(sql);
+            tableNames.get(tableGroup).add(tableName);
+            System.out.println("============= create table: " + tableName 
+                                + "  table_group: " + getTableName(tableName) + " =============\n" 
+                                + (printSql ? sql : "") + " \n============= done =============\n");
         }
-        System.out.println("end");
     }
+    
 
     public static void truncateTables() throws Exception {
-        System.out.print("truncate table start");
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableNames.length; i++) {
-            for (int j = 0; j < tableNames[i].length; j++) {
-                System.out.print(".");
-                String stmt = "TRUNCATE TABLE " + tableNames[i][j] + ";";
+        for (Map.Entry<String, List<String >> entry : tableNames.entrySet()) {
+            for (String tableName : entry.getValue()) {
+                String stmt = "TRUNCATE TABLE " + tableName + ";";
                 conn.createStatement().execute(stmt);
+                System.out.println("============= truncate table " + tableName + " done =============");
             }
         }
-        System.out.println("end");
     }
 
     public static String getTableName(String input) throws Exception {
@@ -248,14 +111,14 @@ public class OHTableSecondaryPartMcfTest {
 
     @BeforeClass
     public static void before() throws Exception {
-        createTableGroups();
-        createTables();
+        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+            createMultiCFTables(type, true);
+        }
     }
 
     @AfterClass
     public static void finish() throws Exception {
         dropTables();
-        dropTableGroups();
     }
 
     @Before
@@ -263,93 +126,54 @@ public class OHTableSecondaryPartMcfTest {
         truncateTables();
     }
 
-    @Test
-    public void testPut() throws Exception {
+    public static void testMultiCFPut(Map.Entry<String, List<String>> entry) throws Exception {
         String key = "putKey";
         String value = "value";
         String column = "putColumn";
         long timestamp = System.currentTimeMillis();
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
-            hTable.init();
-            Put put = new Put(toBytes(key));
-            for (int j = 0; j < tableNames[i].length; j++) {
-                String family = getColumnFamilyName(tableNames[i][j]);
-                put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            }
-            hTable.put(put);
-            hTable.close();
+
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
+        hTable.init();
+        Put put = new Put(toBytes(key));
+        for (String tableName : entry.getValue()) {
+            String family = getColumnFamilyName(tableName);
+            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
         }
+        hTable.put(put);
+        hTable.close();
     }
-
-    @Test
-    public void testIncrement() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
-            hTable.init();
-
-            String key = "Key";
-            String column = "Column";
-            Increment increment = new Increment(key.getBytes());
-            for (int j = 0; j < tableNames[i].length; j++) {
-                String family = getColumnFamilyName(tableNames[i][j]);
-                increment.addColumn(family.getBytes(), column.getBytes(), 1L);
-            }
-            hTable.increment(increment);
-
-            hTable.close();
-        }
-    }
-
-    @Test
-    public void testAppend() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
-            hTable.init();
-
-            String key = "Key";
-            String column = "Column";
-            String value = "app";
-            Append append = new Append(key.getBytes());
-            for (int j = 0; j < tableNames[i].length; j++) {
-                String family = getColumnFamilyName(tableNames[i][j]);
-                KeyValue kv1 = new KeyValue(key.getBytes(), family.getBytes(), column.getBytes(), value.getBytes());
-                append.add(kv1);
-            }
-            hTable.append(append);
-
-            hTable.close();
-        }
-    }
-
-    @Test
-    public void testGet() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i][0]));
-            hTable.init();
-
-            String key = "putKey";
-            String column = "putColumn";
-            String value = "value";
+    
+    public static void testMultiCFGet(Map.Entry<String, List<String>> entry) throws Exception {
+        String key = "putKey";
+        String column = "putColumn";
+        
+        for (String tableName : entry.getValue()) {
+            String family = getColumnFamilyName(tableName);
+            String value = family + "_value";
             long timestamp = System.currentTimeMillis();
+
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+            hTable.init();
             Put put = new Put(toBytes(key));
-            for (int j = 0; j < tableNames[i].length; j++) {
-                String family = getColumnFamilyName(tableNames[i][j]);
-                put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            }
+            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
             hTable.put(put);
 
             Get get = new Get(key.getBytes());
-            get.setMaxVersions(Integer.MAX_VALUE);
-            for (int j = 0; j < tableNames[i].length; j++) {
-                String family = getColumnFamilyName(tableNames[i][j]);
-                get.addColumn(family.getBytes(), column.getBytes());
-            }
+            get.addFamily(family.getBytes());
             Result r = hTable.get(get);
             Assert.assertEquals(1, r.raw().length);
 
             hTable.close();
         }
     }
-
+    
+    @Test
+    public void testPut() throws Exception {
+        FOR_EACH(tableNames, OHTableSecondaryPartMcfTest::testMultiCFPut);
+    }
+    
+    @Test
+    public void testGet() throws Exception {
+        FOR_EACH(tableNames, OHTableSecondaryPartMcfTest::testMultiCFGet);
+    }
 }

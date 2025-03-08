@@ -18,6 +18,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import com.alipay.oceanbase.hbase.util.TableTemplateManager;
+import com.alipay.oceanbase.hbase.util.TimeGenerator;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
@@ -31,92 +33,45 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.getConnection;
+import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 public class OHTableSecondaryPartTest {
-    private static String tableNames[] = new String[] {"test$cf1", "test$cf2", "test$cf3", "test$cf4"};
-    private static String createTableStmt1 = "CREATE TABLE IF NOT EXISTS `" + tableNames[0] + "` (" +
-            "  `K` varbinary(1024) NOT NULL," +
-            "  `Q` varbinary(1024) NOT NULL," +
-            "  `T` bigint(20) NOT NULL," +
-            "  `V` varbinary(1024) DEFAULT NULL," +
-            "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-            "  PRIMARY KEY (`K`, `Q`, `T`)" +
-            ") PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3 (" +
-            "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-            "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-            "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-            "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-            ");";
-    private static String createTableStmt2 = "CREATE TABLE IF NOT EXISTS `" + tableNames[1] + "` (" +
-            "  `K` varbinary(1024) NOT NULL," +
-            "  `Q` varbinary(1024) NOT NULL," +
-            "  `T` bigint(20) NOT NULL," +
-            "  `V` varbinary(1024) DEFAULT NULL," +
-            "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-            "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-            "  PRIMARY KEY (`K`, `Q`, `T`)" +
-            ") PARTITION BY RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 3 (" +
-            "  PARTITION `p0` VALUES LESS THAN (1728921600000)," +
-            "  PARTITION `p1` VALUES LESS THAN (1729008000000)," +
-            "  PARTITION `p2` VALUES LESS THAN (1729094400000)," +
-            "  PARTITION `p3` VALUES LESS THAN MAXVALUE" +
-            ");";
-    private static String createTableStmt3 = "CREATE TABLE IF NOT EXISTS `" + tableNames[2] + "` (" +
-            "    `K` varbinary(1024) NOT NULL," +
-            "    `Q` varbinary(1024) NOT NULL," +
-            "    `T` bigint(20) NOT NULL," +
-            "    `V` varbinary(1024) DEFAULT NULL," +
-            "    `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-            "    PRIMARY KEY (`K`, `Q`, `T`)" +
-            ") PARTITION BY KEY(`K`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-            "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-            "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-            "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-            "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-            ") PARTITIONS 3;";
-    private static String createTableStmt4 = "CREATE TABLE IF NOT EXISTS `" + tableNames[3] + "` (" +
-            "  `K` varbinary(1024) NOT NULL," +
-            "  `Q` varbinary(1024) NOT NULL," +
-            "  `T` bigint(20) NOT NULL," +
-            "  `V` varbinary(1024) DEFAULT NULL," +
-            "  `G` bigint(20) GENERATED ALWAYS AS (-T)," +
-            "  K_PREFIX varbinary(1024) generated always as (substring(`K`, 1, 4))," +
-            "  PRIMARY KEY (`K`, `Q`, `T`)" +
-            ") PARTITION BY KEY(`K_PREFIX`) SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (" +
-            "    SUBPARTITION `p0` VALUES LESS THAN (1728921600000)," +
-            "    SUBPARTITION `p1` VALUES LESS THAN (1729008000000)," +
-            "    SUBPARTITION `p2` VALUES LESS THAN (1729094400000)," +
-            "    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE" +
-            ") PARTITIONS 3;";
-    private static String createTableStmts[] = new String[] {createTableStmt1, createTableStmt2, createTableStmt3, createTableStmt4};
+    private static List<String> tableNames = new LinkedList<String>();
 
     public static void dropTables() throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableNames.length; i++) {
-            String stmt = "DROP TABLE IF EXISTS " + tableNames[i] + ";";
+        for (int i = 0; i < tableNames.size(); i++) {
+            String stmt = "DROP TABLE IF EXISTS " + tableNames.get(i) + ";";
             conn.createStatement().execute(stmt);
-            System.out.println("drop table " + tableNames[i] + " done");
+            System.out.println("============= drop table " + tableNames.get(i) + " done =============");
+        }
+        for (int i = 0; i < tableNames.size(); i++) {
+            String stmt = "DROP TABLEGROUP IF EXISTS " + getTableName(tableNames.get(i)) + ";";
+            conn.createStatement().execute(stmt);
+            System.out.println("============= drop tablegroup " + tableNames.get(i) + " done =============");
         }
     }
-
-    public static void createTables() throws Exception {
+    public static void createTables(TableTemplateManager.TableType type, boolean printSql) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < createTableStmts.length; i++) {
-            conn.createStatement().execute(createTableStmts[i]);
-            System.out.println("create table " + tableNames[i] + " done");
-        }
+        TimeGenerator.TimeRange timeRange = TimeGenerator.generateTestTimeRange();
+        String tableGroup = TableTemplateManager.getTableGroupName(type);
+        String tableGroupSql = TableTemplateManager.generateTableGroupSQL(tableGroup);
+        conn.createStatement().execute(tableGroupSql);
+        String tableName = TableTemplateManager.generateTableName(tableGroup, false, 1);
+        String sql = TableTemplateManager.getCreateTableSQL(type, tableName, timeRange);
+        conn.createStatement().execute(sql);
+        tableNames.add(tableName);
+        System.out.println("============= create table: " + tableName + "  table_group: " + getTableName(tableName) + " =============\n" + (printSql ? sql : "") + " \n============= done =============\n");
     }
 
     public static void truncateTables() throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
-        for (int i = 0; i < tableNames.length; i++) {
-            String stmt = "TRUNCATE TABLE " + tableNames[i] + ";";
+        for (int i = 0; i < tableNames.size(); i++) {
+            String stmt = "TRUNCATE TABLE " + tableNames.get(i) + ";";
             conn.createStatement().execute(stmt);
-            System.out.println("truncate table " + tableNames[i] + " done");
+            System.out.println("============= truncate table " + tableNames.get(i) + " done =============");
         }
     }
 
@@ -148,7 +103,9 @@ public class OHTableSecondaryPartTest {
 
     @BeforeClass
     public static void before() throws Exception {
-        createTables();
+        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+            createTables(type, true);
+        }
     }
 
     @AfterClass
@@ -161,211 +118,236 @@ public class OHTableSecondaryPartTest {
         truncateTables();
     }
 
+    public static void testPut(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column = "putColumn";
+        String value = "value";
+        long timestamp = System.currentTimeMillis();
+        Put put = new Put(toBytes(key));
+        put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+        hTable.put(put);
+
+        hTable.close();
+    }
+    
+    public static void testGet(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column = "putColumn";
+        String value = "value";
+        Put put = new Put(toBytes(key));
+        put.add(family.getBytes(), column.getBytes(), toBytes(value));
+        hTable.put(put);
+        
+        Get get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        Result result = hTable.get(get);
+        Cell[] cells = result.rawCells();
+        assertEquals(1, cells.length);
+        assertEquals(column, Bytes.toString(CellUtil.cloneQualifier(cells[0])));
+        assertEquals("value", Bytes.toString(CellUtil.cloneValue(cells[0])));
+        System.out.println("get table " + tableName + " done");
+
+        hTable.close();
+    }
+    
+    public static void testIncrement(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        long timestamp = System.currentTimeMillis();
+        Put put = new Put(toBytes(key));
+        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes("1"));
+        put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes("1"));
+        hTable.put(put);
+
+        Increment increment = new Increment(key.getBytes());
+        increment.addColumn(family.getBytes(), column1.getBytes(), 1L);
+        increment.addColumn(family.getBytes(), column2.getBytes(), 1L);
+        hTable.increment(increment);
+        
+        Get get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        Result result = hTable.get(get);
+        Cell[] cells = result.rawCells();
+        assertEquals(2, cells.length);
+        for (Cell cell : cells) {
+            if (Bytes.toString(CellUtil.cloneQualifier(cell)).equals(column1)) {
+                assertEquals("2", Bytes.toString(CellUtil.cloneValue(cell)));
+            } else if (Bytes.toString(CellUtil.cloneQualifier(cell)).equals(column2)) {
+                assertEquals("2", Bytes.toString(CellUtil.cloneValue(cell)));
+            }
+        }
+        hTable.close();
+    }
+    
+    public static void testAppend(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+        Append append = new Append(key.getBytes());
+        KeyValue kv1 = new KeyValue(key.getBytes(), family.getBytes(), column1.getBytes(), value.getBytes());
+        KeyValue kv2 = new KeyValue(key.getBytes(), family.getBytes(), column2.getBytes(), value.getBytes());
+        append.add(kv1);
+        append.add(kv2);
+        hTable.append(append);
+
+        Get get = new Get(key.getBytes());
+        get.addFamily(family.getBytes());
+        Result result = hTable.get(get);
+        Cell[] cells = result.rawCells();
+        assertEquals(2, cells.length);
+
+        for (Cell cell : cells) {
+            if (Bytes.toString(CellUtil.cloneQualifier(cell)).equals(column1)) {
+                assertEquals("valuevalue", Bytes.toString(CellUtil.cloneValue(cell)));
+            } else if (Bytes.toString(CellUtil.cloneQualifier(cell)).equals(column2)) {
+                assertEquals("valuevalue", Bytes.toString(CellUtil.cloneValue(cell)));
+            }
+        }
+        hTable.close();
+    }
+    
+    public static void testCheckAndMutate(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column = "putColumn";
+        String value = "value";
+        String newValue = "newValue";
+        RowMutations mutations = new RowMutations(key.getBytes());
+        Put put = new Put(key.getBytes());
+        long timestamp = System.currentTimeMillis();
+        put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+        hTable.put(put);
+
+        Put newPut = new Put(key.getBytes());
+        newPut.add(family.getBytes(), column.getBytes(), timestamp, toBytes(newValue));
+        mutations.add(newPut);
+        hTable.checkAndMutate(key.getBytes(), family.getBytes(),
+                column.getBytes(), CompareFilter.CompareOp.EQUAL, value.getBytes(),
+                mutations);
+
+        hTable.close();
+    }
+    
+    public static void testBatchGet(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        long timestamp = System.currentTimeMillis();
+        Put put = new Put(toBytes(key));
+        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes("1"));
+        put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes("1"));
+        hTable.put(put);
+
+        List<Get> gets = new ArrayList<>();
+        Get get1 = new Get(key.getBytes());
+        get1.addFamily(family.getBytes());
+        gets.add(get1);
+
+        Get get2 = new Get(key.getBytes());
+        get2.addColumn(family.getBytes(), column1.getBytes());
+        gets.add(get2);
+
+        Get get3 = new Get(key.getBytes());
+        get3.addColumn(family.getBytes(), column2.getBytes());
+        gets.add(get3);
+        
+        
+        Result[] results = hTable.get(gets);
+        for (Result result : results) {
+            for (Cell cell : result.listCells()) {
+                String Q = Bytes.toString(CellUtil.cloneQualifier(cell));
+                String V = Bytes.toString(CellUtil.cloneValue(cell));
+                System.out.println("Column: " + Q + ", Value: " + V);
+            }
+        }
+    }
+    
+    public static void testScan(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        long timestamp = System.currentTimeMillis();
+        Put put = new Put(toBytes(key));
+        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes("1"));
+        put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes("1"));
+        hTable.put(put);
+
+        Scan scan = new Scan(key.getBytes());
+        scan.addFamily(family.getBytes());
+        ResultScanner scanner = hTable.getScanner(scan);
+        int count = 0;
+        for (Result result : scanner) {
+            for (KeyValue keyValue : result.raw()) {
+                assertEquals(column1, Bytes.toString(keyValue.getQualifier()));
+                assertEquals("1", Bytes.toString(keyValue.getValue()));
+                count++;
+            }
+        }
+        assertEquals(1, count);
+    }
+    
+    
     @Test
     public void testPut() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("put table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String key = "putKey";
-            String column = "putColumn";
-            String value = "value";
-            long timestamp = System.currentTimeMillis();
-            Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            hTable.put(put);
-            System.out.println("put table " + tableNames[i] + " done");
-
-            hTable.close();
-        }
-    }
-
-    @Test
-    public void testIncrement() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("increment table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String key = "Key";
-            String column1 = "Column1";
-            String column2 = "Column2";
-            Increment increment = new Increment(key.getBytes());
-            increment.addColumn(family.getBytes(), column1.getBytes(), 1L);
-            increment.addColumn(family.getBytes(), column2.getBytes(), 1L);
-            hTable.increment(increment);
-            System.out.println("increment table " + tableNames[i] + " done");
-
-            hTable.close();
-        }
-    }
-
-    @Test
-    public void testAppend() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("append table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String key = "Key";
-            String column1 = "Column1";
-            String column2 = "Column2";
-            String value = "app";
-            Append append = new Append(key.getBytes());
-            KeyValue kv1 = new KeyValue(key.getBytes(), family.getBytes(), column1.getBytes(), value.getBytes());
-            KeyValue kv2 = new KeyValue(key.getBytes(), family.getBytes(), column2.getBytes(), value.getBytes());
-            append.add(kv1);
-            append.add(kv2);
-            hTable.append(append);
-            System.out.println("append table " + tableNames[i] + " done");
-
-            hTable.close();
-        }
-    }
-
-    @Test
-    public void testCheckAndMutate() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("checkAndMutate table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String key = "putKey";
-            String column = "putColumn";
-            String value = "value";
-            String newValue = "newValue";
-            RowMutations mutations = new RowMutations(key.getBytes());
-            Put put = new Put(key.getBytes());
-            long timestamp = System.currentTimeMillis();
-            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            hTable.put(put);
-
-            Put newPut = new Put(key.getBytes());
-            newPut.add(family.getBytes(), column.getBytes(), timestamp, toBytes(newValue));
-            mutations.add(newPut);
-            hTable.checkAndMutate(key.getBytes(), family.getBytes(),
-                    column.getBytes(), CompareFilter.CompareOp.EQUAL, value.getBytes(),
-                    mutations);
-            System.out.println("checkAndMutate table " + tableNames[i] + " done");
-
-            hTable.close();
-        }
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testPut);
     }
 
     @Test
     public void testGet() throws Exception {
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("put table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String key = "putKey";
-            String column = "putColumn";
-            String value = "value";
-            long timestamp = System.currentTimeMillis();
-            Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            hTable.put(put);
-            System.out.println("put table " + tableNames[i] + " done");
-
-            System.out.println("get table " + tableNames[i] + " begin");
-            Get get = new Get(key.getBytes());
-            get.setMaxVersions(Integer.MAX_VALUE);
-            get.addColumn(family.getBytes(), column.getBytes());
-            Result r = hTable.get(get);
-            Assert.assertEquals(1, r.raw().length);
-            System.out.println("get table " + tableNames[i] + " begin");
-
-            hTable.close();
-        }
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testGet);
     }
 
     @Test
+    public void testIncrement() throws Exception {
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testIncrement);
+    }
+
+    @Test
+    public void testAppend() throws Exception {
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testAppend);
+    }
+
+    @Test
+    public void testCheckAndMutate() throws Exception {
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testCheckAndMutate);
+    }
+    
+    @Test
     public void testBatchGet() throws Exception {
-        long batchSize = 10;
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("put table " + tableNames[i] + " begin");
-            String family = getColumnFamilyName(tableNames[i]);
-            String column = "putColumn";
-            String value = "value";
-            long timestamp = System.currentTimeMillis();
-            for (int j = 0; j < batchSize; j++) {
-                String key = "putKey" + j;
-                Put put = new Put(toBytes(key));
-                put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-                hTable.put(put);
-            }
-            System.out.println("put table " + tableNames[i] + " done");
-
-            System.out.println("get table " + tableNames[i] + " begin");
-            List<Get> gets = new ArrayList<>();
-            for (int j = 0; j < batchSize; j++) {
-                String key = "putKey" + j;
-                Get get = new Get(key.getBytes());
-                get.setMaxVersions(Integer.MAX_VALUE);
-                get.addColumn(family.getBytes(), column.getBytes());
-                gets.add(get);
-            }
-            Result[] results = hTable.get(gets);
-            for (Result result : results) {
-                for (Cell cell : result.listCells()) {
-                    String Q = Bytes.toString(CellUtil.cloneQualifier(cell));
-                    String V = Bytes.toString(CellUtil.cloneValue(cell));
-                    System.out.println("Column: " + Q + ", Value: " + V);
-                }
-            }
-            System.out.println("get table " + tableNames[i] + " begin");
-
-            hTable.close();
-        }
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testBatchGet);
     }
 
     @Test
     public void testScan() throws Exception {
-        long rowSize = 10;
-        for (int i = 0; i < tableNames.length; i++) {
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableNames[i]));
-            hTable.init();
-
-            System.out.println("put table " + tableNames[i] + " begin");
-            String key = "putKey";
-            String family = getColumnFamilyName(tableNames[i]);
-            String column = "Column";
-            String value = "value";
-            long timestamp = System.currentTimeMillis();
-            for (int j = 0; j < rowSize; j++) {
-                Put put = new Put(toBytes(key));
-                String qualify = column + j;
-                put.add(family.getBytes(), qualify.getBytes(), timestamp, toBytes(value));
-                hTable.put(put);
-            }
-            System.out.println("put table " + tableNames[i] + " done");
-
-            System.out.println("scan table " + tableNames[i] + " begin");
-            Scan scan = new Scan(toBytes(key));
-            scan.addFamily(family.getBytes());
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                for (KeyValue keyValue : result.raw()) {
-                    assertEquals(column + count, Bytes.toString(keyValue.getQualifier()));
-                    assertEquals(value, Bytes.toString(keyValue.getValue()));
-                    count++;
-                }
-            }
-            assertEquals(rowSize, count);
-            System.out.println("scan table " + tableNames[i] + " end");
-
-            hTable.close();
-        }
+        FOR_EACH(tableNames, OHTableSecondaryPartTest::testScan);
     }
 }
