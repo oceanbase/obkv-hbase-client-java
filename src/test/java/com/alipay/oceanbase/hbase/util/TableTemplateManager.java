@@ -256,8 +256,8 @@ public class TableTemplateManager {
         return String.format("CREATE TABLEGROUP IF NOT EXISTS %s SHARDING = 'ADAPTIVE'", tableGroup);
     }
 
-    public static String getTableGroupName(TableTemplateManager.TableType type) {
-        return TABLE_GROUP_PREFIX + type.name().toLowerCase();
+    public static String getTableGroupName(TableTemplateManager.TableType type, boolean multiCf) {
+        return TABLE_GROUP_PREFIX + type.name().toLowerCase() + (multiCf ? "_mcf" : "");
     }
 
     public static String generateTableName(String tableGroup, boolean multiCf, int cfIndex) {
