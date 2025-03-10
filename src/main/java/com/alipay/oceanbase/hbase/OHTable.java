@@ -1347,7 +1347,8 @@ public class OHTable implements HTableInterface {
         }
         byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
         ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
-        ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false);
+        ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false,
+            new TimeRange());
         ObTableBatchOperation batch = buildObTableBatchOperation(mutations, null);
 
         ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
@@ -1384,7 +1385,8 @@ public class OHTable implements HTableInterface {
                 Collections.singletonList(append), qualifiers);
             // the later hbase has supported timeRange
             ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
-            ObTableQuery obTableQuery = buildObTableQuery(filter, r, true, r, true, false);
+            ObTableQuery obTableQuery = buildObTableQuery(filter, r, true, r, true, false,
+                new TimeRange());
             ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
             queryAndMutate.setTableQuery(obTableQuery);
             queryAndMutate.setMutations(batchOperation);
@@ -1436,7 +1438,7 @@ public class OHTable implements HTableInterface {
             ObHTableFilter filter = buildObHTableFilter(null, increment.getTimeRange(), 1,
                 qualifiers);
 
-            ObTableQuery obTableQuery = buildObTableQuery(filter, rowKey, true, rowKey, true, false);
+            ObTableQuery obTableQuery = buildObTableQuery(filter, rowKey, true, rowKey, true, false, increment.getTimeRange());
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
@@ -1483,7 +1485,8 @@ public class OHTable implements HTableInterface {
 
             ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
 
-            ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false);
+            ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false,
+                new TimeRange());
             ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
             queryAndMutate.setMutations(batch);
             queryAndMutate.setTableQuery(obTableQuery);
@@ -1879,28 +1882,32 @@ public class OHTable implements HTableInterface {
 
     private ObTableQuery buildObTableQuery(ObHTableFilter filter, byte[] start,
                                            boolean includeStart, byte[] stop, boolean includeStop,
-                                           boolean isReversed) {
+                                           boolean isReversed, TimeRange ts) {
         ObNewRange obNewRange = new ObNewRange();
         ObBorderFlag obBorderFlag = new ObBorderFlag();
+        Object left_ts = ObObj.getMin();
+        Object right_ts = ObObj.getMax();
+        if (!ts.isAllTime()) {
+            left_ts = -ts.getMax();
+            right_ts = -ts.getMin();
+        }
         if (Arrays.equals(start, HConstants.EMPTY_BYTE_ARRAY)) {
-            obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(),
-                ObObj.getMin()));
+            obNewRange.setStartKey(ObRowKey.getInstance(ObObj.getMin(), ObObj.getMin(), left_ts));
         } else if (includeStart) {
-            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), left_ts));
             obBorderFlag.setInclusiveStart();
         } else {
-            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), left_ts));
             obBorderFlag.unsetInclusiveStart();
         }
 
         if (Arrays.equals(stop, HConstants.EMPTY_BYTE_ARRAY)) {
-            obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
-                ObObj.getMax()));
+            obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(), right_ts));
         } else if (includeStop) {
-            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), right_ts));
             obBorderFlag.setInclusiveEnd();
         } else {
-            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), ObObj.getMin()));
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), right_ts));
             obBorderFlag.unsetInclusiveEnd();
         }
         ObTableQuery obTableQuery = new ObTableQuery();
@@ -1916,6 +1923,7 @@ public class OHTable implements HTableInterface {
 
     private ObTableQuery buildObTableQuery(ObHTableFilter filter, final Scan scan) {
         ObTableQuery obTableQuery;
+        TimeRange ts = scan.getTimeRange();
         if (scan.getMaxResultsPerColumnFamily() > 0) {
             filter.setLimitPerRowPerCf(scan.getMaxResultsPerColumnFamily());
         }
@@ -1924,10 +1932,10 @@ public class OHTable implements HTableInterface {
         }
         if (scan.isReversed()) {
             obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false, scan.getStartRow(),
-                true, true);
+                true, true, ts);
         } else {
             obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true, scan.getStopRow(),
-                false, false);
+                false, false, ts);
         }
         if (scan.getBatch() > 0) {
             obTableQuery.setBatchSize(scan.getBatch());
@@ -1955,9 +1963,10 @@ public class OHTable implements HTableInterface {
             get.getMaxVersions(), columnQualifiers);
         if (get.isClosestRowBefore()) {
             obTableQuery = buildObTableQuery(filter, HConstants.EMPTY_BYTE_ARRAY, true,
-                get.getRow(), true, true);
+                get.getRow(), true, true, get.getTimeRange());
         } else {
-            obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(), true, false);
+            obTableQuery = buildObTableQuery(filter, get.getRow(), true, get.getRow(), true, false,
+                get.getTimeRange());
         }
         obTableQuery.setObKVParams(buildOBKVParams(get));
         return obTableQuery;
