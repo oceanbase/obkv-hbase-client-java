@@ -156,4 +156,28 @@ public class ObHTableTestUtil {
             throw new RuntimeException(e);
         }
     }
+
+    @FunctionalInterface
+    public interface CheckedConsumer<T> {
+        void accept(T t) throws Exception;
+        default CheckedConsumer<T> andThen(CheckedConsumer<? super T> after) throws Exception {
+            if (after == null) { throw new NullPointerException();}
+            return (T t) -> {
+                accept(t);
+                after.accept(t);
+            };
+        }
+    }
+    
+    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer) throws Exception {
+        for (String tableName : tableNames) {
+            consumer.accept(tableName);
+        }
+    }
+    
+    public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Exception {
+        for (Map.Entry<String, List<String>> entry : group2Tables.entrySet()) {
+            consumer.accept(entry);
+        }
+    }
 }
