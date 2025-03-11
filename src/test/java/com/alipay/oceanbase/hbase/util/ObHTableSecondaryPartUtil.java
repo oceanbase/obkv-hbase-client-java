@@ -25,6 +25,18 @@ import java.util.Map;
 
 
 public class ObHTableSecondaryPartUtil {
+    public static void openDistributedExecute() throws Exception {
+        Connection conn = ObHTableTestUtil.getSysConnection();
+        String stmt = "ALTER SYSTEM SET _obkv_feature_mode = 'distributed_execute=on';";
+        conn.createStatement().execute(stmt);
+    }
+
+    public static void closeDistributedExecute() throws Exception {
+        Connection conn = ObHTableTestUtil.getSysConnection();
+        String stmt = "ALTER SYSTEM SET _obkv_feature_mode = 'distributed_execute=off';";
+        conn.createStatement().execute(stmt);
+    }
+
     public static void createTables(TableTemplateManager.TableType type, List<String> tableNames, Map<String, List<String >> group2tableNames, boolean printSql) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // single cf table

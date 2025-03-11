@@ -45,6 +45,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
 
     @BeforeClass
     public static void before() throws Exception {
+        openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
             createTables(type, tableNames, group2tableNames, true);
         }
@@ -52,6 +53,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
 
     @AfterClass
     public static void finish() throws Exception {
+        closeDistributedExecute();
         dropTables(tableNames, group2tableNames);
     }
 
