@@ -21,6 +21,7 @@ package com.alipay.oceanbase.hbase.util;
 import java.util.EnumMap;
 import java.util.Map;
 public class TableTemplateManager {
+    public static final long PART_NUM = 3;
     public static final String TABLE_GROUP_PREFIX = "test_group_";
     public static final String COLUMN_FAMILY = "cf";
     public enum TableType {
@@ -41,7 +42,7 @@ public class TableTemplateManager {
     static {
         // 普通表非分区表模版
         SQL_TEMPLATES.put(TableType.NON_PARTITIONED_REGULAR,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -50,7 +51,7 @@ public class TableTemplateManager {
                         ") TABLEGROUP = %s");
         // 时序表非分区表模版
         SQL_TEMPLATES.put(TableType.NON_PARTITIONED_TIME_SERIES,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
@@ -59,7 +60,7 @@ public class TableTemplateManager {
                         ") TABLEGROUP = %s");
         // 普通表一级分区模板
         SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_REGULAR,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -68,7 +69,7 @@ public class TableTemplateManager {
                         ") TABLEGROUP = %s PARTITION BY KEY(`K`) PARTITIONS %d ");
         // 时序表一级分区模板
         SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_TIME_SERIES,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
@@ -77,7 +78,7 @@ public class TableTemplateManager {
                         ") TABLEGROUP = %s PARTITION BY KEY(`K`) PARTITIONS %d ");
         // 普通表RANGE-KEY分区（使用K）
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -93,7 +94,7 @@ public class TableTemplateManager {
 
         // 合并GEN类型的注释处理
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_GEN,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -109,7 +110,7 @@ public class TableTemplateManager {
 
         // 普通表KEY-RANGE分区（使用K）
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -126,7 +127,7 @@ public class TableTemplateManager {
 
         // 普通表KEY-RANGE分区（使用生成列）
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_GEN,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
@@ -143,7 +144,7 @@ public class TableTemplateManager {
 
         // 时序表RANGE-KEY分区
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
@@ -159,7 +160,7 @@ public class TableTemplateManager {
 
         // 时序表KEY-RANGE分区
         SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_TIME_KEY_RANGE,
-                "CREATE TABLE `%s` (\n" +
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
                         "  `K` varbinary(1024) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
@@ -188,7 +189,7 @@ public class TableTemplateManager {
                 break;
             case SINGLE_PARTITIONED_REGULAR:
             case SINGLE_PARTITIONED_TIME_SERIES:  // 合并相同处理逻辑
-                params = new Object[]{tableName, tableGroup, 97};
+                params = new Object[]{tableName, tableGroup, PART_NUM};
                 break;
             case SECONDARY_PARTITIONED_RANGE_KEY:
             case SECONDARY_PARTITIONED_RANGE_KEY_GEN:
@@ -200,7 +201,7 @@ public class TableTemplateManager {
                         getGeneratedColumn(type),
                         tableGroup,
                         isGen ? "K_PREFIX" : "K",
-                        97,
+                        PART_NUM,
                         timeRange.lowerBound1(),
                         timeRange.lowerBound1() + 86400000,
                         timeRange.lowerBound1() + 172800000
@@ -213,7 +214,7 @@ public class TableTemplateManager {
                         "",
                         tableGroup,
                         "K",
-                        97,
+                        PART_NUM,
                         timeRange.lowerBound1(),
                         timeRange.lowerBound1() + 86400000,
                         timeRange.lowerBound1() + 172800000
@@ -241,13 +242,13 @@ public class TableTemplateManager {
     private static String getPartitionStrategy(TableType type) {
         if (type.name().contains("RANGE_KEY")) {
             return type.name().contains("GEN")
-                    ? "RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS 97"
-                    : "RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS 97";
+                    ? "RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K_PREFIX`) SUBPARTITIONS " + PART_NUM
+                    : "RANGE COLUMNS(`G`) SUBPARTITION BY KEY(`K`) SUBPARTITIONS "+ PART_NUM;
         }
         if (type.name().contains("KEY_RANGE")) {
             return type.name().contains("GEN")
-                    ? "KEY(`K_PREFIX`) PARTITIONS 97 SUBPARTITION BY RANGE COLUMNS(`G`)"
-                    : "KEY(`K`) PARTITIONS 97 SUBPARTITION BY RANGE COLUMNS(`G`)";
+                    ? "KEY(`K_PREFIX`) PARTITIONS "+ PART_NUM +" SUBPARTITION BY RANGE COLUMNS(`G`)"
+                    : "KEY(`K`) PARTITIONS "+ PART_NUM +" SUBPARTITION BY RANGE COLUMNS(`G`)";
         }
         return "";
     }

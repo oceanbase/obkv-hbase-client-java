@@ -35,6 +35,7 @@ import java.util.Map;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.SECONDARY_PARTITIONED_KEY_RANGE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
@@ -53,6 +54,7 @@ public class OHTableSecondaryPartGetTest {
 
     @AfterClass
     public static void finish() throws Exception {
+        closeDistributedExecute();
         dropTables(tableNames, group2tableNames);
     }
 

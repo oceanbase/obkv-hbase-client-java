@@ -43,6 +43,7 @@ public class OHTableSecondaryPartPutTest {
 
     @BeforeClass
     public static void before() throws Exception {
+        openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
             createTables(type, tableNames, group2tableNames, true);
         }
@@ -50,7 +51,8 @@ public class OHTableSecondaryPartPutTest {
 
     @AfterClass
     public static void finish() throws Exception {
-       dropTables(tableNames, group2tableNames);
+        closeDistributedExecute();
+        dropTables(tableNames, group2tableNames);
     }
 
     @Before

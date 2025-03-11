@@ -157,6 +157,17 @@ public class ObHTableTestUtil {
         }
     }
 
+    static public Connection getSysConnection() {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
+
+            return conn;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @FunctionalInterface
     public interface CheckedConsumer<T> {
         void accept(T t) throws Exception;
