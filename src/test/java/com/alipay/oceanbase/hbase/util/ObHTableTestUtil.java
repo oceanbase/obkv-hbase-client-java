@@ -52,6 +52,10 @@ public class ObHTableTestUtil {
                                                 + JDBC_DATABASE + "?" + "useUnicode=TRUE&"
                                                 + "characterEncoding=utf-8&"
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
+    public static String       SYS_JDBC_URL   = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
+                                                +  "oceanbase?" + "useUnicode=TRUE&"
+                                                + "characterEncoding=utf-8&"
+                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
 
     public static String       SQL_FORMAT     = "truncate %s";
     public static List<String> tableNameList;
@@ -160,7 +164,7 @@ public class ObHTableTestUtil {
     static public Connection getSysConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            Connection conn = DriverManager.getConnection(JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
+            Connection conn = DriverManager.getConnection(SYS_JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
 
             return conn;
         } catch (Exception e) {
@@ -170,7 +174,7 @@ public class ObHTableTestUtil {
 
     @FunctionalInterface
     public interface CheckedConsumer<T> {
-        void accept(T t) throws Exception;
+        void accept(T t) throws Throwable;
         default CheckedConsumer<T> andThen(CheckedConsumer<? super T> after) throws Exception {
             if (after == null) { throw new NullPointerException();}
             return (T t) -> {
@@ -180,13 +184,14 @@ public class ObHTableTestUtil {
         }
     }
     
-    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer) throws Exception {
+    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer) throws Throwable {
         for (String tableName : tableNames) {
+            System.out.println("============================= table::{" + tableName + "} =============================");
             consumer.accept(tableName);
         }
     }
     
-    public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Exception {
+    public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Throwable {
         for (Map.Entry<String, List<String>> entry : group2Tables.entrySet()) {
             consumer.accept(entry);
         }

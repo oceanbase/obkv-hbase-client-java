@@ -31,19 +31,28 @@ public class TimeGenerator {
             this.upperBound2 = upperBound2;
         }
 
-        public long lowerBound1() { return lowerBound1; }
-        public long lowerBound2() { return lowerBound2; }
-        public long upperBound1() { return upperBound1; }
-        public long upperBound2() { return upperBound2; }
+        public long lowerBound1() {
+            return lowerBound1;
+        }
+
+        public long lowerBound2() {
+            return lowerBound2;
+        }
+
+        public long upperBound1() {
+            return upperBound1;
+        }
+
+        public long upperBound2() {
+            return upperBound2;
+        }
     }
 
     public static TimeRange generateTestTimeRange() {
         long current = System.currentTimeMillis();
-        return new TimeRange(
-                current - 86400000,  // 24小时前
-                current,
-                current + 86400000,  // 24小时后
-                current + 172800000  // 48小时后
+        return new TimeRange(current - 86400000, // 24小时前
+            current, current + 86400000, // 24小时后
+            current + 172800000 // 48小时后
         );
     }
 }

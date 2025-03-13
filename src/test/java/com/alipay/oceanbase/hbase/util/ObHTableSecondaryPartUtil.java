@@ -18,11 +18,10 @@
 package com.alipay.oceanbase.hbase.util;
 
 import java.sql.Connection;
-import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-
 
 public class ObHTableSecondaryPartUtil {
     public static void openDistributedExecute() throws Exception {
@@ -37,7 +36,9 @@ public class ObHTableSecondaryPartUtil {
         conn.createStatement().execute(stmt);
     }
 
-    public static void createTables(TableTemplateManager.TableType type, List<String> tableNames, Map<String, List<String >> group2tableNames, boolean printSql) throws Exception {
+    public static void createTables(TableTemplateManager.TableType type, List<String> tableNames,
+                                    Map<String, List<String>> group2tableNames, boolean printSql)
+                                                                                                 throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // single cf table
         if (tableNames != null) {
@@ -48,8 +49,9 @@ public class ObHTableSecondaryPartUtil {
             createTables(conn, type, group2tableNames, printSql);
         }
     }
-    
-    public static void createTables(Connection conn, TableTemplateManager.TableType type, List<String> tableNames, boolean printSql) throws Exception {
+
+    public static void createTables(Connection conn, TableTemplateManager.TableType type,
+                                    List<String> tableNames, boolean printSql) throws Exception {
         // create single cf table
         if (tableNames != null) {
             TimeGenerator.TimeRange timeRange = TimeGenerator.generateTestTimeRange();
@@ -58,12 +60,24 @@ public class ObHTableSecondaryPartUtil {
             conn.createStatement().execute(tableGroupSql);
             String tableName = TableTemplateManager.generateTableName(tableGroup, false, 1);
             String sql = TableTemplateManager.getCreateTableSQL(type, tableName, timeRange);
-            conn.createStatement().execute(sql);
+            try {
+                conn.createStatement().execute(sql);
+                System.out.println("============= create table: " + tableName + "  table_group: "
+                                   + getTableName(tableName) + " =============\n"
+                                   + (printSql ? sql : "")
+                                   + " \n============= done =============\n");
+            } catch (SQLSyntaxErrorException e) {
+                if (!e.getMessage().contains("already exists")) {
+                    throw e;
+                } else {
+                    System.out.println("============= table: " + tableName + "  table_group: "
+                                       + getTableName(tableName) + " already exist =============");
+                }
+            }
             tableNames.add(tableName);
-            System.out.println("============= create table: " + tableName + "  table_group: " + getTableName(tableName) + " =============\n" + (printSql ? sql : "") + " \n============= done =============\n");
         }
     }
-    
+
     public static void createTables(Connection conn, TableTemplateManager.TableType type, Map<String, List<String>> group2tableNames, boolean printSql) throws Exception {
         if (group2tableNames != null) {
             TimeGenerator.TimeRange timeRange = TimeGenerator.generateTestTimeRange();
@@ -74,54 +88,66 @@ public class ObHTableSecondaryPartUtil {
             for (int i = 1; i <= 3; ++i) {
                 String tableName = TableTemplateManager.generateTableName(tableGroup, true, i);
                 String sql = TableTemplateManager.getCreateTableSQL(type, tableName, timeRange);
-                conn.createStatement().execute(sql);
+                try {
+                    conn.createStatement().execute(sql);
+                    System.out.println("============= create table: " + tableName
+                            + "  table_group: " + getTableName(tableName) + " =============\n"
+                            + (printSql ? sql : "") + " \n============= done =============\n");
+                } catch (SQLSyntaxErrorException e) {
+                    if (!e.getMessage().contains("already exists")) {
+                        throw e;
+                    } else {
+                        System.out.println("============= table: " + tableName + "  table_group: " + getTableName(tableName) + " already exist =============");
+                    }
+                }
                 group2tableNames.get(tableGroup).add(tableName);
-                System.out.println("============= create table: " + tableName
-                        + "  table_group: " + getTableName(tableName) + " =============\n"
-                        + (printSql ? sql : "") + " \n============= done =============\n");
             }
         }
     }
 
-    public static void truncateTables(List<String> tableNames, Map<String, List<String >> group2tableNames) throws Exception {
+    public static void truncateTables(List<String> tableNames,
+                                      Map<String, List<String>> group2tableNames) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // truncate single cf table
         truncateTables(conn, tableNames);
         // truncate multi cf table
         truncateTables(conn, group2tableNames);
     }
-    
+
     public static void truncateTables(Connection conn, List<String> tableNames) throws Exception {
         if (tableNames != null) {
             for (int i = 0; i < tableNames.size(); i++) {
                 String stmt = "TRUNCATE TABLE " + tableNames.get(i) + ";";
                 conn.createStatement().execute(stmt);
-                System.out.println("============= truncate table " + tableNames.get(i) + " done =============");
+                System.out.println("============= truncate table " + tableNames.get(i)
+                                   + " done =============");
             }
         }
     }
-    
-    public static void truncateTables(Connection conn, Map<String, List<String>> group2tableNames) throws Exception {
+
+    public static void truncateTables(Connection conn, Map<String, List<String>> group2tableNames)
+                                                                                                  throws Exception {
         if (group2tableNames != null) {
             for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
                 for (String tableName : entry.getValue()) {
                     String stmt = "TRUNCATE TABLE " + tableName + ";";
                     conn.createStatement().execute(stmt);
-                    System.out.println("============= truncate table " + tableName + " done =============");
+                    System.out.println("============= truncate table " + tableName
+                                       + " done =============");
                 }
             }
         }
     }
-    
 
-    public static void dropTables(List<String> tableNames, Map<String, List<String >> group2tableNames) throws Exception {
+    public static void dropTables(List<String> tableNames,
+                                  Map<String, List<String>> group2tableNames) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // drop single cf table
         dropTables(conn, tableNames);
         // drop multi cf table
         dropTables(conn, group2tableNames);
     }
-    
+
     public static void dropTables(Connection conn, List<String> tableNames) throws Exception {
         if (tableNames != null) {
             for (String tableName : tableNames) {
@@ -131,22 +157,24 @@ public class ObHTableSecondaryPartUtil {
             }
         }
     }
-    
-    public static void dropTables(Connection conn, Map<String, List<String>> group2tableNames) throws Exception {
+
+    public static void dropTables(Connection conn, Map<String, List<String>> group2tableNames)
+                                                                                              throws Exception {
         if (group2tableNames != null) {
             for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
                 for (String tableName : entry.getValue()) {
                     String stmt = "DROP TABLE IF EXISTS " + tableName + ";";
                     conn.createStatement().execute(stmt);
-                    System.out.println("============= drop table " + tableName + " done =============");
+                    System.out.println("============= drop table " + tableName
+                                       + " done =============");
                 }
                 String stmt = "DROP TABLEGROUP IF EXISTS " + entry.getKey() + ";";
                 conn.createStatement().execute(stmt);
-                System.out.println("============= drop tablegroup " + entry.getKey() + " done =============");
+                System.out.println("============= drop tablegroup " + entry.getKey()
+                                   + " done =============");
             }
         }
     }
-
 
     public static String getTableName(String input) throws Exception {
         // 查找 '$' 的索引
