@@ -1393,9 +1393,12 @@ public class OHTable implements HTableInterface {
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batchOperation,
                 getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(append.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
+            if (!append.isReturnResults()) {
+                return null;
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1442,9 +1445,12 @@ public class OHTable implements HTableInterface {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(increment.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
+            if (!increment.isReturnResults()) {
+                return null;
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1453,7 +1459,6 @@ public class OHTable implements HTableInterface {
                 long t = (Long) row.get(2).getValue();
                 byte[] v = (byte[]) row.get(3).getValue();
                 KeyValue kv = new KeyValue(k, f, q, t, v);
-
                 keyValues.add(kv);
             }
             return new Result(keyValues);

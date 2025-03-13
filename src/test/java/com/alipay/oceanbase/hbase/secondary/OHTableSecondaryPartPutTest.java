@@ -37,7 +37,7 @@ import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartPutTest {
-    private static List<String> tableNames = new LinkedList<String>();
+    private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
 
 
@@ -67,10 +67,12 @@ public class OHTableSecondaryPartPutTest {
         String family = getColumnFamilyName(tableName);
         String key = "putKey";
         String column = "putColumn";
+        String column1 = "putColumn1";
         String value = "value";
         long timestamp = System.currentTimeMillis();
         Put put = new Put(toBytes(key));
         put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
+        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(value));
         hTable.put(put);
 
         hTable.close();
@@ -94,12 +96,12 @@ public class OHTableSecondaryPartPutTest {
     }
 
     @Test
-    public void testPut() throws Exception {
+    public void testPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testPutImpl);
     }
 
     @Test
-    public void testMultiCFPut() throws Exception {
+    public void testMultiCFPut() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMultiCFPutImpl);
     }
 

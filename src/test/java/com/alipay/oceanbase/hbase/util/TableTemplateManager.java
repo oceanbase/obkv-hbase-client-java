@@ -18,8 +18,14 @@
 package com.alipay.oceanbase.hbase.util;
 
 
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.*;
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.SECONDARY_PARTITIONED_KEY_RANGE_GEN;
+
 public class TableTemplateManager {
     public static final long PART_NUM = 3;
     public static final String TABLE_GROUP_PREFIX = "test_group_";
@@ -36,6 +42,13 @@ public class TableTemplateManager {
         SECONDARY_PARTITIONED_TIME_RANGE_KEY,   // 时序表RANGE-KEY
         SECONDARY_PARTITIONED_TIME_KEY_RANGE    // 时序表KEY-RANGE
     }
+
+    public static List<TableType> NORMAL_TABLES = Arrays.asList(NON_PARTITIONED_REGULAR,
+            SINGLE_PARTITIONED_REGULAR,
+            SECONDARY_PARTITIONED_RANGE_KEY,
+            SECONDARY_PARTITIONED_RANGE_KEY_GEN,
+            SECONDARY_PARTITIONED_KEY_RANGE,
+            SECONDARY_PARTITIONED_KEY_RANGE_GEN);
     
     private static final Map<TableType, String> SQL_TEMPLATES = new EnumMap<>(TableType.class);
 
