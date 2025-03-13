@@ -23,7 +23,6 @@ import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -35,11 +34,10 @@ import java.util.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.assertEquals;
 
 
 public class OHTableSecondaryPartBatchGetTest {
-    private static List<String> tableNames = new LinkedList<String>();
+    private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
 
 
@@ -102,7 +100,7 @@ public class OHTableSecondaryPartBatchGetTest {
     }
     
     @Test
-    public void testBatchGet() throws Exception {
+    public void testBatchGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartBatchGetTest::testBatchGetImpl);
     }
 }

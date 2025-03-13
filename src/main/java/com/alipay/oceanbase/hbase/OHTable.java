@@ -1467,9 +1467,12 @@ public class OHTable implements Table {
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batchOperation,
                 getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(append.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
+            if (!append.isReturnResults()) {
+                return null;
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<Cell> keyValues = new ArrayList<Cell>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1516,9 +1519,12 @@ public class OHTable implements Table {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(increment.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
+            if (!increment.isReturnResults()) {
+                return null;
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<Cell> keyValues = new ArrayList<Cell>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1527,7 +1533,6 @@ public class OHTable implements Table {
                 long t = (Long) row.get(2).getValue();
                 byte[] v = (byte[]) row.get(3).getValue();
                 KeyValue kv = new KeyValue(k, f, q, t, v);
-
                 keyValues.add(kv);
             }
             return Result.create(keyValues);

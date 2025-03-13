@@ -42,9 +42,8 @@ import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
 public class OHTableSecondaryPartScanTest {
-    private static List<String> tableNames = new LinkedList<String>();
+    private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
 
     @BeforeClass
     public static void before() throws Exception {
@@ -64,8 +63,6 @@ public class OHTableSecondaryPartScanTest {
     public void prepareCase() throws Exception {
         truncateTables(tableNames, group2tableNames);
     }
-
-
 
     public static void testScanImpl(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
@@ -94,14 +91,14 @@ public class OHTableSecondaryPartScanTest {
         }
         assertEquals(1, count);
     }
-    
+
     @Test
-    public void testScan() throws Exception {
+    public void testScan() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testScanImpl);
     }
-    
+
     @Test
-    public void testMultiCFScan() throws Exception {
+    public void testMultiCFScan() throws Throwable {
         // implement later
     }
 }

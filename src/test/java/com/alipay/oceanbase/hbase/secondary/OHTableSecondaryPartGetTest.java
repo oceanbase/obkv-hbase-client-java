@@ -40,7 +40,7 @@ import static org.junit.Assert.assertEquals;
 
 
 public class OHTableSecondaryPartGetTest {
-    private static List<String> tableNames = new LinkedList<String>();
+    private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
 
 
@@ -114,12 +114,12 @@ public class OHTableSecondaryPartGetTest {
     
     
     @Test
-    public void testGet() throws Exception {
+    public void testGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartGetTest::testGetImpl);
     }
     
     @Test
-    public void testMultiCFGet() throws Exception {
+    public void testMultiCFGet() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartGetTest::testMultiCFGetImpl);
     }
 }
