@@ -17,6 +17,10 @@
 
 package com.alipay.oceanbase.hbase.util;
 
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.junit.Assert;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.LinkedList;
@@ -172,5 +176,18 @@ public class ObHTableSecondaryPartUtil {
             result = ""; // 如果没有 '$' 或 '$' 是最后一个字符，则返回空字符串
         }
         return result;
+    }
+
+    public static void AssertKeyValue(String key, String qualifier, long timestamp, String value, Cell cell) {
+        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
+        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(timestamp, cell.getTimestamp());
+        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+    }
+
+    public static void AssertKeyValue(String key, String qualifier, String value, Cell cell) {
+        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
+        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
     }
 }
