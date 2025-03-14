@@ -52,11 +52,8 @@ public class OHTableSecondaryPartGetTest {
     public static void before() throws Exception {
         openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
-            if (type != SECONDARY_PARTITIONED_TIME_RANGE_KEY &&
-                    type != SECONDARY_PARTITIONED_TIME_KEY_RANGE &&
-                        type != NON_PARTITIONED_TIME_SERIES &&
-                            type != SINGLE_PARTITIONED_TIME_SERIES) {
-                    createTables(type, tableNames, group2tableNames, true);
+            if (!type.name().contains("TIME")) {
+                createTables(type, tableNames, group2tableNames, true);
             }
         }
     }
