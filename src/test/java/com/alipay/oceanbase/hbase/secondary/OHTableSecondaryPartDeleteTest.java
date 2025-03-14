@@ -77,7 +77,7 @@ public class OHTableSecondaryPartDeleteTest {
             put.add(toBytes(family), toBytes(column), ts2, toBytes(value));
             put.add(toBytes(family), toBytes(column), ts3, toBytes(value));
             put.add(toBytes(family), toBytes(column), ts4, toBytes(value));
-//            hTable.put(put);
+            hTable.put(put);
 
             Delete delete = new Delete(toBytes(key));
             delete.deleteColumn(toBytes(family), toBytes(column));
@@ -163,7 +163,7 @@ public class OHTableSecondaryPartDeleteTest {
             get.addColumn(toBytes(family), toBytes(column));
             get.setMaxVersions();
             Result result = hTable.get(get);
-            Assert.assertEquals(1, result.size()); // ts1, ts2, ts3 is deleted
+            Assert(tableName, ()->Assert.assertEquals(2, result.size())); // ts1, ts2, ts3 is deleted
             Assert.assertEquals(Arrays.toString((value + ts4).getBytes()), Arrays.toString(result.getValue(family.getBytes(), column.getBytes())));
             for (Cell cell : result.rawCells()) {
                 Assert.assertTrue(cell.getTimestamp() != ts1);
@@ -237,8 +237,8 @@ public class OHTableSecondaryPartDeleteTest {
             Result result = hTable.get(get);
             Assert.assertEquals(2, result.size());
             for (Cell cell : result.rawCells()) {
-                Assert.assertTrue(cell.getTimestamp() != ts1);
-                Assert.assertTrue(cell.getTimestamp() != ts2);
+                Assert(tableName, ()->Assert.assertTrue(cell.getTimestamp() != ts1));
+                Assert(tableName, ()->Assert.assertTrue(cell.getTimestamp() != ts2));
             }
         }
     }
@@ -252,7 +252,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-        
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -297,7 +297,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -338,7 +338,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -380,7 +380,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -416,7 +416,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -441,6 +441,7 @@ public class OHTableSecondaryPartDeleteTest {
         }
         Result result = hTable.get(get);
         Assert.assertEquals(2 * 3, result.size());
+        Assert(entry.getValue(), ()->Assert.assertEquals(0, result.size()));
     }
     
     public static void testDeleteAllImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -452,7 +453,7 @@ public class OHTableSecondaryPartDeleteTest {
         long ts2 = ts1 + 1000;
         long ts3 = ts2 + 1000;
         long ts4 = ts3 + 1000;
-
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
         hTable.init();
         Put put = new Put(toBytes(key));
@@ -475,62 +476,62 @@ public class OHTableSecondaryPartDeleteTest {
             get.addColumn(toBytes(family), toBytes(column + family));
         }
         Result result = hTable.get(get);
-        Assert.assertEquals(0, result.size());
+        Assert(entry.getValue(), ()->Assert.assertEquals(0, result.size()));
     }
     
     @Test
-    public void testDelete() throws Exception {
+    public void testDelete() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartDeleteTest::testDeleteSpecifiedImpl);
     }
     @Test
-    public void testDeleteLastVersion() throws Exception {
+    public void testDeleteLastVersion() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartDeleteTest::testDeleteLastVersionImpl);
     }
     
     @Test
-    public void testDeleteColumn() throws Exception {
+    public void testDeleteColumn() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartDeleteTest::testDeleteColumnImpl);
     }
     
     @Test
-    public void testDeleteFamily() throws Exception {
+    public void testDeleteFamily() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartDeleteTest::testDeleteFamilyImpl);
     }
     
     @Test
-    public void testDeleteFamilyVersion() throws Exception {
+    public void testDeleteFamilyVersion() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartDeleteTest::testDeleteFamilyVersionImpl);
     }
     
     
     @Test
-    public void testMultiCFDelete() throws Exception {
+    public void testMultiCFDelete() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteLastVersionImpl);
     }
     
     @Test 
-    public void testMultiCFDeleteSpecified() throws Exception {
+    public void testMultiCFDeleteSpecified() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteSpecifiedImpl);
     }
     
     @Test
-    public void testMultiCFDeleteColumn() throws Exception {
+    public void testMultiCFDeleteColumn() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteColumnImpl);
     }
     
     @Test
-    public void testMultiCFDeleteFamily() throws Exception {
+    public void testMultiCFDeleteFamily() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyImpl);
     }
     
     @Test
-    public void testMultiCFDeleteFamilyVersion() throws Exception {
+    public void testMultiCFDeleteFamilyVersion() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyVersionImpl);
     }
     
     
     @Test
-    public void testDeleteAll() throws Exception {
+    public void testDeleteAll() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testDeleteAllImpl);
     }
 }

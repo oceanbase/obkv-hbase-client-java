@@ -2032,7 +2032,6 @@ public class OHTable implements HTableInterface {
         ObTableQuery tableQuery = new ObTableQuery();
         tableQuery.setObKVParams(buildOBKVParams((Scan)null));
         ObHTableFilter filter = null;
-//        buildObTableQuery(tableQuery, range, filter, null);
         switch (kvType) {
             case Delete:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
