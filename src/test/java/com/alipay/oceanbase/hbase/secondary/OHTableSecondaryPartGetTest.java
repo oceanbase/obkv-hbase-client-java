@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTableClient;
+import com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.Cell;
@@ -25,7 +26,9 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.filter.BinaryComparator;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.ValueFilter;
 import org.junit.*;
 
 import java.util.LinkedHashMap;
@@ -35,6 +38,7 @@ import java.util.Map;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
@@ -48,7 +52,9 @@ public class OHTableSecondaryPartGetTest {
     public static void before() throws Exception {
         openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
-            createTables(type, tableNames, group2tableNames, true);
+            if (!type.name().contains("TIME")) {
+                createTables(type, tableNames, group2tableNames, true);
+            }
         }
     }
 
@@ -68,51 +74,223 @@ public class OHTableSecondaryPartGetTest {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
 
+        // 0. prepare data
         String family = getColumnFamilyName(tableName);
         String key = "putKey";
-        String column = "putColumn";
-        String value = "value";
-        Put put = new Put(toBytes(key));
-        put.add(family.getBytes(), column.getBytes(), toBytes(value));
-        hTable.put(put);
+        String[] columns = {"putColumn1", "putColumn2", "putColumn3"};
+        String[] values = {"version1", "version2"}; // each column have two versions
+        long curTs = System.currentTimeMillis();
+        long[] ts = {curTs, curTs+1}; // each column have two versions
+        String latestValue = values[1];
+        long lastTs = ts[1];
+        for (int i = 0; i < values.length; i++) {
+            for (int j = 0; j < columns.length; j++) {
+                Put put = new Put(toBytes(key));
+                put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]));
+                hTable.put(put);
+            }
+        }
 
-        Get get = new Get(key.getBytes());
-        get.addFamily(family.getBytes());
-        Result result = hTable.get(get);
-        Cell[] cells = result.rawCells();
-        assertEquals(1, cells.length);
-        assertEquals(column, Bytes.toString(CellUtil.cloneQualifier(cells[0])));
-        assertEquals("value", Bytes.toString(CellUtil.cloneValue(cells[0])));
-        System.out.println("get table " + tableName + " done");
+        // 1. get specify column
+        {
+            int index = 0;
+            Get get = new Get(key.getBytes());
+            get.addColumn(family.getBytes(), columns[index].getBytes());
+            Result r = hTable.get(get);
+            Assert.assertEquals(1, r.raw().length);
+            AssertKeyValue(key, columns[index], lastTs, latestValue, r.rawCells()[0]);
+        }
+
+        // 2. get do not specify column
+        {
+            Get get = new Get(key.getBytes());
+            get.addFamily(family.getBytes());
+            Result result = hTable.get(get);
+            Cell[] cells = result.rawCells();
+            assertEquals(columns.length, cells.length);
+            for (int i = 0; i < columns.length; i++) {
+                ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue, cells[i]);
+            }
+        }
+
+        // 3. get specify versions
+        {
+            int index = 0;
+            Get get = new Get(key.getBytes());
+            get.addColumn(family.getBytes(), columns[index].getBytes());
+            get.setMaxVersions(2);
+            Result r = hTable.get(get);
+            Assert.assertEquals(2, r.raw().length);
+            AssertKeyValue(key, columns[index], ts[1], values[1], r.raw()[0]);
+            AssertKeyValue(key, columns[index], ts[0], values[0], r.raw()[1]);
+        }
+
+        // 4. get specify time range
+        {
+            Get get = new Get(key.getBytes());
+            get.addFamily(family.getBytes());
+            get.setMaxVersions(2);
+            get.setTimeStamp(ts[1]);
+            Result r = hTable.get(get);
+            Assert.assertEquals(columns.length, r.raw().length);
+            for (int i = 0; i < columns.length; i++) {
+                AssertKeyValue(key, columns[i], values[1], r.raw()[i]);
+            }
+        }
+
+        // 5. get specify filter
+        {
+            Get get = new Get(key.getBytes());
+            get.addFamily(family.getBytes());
+            get.setMaxVersions(2);
+            ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
+                    new BinaryComparator(toBytes(values[0])));
+            get.setFilter(valueFilter);
+            Result r = hTable.get(get);
+            Assert.assertEquals(columns.length, r.raw().length);
+            for (int i = 0; i < columns.length; i++) {
+                AssertKeyValue(key, columns[i], values[0], r.raw()[i]);
+            }
+        }
 
         hTable.close();
     }
     
     public static void testMultiCFGetImpl(Map.Entry<String, List<String>> entry) throws Exception {
+
+        // 0. prepare data
         String key = "putKey";
-        String column = "putColumn";
+        String[] columns = {"putColumn1", "putColumn2", "putColumn3"};
+        String groupName = getTableName(entry.getKey());
+        String[] values = {"version1", "version2"}; // each column have two versions
+        String latestValue = values[1];
+        List<String> tableNames = entry.getValue();
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        long timestamp = System.currentTimeMillis();
+        long[] ts = {timestamp, timestamp+1};
+        long lastTs = ts[1];
+        hTable.init();
 
-        for (String tableName : entry.getValue()) {
+        for (String tableName : tableNames) {
             String family = getColumnFamilyName(tableName);
-            String value = family + "_value";
-            long timestamp = System.currentTimeMillis();
+            for (int i = 0; i < values.length; i++) {
+                for (int j = 0; j < columns.length; j++) {
+                    Put put = new Put(toBytes(key));
+                    put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]));
+                    hTable.put(put);
+                }
+            }
+        }
 
-            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
-            hTable.init();
-            Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column.getBytes(), timestamp, toBytes(value));
-            hTable.put(put);
+        // 1. get specify column
+        {
+            int columnIndex = 0;
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                Get get = new Get(key.getBytes());
+                get.addColumn(family.getBytes(), columns[columnIndex].getBytes());
+                Result r = hTable.get(get);
+                Assert.assertEquals(1, r.raw().length);
+                AssertKeyValue(key, columns[columnIndex], lastTs, latestValue, r.rawCells()[0]);
+            }
+        }
 
+        // 2. get do not specify column
+        {
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                Get get = new Get(key.getBytes());
+                get.addFamily(family.getBytes());
+                Result result = hTable.get(get);
+                Cell[] cells = result.rawCells();
+                assertEquals(columns.length, cells.length);
+                for (int i = 0; i < columns.length; i++) {
+                    ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue, cells[i]);
+                }
+            }
+        }
+
+        // 3. get do not specify column family
+        {
             Get get = new Get(key.getBytes());
-            get.addFamily(family.getBytes());
             Result r = hTable.get(get);
-            Assert.assertEquals(1, r.raw().length);
+            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            int cur = 0;
+            for (int i = 0; i < columns.length; i++) {
+                for (String tableName : tableNames) {
+                    AssertKeyValue(key, columns[i], lastTs, latestValue, r.raw()[cur]);
+                    cur++;
+                }
+            }
+        }
 
-            hTable.close();
+        // 4. get specify multi cf and column
+        {
+            int columnIndex = 0;
+            Get get = new Get(key.getBytes());
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                get.addColumn(family.getBytes(), columns[columnIndex].getBytes());
+            }
+            Result r = hTable.get(get);
+            Assert.assertEquals(tableNames.size(), r.rawCells().length);
+            for (int i = 0; i < tableNames.size(); i++) {
+                AssertKeyValue(key, columns[columnIndex], lastTs, latestValue, r.rawCells()[i]);
+            }
+        }
+
+        // 5. get specify multi cf and versions
+        {
+            Get get = new Get(key.getBytes());
+            get.setMaxVersions(2);
+            Result r = hTable.get(get);
+            Assert.assertEquals(tableNames.size() * columns.length * ts.length, r.raw().length);
+            int cur = 0;
+            for (int i = 0; i < columns.length; i++) {
+                for (String tableName : tableNames) {
+                    for (int k = ts.length-1; k >= 0; k--) {
+                        AssertKeyValue(key, columns[i], ts[k], values[k], r.raw()[cur]);
+                        cur++;
+                    }
+                }
+            }
+        }
+
+        // 6. get specify multi cf and time range
+        {
+            Get get = new Get(key.getBytes());
+            get.setMaxVersions(2);
+            get.setTimeStamp(ts[1]);
+            Result r = hTable.get(get);
+            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            int cur = 0;
+            for (int i = 0; i < columns.length; i++) {
+                for (String tableName : tableNames) {
+                    AssertKeyValue(key, columns[i], ts[1], values[1], r.raw()[cur]);
+                    cur++;
+                }
+            }
+        }
+
+        // 7. get specify multi cf and filter
+        {
+            Get get = new Get(key.getBytes());
+            get.setMaxVersions(2);
+            ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
+                    new BinaryComparator(toBytes(values[0])));
+            get.setFilter(valueFilter);
+            Result r = hTable.get(get);
+            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            int cur = 0;
+            for (int i = 0; i < columns.length; i++) {
+                for (String tableName : tableNames) {
+                    AssertKeyValue(key, columns[i], ts[0], values[0], r.raw()[cur]);
+                    cur++;
+                }
+            }
         }
     }
-    
-    
+
     @Test
     public void testGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartGetTest::testGetImpl);
