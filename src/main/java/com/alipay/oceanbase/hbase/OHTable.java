@@ -40,6 +40,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQuer
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.mutate.ObTableQueryAndMutateResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.*;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.syncquery.ObTableQueryAsyncRequest;
+import com.alipay.oceanbase.rpc.queryandmutate.QueryAndMutate;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import com.alipay.oceanbase.rpc.table.ObHBaseParams;
@@ -78,6 +79,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static com.alipay.oceanbase.hbase.filter.HBaseFilterUtils.writeBytesWithEscape;
+import static org.apache.hadoop.hbase.KeyValue.Type.*;
 
 public class OHTable implements HTableInterface {
 
@@ -552,8 +554,8 @@ public class OHTable implements HTableInterface {
             boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()).anyMatch(
                             kv -> KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamily || KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamilyVersion);
+                                    kv.getType()) == DeleteFamily || KeyValue.Type.codeToType(
+                                    kv.getType()) == DeleteFamilyVersion);
             if (!has_delete_family) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
@@ -1266,6 +1268,7 @@ public class OHTable implements HTableInterface {
             batch(Collections.singletonList(delete));
         } catch (Exception e) {
             logger.error(LCD.convert("01-00004"), tableNameString, e);
+            throw e;
         }
     }
 
@@ -2020,7 +2023,81 @@ public class OHTable implements HTableInterface {
         batch.setSamePropertiesNames(true);
         return batch;
     }
-
+    private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
+                                                     ObTableOperationType operationType,
+                                                     boolean isTableGroup, Long TTL) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
+        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType, isTableGroup, TTL);
+        ObNewRange range = new ObNewRange();
+        ObTableQuery tableQuery = new ObTableQuery();
+        tableQuery.setObKVParams(buildOBKVParams((Scan)null));
+        ObHTableFilter filter = null;
+        switch (kvType) {
+            case Delete:
+                if (kv.getTimestamp() == Long.MAX_VALUE) {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    filter = buildObHTableFilter(null, null, 1, kv.getQualifier());
+                }  else {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), 1, kv.getQualifier());
+                }
+                break;
+            case DeleteColumn:
+                if (kv.getTimestamp() == Long.MAX_VALUE) {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                } else {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                }
+                break;
+            case DeleteFamily:
+                if (kv.getTimestamp() == Long.MAX_VALUE) {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    if (!isTableGroup) {
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                    } else {
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                    }
+                } else {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    if (!isTableGroup) {
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                    } else {
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                    }
+                }
+                break;
+            case DeleteFamilyVersion:
+                if (kv.getTimestamp() == Long.MAX_VALUE) {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                } else {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    if (!isTableGroup) {
+                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                    } else {
+                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                    }
+                }
+                break;
+            default:
+                return null;
+        }
+        tableQuery.sethTableFilter(filter);
+        tableQuery.addKeyRange(range);
+        return new QueryAndMutate(tableQuery, tableMutation);
+    }
+    
+    
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup, Long TTL) {
@@ -2132,7 +2209,7 @@ public class OHTable implements HTableInterface {
                 Put put = (Put) row;
                 if (put.isEmpty()) {
                     throw new IllegalArgumentException("No columns to insert for #"
-                                                       + (posInList + 1) + " item");
+                            + (posInList + 1) + " item");
                 }
                 for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
                     byte[] family = entry.getKey();
@@ -2155,8 +2232,24 @@ public class OHTable implements HTableInterface {
                 if (delete.isEmpty()) {
                     singleOpResultNum++;
                     KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                        KeyValue.Type.Maximum);
-                    batch.addOperation(buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE));
+                            KeyValue.Type.Maximum);
+                    com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE);
+                    ObNewRange range = new ObNewRange();
+                    ObTableQuery tableQuery = new ObTableQuery();
+                    ObHTableFilter filter = null;
+                    tableQuery.setObKVParams(buildOBKVParams((Scan)null));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    if (kv.getTimestamp() == Long.MAX_VALUE) {
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                    } else {
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                    }
+                    tableQuery.sethTableFilter(filter);
+                    tableQuery.addKeyRange(range);
+
+                    tableMutation.setTable(tableName);
+                    batch.addOperation(new QueryAndMutate(tableQuery, tableMutation));
                 } else {
                     for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
                         byte[] family = entry.getKey();
@@ -2167,9 +2260,9 @@ public class OHTable implements HTableInterface {
                                 KeyValue new_kv = modifyQualifier(kv,
                                     (Bytes.toString(family) + "." + Bytes.toString(kv
                                         .getQualifier())).getBytes());
-                                batch.addOperation(buildMutation(new_kv, DEL, true, Long.MAX_VALUE));
+                                batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
                             } else {
-                                batch.addOperation(buildMutation(kv, DEL, false, Long.MAX_VALUE));
+                                batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, false, Long.MAX_VALUE));
                             }
                         }
                     }
