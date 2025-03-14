@@ -96,7 +96,7 @@ public class TableTemplateManager {
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `V` varbinary(1024) DEFAULT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
                         ") TABLEGROUP = %s PARTITION BY RANGE COLUMNS(`G`) \n" +
                         "SUBPARTITION BY KEY(`%s`) SUBPARTITIONS %d \n" +
@@ -112,7 +112,7 @@ public class TableTemplateManager {
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `V` varbinary(1024) DEFAULT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
                         ") TABLEGROUP = %s PARTITION BY RANGE COLUMNS(`G`) \n" +
                         "SUBPARTITION BY KEY(`%s`) SUBPARTITIONS %d \n" +
@@ -128,7 +128,7 @@ public class TableTemplateManager {
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `V` varbinary(1024) DEFAULT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
                         ") TABLEGROUP = %s PARTITION BY KEY(`%s`) PARTITIONS %d \n" +
                         "SUBPARTITION BY RANGE COLUMNS(`G`) \n" +
@@ -145,7 +145,7 @@ public class TableTemplateManager {
                         "  `Q` varbinary(256) NOT NULL,\n" +
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `V` varbinary(1024) DEFAULT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
                         ") TABLEGROUP = %s PARTITION BY KEY(`%s`) PARTITIONS %d \n" +
                         "SUBPARTITION BY RANGE COLUMNS(`G`) \n" +
@@ -162,7 +162,7 @@ public class TableTemplateManager {
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
                         "  `V` json NOT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `T`, `S`)\n" +
                         ") TABLEGROUP = %s PARTITION BY RANGE COLUMNS(`G`) \n" +
                         "SUBPARTITION BY KEY(`%s`) SUBPARTITIONS %d \n" +
@@ -178,7 +178,7 @@ public class TableTemplateManager {
                         "  `T` bigint(20) NOT NULL,\n" +
                         "  `S` bigint(20) NOT NULL,\n" +
                         "  `V` json NOT NULL,\n" +
-                        "  `G` bigint(20) GENERATED ALWAYS AS (-T)%s,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
                         "  PRIMARY KEY (`K`, `T`, `S`)\n" +
                         ") TABLEGROUP = %s PARTITION BY KEY(`%s`) PARTITIONS %d \n" +
                         "SUBPARTITION BY RANGE COLUMNS(`G`) \n" +
