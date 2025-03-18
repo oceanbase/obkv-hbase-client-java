@@ -40,7 +40,15 @@ public class TableTemplateManager {
         SECONDARY_PARTITIONED_KEY_RANGE,        // KEY-RANGE分区（使用K）
         SECONDARY_PARTITIONED_KEY_RANGE_GEN,    // KEY-RANGE分区（使用生成列）
         SECONDARY_PARTITIONED_TIME_RANGE_KEY,   // 时序表RANGE-KEY
-        SECONDARY_PARTITIONED_TIME_KEY_RANGE    // 时序表KEY-RANGE
+        SECONDARY_PARTITIONED_TIME_KEY_RANGE,   // 时序表KEY-RANGE
+
+        /* ------------------ CELL TTL ----------------*/
+        NON_PARTITIONED_REGULAR_CELL_TTL,
+        SINGLE_PARTITIONED_REGULAR_CELL_TTL,
+        SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,        // RANGE-KEY分区（使用K）
+        SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,    // RANGE-KEY分区（使用生成列）
+        SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,        // KEY-RANGE分区（使用K）
+        SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL,    // KEY-RANGE分区（使用生成列）
     }
 
     public static List<TableType> NORMAL_TABLES = Arrays.asList(NON_PARTITIONED_REGULAR,
@@ -49,6 +57,13 @@ public class TableTemplateManager {
             SECONDARY_PARTITIONED_RANGE_KEY_GEN,
             SECONDARY_PARTITIONED_KEY_RANGE,
             SECONDARY_PARTITIONED_KEY_RANGE_GEN);
+
+    public static List<TableType> CELL_TTL_TABLES = Arrays.asList(NON_PARTITIONED_REGULAR_CELL_TTL,
+            SINGLE_PARTITIONED_REGULAR_CELL_TTL,
+            SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,
+            SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,
+            SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
+            SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL);
     
     private static final Map<TableType, String> SQL_TEMPLATES = new EnumMap<>(TableType.class);
 
@@ -187,6 +202,93 @@ public class TableTemplateManager {
                         "  SUBPARTITION `p1` VALUES LESS THAN (%d),\n" +
                         "  SUBPARTITION `p2` VALUES LESS THAN (%d),\n" +
                         "  SUBPARTITION `p3` VALUES LESS THAN MAXVALUE)");
+
+        /* ------------------ CELL TTL ----------------*/
+        SQL_TEMPLATES.put(TableType.NON_PARTITIONED_REGULAR_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s");
+
+        SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_REGULAR_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s PARTITION BY KEY(`K`) PARTITIONS %d ");
+
+        SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s PARTITION BY RANGE COLUMNS(`G`) \n" +
+                        "SUBPARTITION BY KEY(`%s`) SUBPARTITIONS %d \n" +
+                        "(PARTITION `p0` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p1` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p2` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p3` VALUES LESS THAN MAXVALUE)");
+
+        SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s PARTITION BY RANGE COLUMNS(`G`) \n" +
+                        "SUBPARTITION BY KEY(`%s`) SUBPARTITIONS %d \n" +
+                        "(PARTITION `p0` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p1` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p2` VALUES LESS THAN (%d),\n" +
+                        " PARTITION `p3` VALUES LESS THAN MAXVALUE) ");
+
+        SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s PARTITION BY KEY(`%s`) PARTITIONS %d \n" +
+                        "SUBPARTITION BY RANGE COLUMNS(`G`) \n" +
+                        "SUBPARTITION TEMPLATE (\n" +
+                        "  SUBPARTITION `p0` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p1` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p2` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p3` VALUES LESS THAN MAXVALUE) ");
+
+        SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL,
+                "CREATE TABLE IF NOT EXISTS `%s` (\n" +
+                        "  `K` varbinary(1024) NOT NULL,\n" +
+                        "  `Q` varbinary(256) NOT NULL,\n" +
+                        "  `T` bigint(20) NOT NULL,\n" +
+                        "  `V` varbinary(1024) DEFAULT NULL,\n" +
+                        "  `TTL` bigint(20) DEFAULT NULL,\n" +
+                        "  `G` bigint(20) GENERATED ALWAYS AS (ABS(`T`))%s,\n" +
+                        "  PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                        ") TABLEGROUP = %s PARTITION BY KEY(`%s`) PARTITIONS %d \n" +
+                        "SUBPARTITION BY RANGE COLUMNS(`G`) \n" +
+                        "SUBPARTITION TEMPLATE (\n" +
+                        "  SUBPARTITION `p0` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p1` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p2` VALUES LESS THAN (%d),\n" +
+                        "  SUBPARTITION `p3` VALUES LESS THAN MAXVALUE) ");
     }
 
     public static String getCreateTableSQL(TableType type, String tableName,
@@ -198,16 +300,22 @@ public class TableTemplateManager {
         switch (type) {
             case NON_PARTITIONED_REGULAR:
             case NON_PARTITIONED_TIME_SERIES:
+            case NON_PARTITIONED_REGULAR_CELL_TTL:
                 params = new Object[]{tableName, tableGroup};
                 break;
             case SINGLE_PARTITIONED_REGULAR:
             case SINGLE_PARTITIONED_TIME_SERIES:  // 合并相同处理逻辑
+            case SINGLE_PARTITIONED_REGULAR_CELL_TTL:
                 params = new Object[]{tableName, tableGroup, PART_NUM};
                 break;
             case SECONDARY_PARTITIONED_RANGE_KEY:
             case SECONDARY_PARTITIONED_RANGE_KEY_GEN:
             case SECONDARY_PARTITIONED_KEY_RANGE:
             case SECONDARY_PARTITIONED_KEY_RANGE_GEN:
+            case SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL:
+            case SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL:
+            case SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL:
+            case SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL:
                 boolean isGen = type.name().contains("GEN");
                 params = new Object[]{
                         tableName,

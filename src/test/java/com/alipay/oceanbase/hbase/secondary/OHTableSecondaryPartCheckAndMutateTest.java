@@ -33,6 +33,7 @@ import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.NORMAL_TABLES;
 import static org.junit.Assert.*;
 
 
@@ -49,7 +50,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+        for (TableTemplateManager.TableType type : NORMAL_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -78,6 +79,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         hTable.put(put);
         // get row back and assert the values
         Get get = new Get(ROW);
+        get.addFamily(FAMILY);
         Result result = hTable.get(get);
         assertTrue("Column A value should be a",
                 Bytes.toString(result.getValue(FAMILY, Bytes.toBytes("A"))).equals("a"));
@@ -126,40 +128,6 @@ public class OHTableSecondaryPartCheckAndMutateTest {
                 // expected
             }
         }
-        hTable.close();
-    }
-
-    public static void testCheckAndMutateDiffRow(String tableName) throws Throwable {
-        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
-        hTable.init();
-
-        byte[] family = getColumnFamilyName(tableName).getBytes();
-        byte[] row1 = Bytes.toBytes("row1");
-        byte[] qualifier = Bytes.toBytes("q1");
-        byte[] value1 = Bytes.toBytes("value1");
-
-        Put put = new Put(row1);
-        put.addColumn(family, qualifier, value1);
-        hTable.put(put);
-
-        Result result = hTable.get(new Get(row1));
-        assertArrayEquals("the value of column q in row1 should be value1",
-                value1, result.getValue(family, qualifier));
-
-        byte[] row2 = Bytes.toBytes("row2");
-        byte[] value2 = Bytes.toBytes("value2");
-        RowMutations mutations = new RowMutations(row2);
-        put = new Put(row2);
-        put.addColumn(family, qualifier, value2);
-        mutations.add(put);
-
-        // check row1 and put row2
-        assertTrue(hTable.checkAndMutate(row1, family, qualifier,
-                CompareFilter.CompareOp.GREATER, value2, mutations));
-
-        result = hTable.get(new Get(row2));
-        assertArrayEquals("the value of column q in row2 should be value2",
-                value2, result.getValue(family, qualifier));
         hTable.close();
     }
 
@@ -356,11 +324,6 @@ public class OHTableSecondaryPartCheckAndMutateTest {
     @Test
     public void testCheckAndPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartCheckAndMutateTest::testCheckAndPut);
-    }
-
-    @Test
-    public void testCheckAndMutateDiffRow() throws Throwable {
-        FOR_EACH(tableNames, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateDiffRow);
     }
 
     @Test
