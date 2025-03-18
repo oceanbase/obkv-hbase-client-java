@@ -18,14 +18,19 @@
 package com.alipay.oceanbase.hbase.util;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Assert;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLSyntaxErrorException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public class ObHTableSecondaryPartUtil {
     public static void openDistributedExecute() throws Exception {
@@ -206,6 +211,82 @@ public class ObHTableSecondaryPartUtil {
         return result;
     }
 
+    public static void alterTableTimeToLive(List<String> tableNames, boolean printSql, long timeToLive)
+            throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        if (tableNames != null) {
+            for (String tableName : tableNames) {
+                String alterTableTTLSQL = "ALTER TABLE " + tableName +
+                        String.format(" kv_attributes ='{\"Hbase\": {\"TimeToLive\": %d}}';", timeToLive);
+                try {
+                    conn.createStatement().execute(alterTableTTLSQL);
+                    System.out.println("============= alter table ttl: " + tableName + " table_group: "
+                            + getTableName(tableName) + " =============\n"
+                            + (printSql ? alterTableTTLSQL : "")
+                            + " \n============= done =============\n");
+                } catch (SQLSyntaxErrorException e) {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    public static void alterTableMaxVersion(List<String> tableNames, boolean printSql, long maxVersion)
+            throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        if (tableNames != null) {
+            for (String tableName : tableNames) {
+                String alterTableTTLSQL = "ALTER TABLE " + tableName +
+                        String.format(" kv_attributes ='{\"Hbase\": {\"MaxVersions\": %d}}';", maxVersion);
+                try {
+                    conn.createStatement().execute(alterTableTTLSQL);
+                    System.out.println("============= alter table ttl: " + tableName + " table_group: "
+                            + getTableName(tableName) + " =============\n"
+                            + (printSql ? alterTableTTLSQL : "")
+                            + " \n============= done =============\n");
+                } catch (SQLSyntaxErrorException e) {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    public static int getSQLTableRowCnt(String tableName) throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        String RowCountSQL = "SELECT COUNT(*) FROM " + tableName + ";";
+        ResultSet resultSet = conn.createStatement().executeQuery(RowCountSQL);
+        int rowCnt = 0;
+        if (resultSet.next()) {
+            rowCnt = resultSet.getInt(1);
+        }
+        return rowCnt;
+    }
+
+    public static int getRunningNormalTTLTaskCnt() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        String RowCountSQL = "SELECT COUNT(*) FROM " + "OCEANBASE.DBA_OB_KV_TTL_TASKS where TASK_TYPE = 'NORMAL'";
+        ResultSet resultSet = conn.createStatement().executeQuery(RowCountSQL);
+        int rowCnt = 0;
+        if (resultSet.next()) {
+            rowCnt = resultSet.getInt(1);
+        }
+        return rowCnt;
+    }
+
+    public static void openTTLExecute() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        String stmt1 = "ALTER SYSTEM set enable_kv_ttl = true;";
+        String stmt2 = "ALTER SYSTEM trigger TTL;";
+        conn.createStatement().execute(stmt1);
+        conn.createStatement().execute(stmt2);
+    }
+
+    public static void closeTTLExecute() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM set enable_kv_ttl = false;";
+        conn.createStatement().execute(stmt);
+    }
+
     public static void AssertKeyValue(String key, String qualifier, long timestamp, String value, Cell cell) {
         Assert.assertEquals(key, Bytes.toString(cell.getRow()));
         Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
@@ -217,5 +298,33 @@ public class ObHTableSecondaryPartUtil {
         Assert.assertEquals(key, Bytes.toString(cell.getRow()));
         Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
         Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+    }
+
+    public static void AssertKeyValue(String key, String family, String qualifier, long timestamp, String value, Cell cell) {
+        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
+        Assert.assertEquals(family, Bytes.toString(cell.getFamily()));
+        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(timestamp, cell.getTimestamp());
+        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+    }
+
+    public static List<Cell> getCellsFromScanner(ResultScanner scanner) {
+        List<Cell> cells = new ArrayList<Cell>();
+        for (Result result : scanner) {
+            for (Cell cell : result.rawCells()) {
+                cells.add(cell);
+            }
+        }
+        return cells;
+    }
+
+
+    public static void checkUtilTimeout(Supplier<Boolean> function, long timeout, long interval) throws Exception {
+        long startTime = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTime < timeout) {
+            if (function.get()) { return; }
+            Thread.sleep(interval);
+        }
+       Assert.assertTrue("Timeout while waiting for the function to return expected result", false);
     }
 }
