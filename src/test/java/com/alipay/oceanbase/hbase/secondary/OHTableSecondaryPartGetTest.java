@@ -216,8 +216,8 @@ public class OHTableSecondaryPartGetTest {
             Result r = hTable.get(get);
             Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
             int cur = 0;
-            for (int i = 0; i < columns.length; i++) {
-                for (String tableName : tableNames) {
+            for (String tableName : tableNames) {
+                for (int i = 0; i < columns.length; i++) {
                     AssertKeyValue(key, columns[i], lastTs, latestValue, r.raw()[cur]);
                     cur++;
                 }
@@ -246,10 +246,11 @@ public class OHTableSecondaryPartGetTest {
             Result r = hTable.get(get);
             Assert.assertEquals(tableNames.size() * columns.length * ts.length, r.raw().length);
             int cur = 0;
-            for (int i = 0; i < columns.length; i++) {
-                for (String tableName : tableNames) {
-                    for (int k = ts.length-1; k >= 0; k--) {
-                        AssertKeyValue(key, columns[i], ts[k], values[k], r.raw()[cur]);
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                for (int i = 0; i < columns.length; i++) {
+                    for (int k = ts.length - 1; k >= 0; k--) {
+                        AssertKeyValue(key, family, columns[i], ts[k], values[k], r.raw()[cur]);
                         cur++;
                     }
                 }
@@ -264,9 +265,10 @@ public class OHTableSecondaryPartGetTest {
             Result r = hTable.get(get);
             Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
             int cur = 0;
-            for (int i = 0; i < columns.length; i++) {
-                for (String tableName : tableNames) {
-                    AssertKeyValue(key, columns[i], ts[1], values[1], r.raw()[cur]);
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                for (int i = 0; i < columns.length; i++) {
+                    AssertKeyValue(key, family, columns[i], ts[1], values[1], r.raw()[cur]);
                     cur++;
                 }
             }
@@ -282,9 +284,10 @@ public class OHTableSecondaryPartGetTest {
             Result r = hTable.get(get);
             Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
             int cur = 0;
-            for (int i = 0; i < columns.length; i++) {
-                for (String tableName : tableNames) {
-                    AssertKeyValue(key, columns[i], ts[0], values[0], r.raw()[cur]);
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                for (int i = 0; i < columns.length; i++) {
+                    AssertKeyValue(key, family, columns[i], ts[0], values[0], r.raw()[cur]);
                     cur++;
                 }
             }
