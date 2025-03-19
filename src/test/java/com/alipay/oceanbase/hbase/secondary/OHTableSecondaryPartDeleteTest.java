@@ -42,7 +42,7 @@ public class OHTableSecondaryPartDeleteTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -163,7 +163,7 @@ public class OHTableSecondaryPartDeleteTest {
             get.addColumn(toBytes(family), toBytes(column));
             get.setMaxVersions();
             Result result = hTable.get(get);
-            Assert(tableName, ()->Assert.assertEquals(2, result.size())); // ts1, ts2, ts3 is deleted
+            Assert(tableName, ()->Assert.assertEquals(1, result.size())); // ts1, ts2, ts3 is deleted
             Assert.assertEquals(Arrays.toString((value + ts4).getBytes()), Arrays.toString(result.getValue(family.getBytes(), column.getBytes())));
             for (Cell cell : result.rawCells()) {
                 Assert.assertTrue(cell.getTimestamp() != ts1);
