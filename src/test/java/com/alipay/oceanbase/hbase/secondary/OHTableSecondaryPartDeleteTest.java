@@ -88,7 +88,7 @@ public class OHTableSecondaryPartDeleteTest {
             get.setMaxVersions();
             Result result = hTable.get(get);
             Assert.assertEquals(3, result.size()); // ts4 is deleted
-            Assert.assertEquals(value, result.getValue(family.getBytes(), column.getBytes()));
+            Assert(tableName, () -> Assert.assertTrue(secureCompare(value.getBytes(), result.getValue(family.getBytes(), column.getBytes()))));
             for (Cell cell : result.rawCells()) {
                 Assert.assertTrue(cell.getTimestamp() != ts4);
             }
@@ -440,8 +440,7 @@ public class OHTableSecondaryPartDeleteTest {
             get.addColumn(toBytes(family), toBytes(column + family));
         }
         Result result = hTable.get(get);
-        Assert.assertEquals(2 * 3, result.size());
-        Assert(entry.getValue(), ()->Assert.assertEquals(0, result.size()));
+        Assert(entry.getValue(), ()->Assert.assertEquals(6, result.size()));
     }
     
     public static void testDeleteAllImpl(Map.Entry<String, List<String>> entry) throws Exception {
