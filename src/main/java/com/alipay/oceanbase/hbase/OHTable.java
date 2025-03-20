@@ -2245,11 +2245,10 @@ public class OHTable implements Table {
             return;
         }
         this.obTableClient.getOrRefreshTableEntry(
-            getNormalTargetTableName(tableNameString, familyString), true, true);
+            getNormalTargetTableName(tableNameString, familyString), true);
         if (hasTestLoad) {
             this.obTableClient.getOrRefreshTableEntry(
-                getTestLoadTargetTableName(tableNameString, familyString, configuration), true,
-                true);
+                getTestLoadTargetTableName(tableNameString, familyString, configuration), true);
         }
     }
 
