@@ -273,15 +273,19 @@ public class ObHTableSecondaryPartUtil {
         return rowCnt;
     }
 
-    public static void openTTLExecute() throws Exception {
+    public static void enableTTL() throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
-        String stmt1 = "ALTER SYSTEM set enable_kv_ttl = true;";
-        String stmt2 = "ALTER SYSTEM trigger TTL;";
-        conn.createStatement().execute(stmt1);
-        conn.createStatement().execute(stmt2);
+        String stmt = "ALTER SYSTEM set enable_kv_ttl = true;";
+        conn.createStatement().execute(stmt);
     }
 
-    public static void closeTTLExecute() throws Exception {
+    public static void triggerTTL() throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM trigger TTL;";
+        conn.createStatement().execute(stmt);
+    }
+
+    public static void disableTTL() throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         String stmt = "ALTER SYSTEM set enable_kv_ttl = false;";
         conn.createStatement().execute(stmt);
