@@ -46,7 +46,7 @@ public class OHTableSecondaryPartTTLTest {
     }
 
     public static void testTTLImpl(List<String> tableNames) throws Exception {
-        closeTTLExecute();
+        disableTTL();
         // 0. prepare data
         String keys[] = {"putKey1", "putKey2", "putKey3"};
         String endKey = "putKey4";
@@ -94,7 +94,8 @@ public class OHTableSecondaryPartTTLTest {
         }
 
         // 4. open ttl knob to delete expired hbase data
-        openTTLExecute();
+        enableTTL();
+        triggerTTL();
 
         // 5. check util expired hbase data is deleted by ttl tasks
         checkUtilTimeout(()-> {
@@ -110,11 +111,11 @@ public class OHTableSecondaryPartTTLTest {
         }
 
         // 6. close ttl knob
-        closeTTLExecute();
+        disableTTL();
     }
 
     public static void testMultiCFTTLImpl(Map<String, List<String>> group2tableNames) throws Exception {
-        closeTTLExecute();
+        disableTTL();
         List<String> allTableNames = group2tableNames.values().stream().flatMap(Collection::stream).collect(Collectors.toList());
         // 0. prepare data
         String keys[] = {"putKey1", "putKey2", "putKey3"};
@@ -127,7 +128,6 @@ public class OHTableSecondaryPartTTLTest {
             OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
             hTable.init();
             List<String> tableNames = entry.getValue();
-
             for (String tableName : tableNames) {
                 String family = getColumnFamilyName(tableName);
                 for (String key : keys) {
@@ -168,7 +168,8 @@ public class OHTableSecondaryPartTTLTest {
         }
 
         // 4. open ttl knob to delete expired hbase data
-        openTTLExecute();
+        enableTTL();
+        triggerTTL();
 
         // 5. check util expired hbase data is deleted by ttl tasks
         checkUtilTimeout(()-> {
@@ -184,7 +185,159 @@ public class OHTableSecondaryPartTTLTest {
         }
 
         // 6. close ttl knob
-        closeTTLExecute();
+        disableTTL();
+    }
+
+    void testRowkeyTTL(List<String> tableNames, Boolean useScan, Boolean isReversed) throws Exception {
+        disableTTL();
+        // 0. prepare data
+        String keys[] = {"putKey1", "putKey2", "putKey3"};
+        String endKey = "putKey4";
+        String columns[] = {"putColumn1", "putColumn2"};
+        String values[] = {"putValue1", "putValue2", "putValue3", "putValue4"};
+        for (String tableName : tableNames) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+            hTable.init();
+            String family = getColumnFamilyName(tableName);
+            for (String key : keys) {
+                for (String column : columns) {
+                    for (int i = 0; i < values.length; i++) {
+                        Put put = new Put(toBytes(key));
+                        put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                        hTable.put(put);
+                    }
+                }
+            }
+        }
+
+        // 1. sleep util data expired
+        sleep(12000);
+
+        // 2. enable kv ttl
+        enableTTL();
+
+        // 3. SQL can scan expired but not delete yet hbase data
+        for (String tableName : tableNames) {
+            Assert.assertEquals(keys.length * columns.length * values.length,
+                    getSQLTableRowCnt(tableName));
+        }
+
+        // 4. use Hbase scan/get expired data to trigger ttl
+        for (String tableName : tableNames) {
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+            hTable.init();
+            String family = getColumnFamilyName(tableName);
+            if (useScan) {
+                Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
+                scan.addFamily(family.getBytes());
+                scan.setReversed(isReversed);
+                ResultScanner scanner = hTable.getScanner(scan);
+                List<Cell> cells = getCellsFromScanner(scanner);
+                assertEquals(0, cells.size());
+            } else {
+                for (String key : keys) {
+                    Get get = new Get(key.getBytes());
+                    get.addFamily(family.getBytes());
+                    Result result = hTable.get(get);
+                    assertEquals(0, result.rawCells().length);
+                }
+            }
+        }
+
+        // 5. wait to disable
+        checkUtilTimeout(()-> {
+            try {
+                Boolean passed = true;
+                for (int i = 0; passed && i < tableNames.size(); i++) {
+                    if (getSQLTableRowCnt(tableNames.get(i)) > 0) {
+                        passed = false;
+                    }
+                }
+                return passed;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, 50000, 3000);
+
+        // 6. disable ttl
+        disableTTL();
+    }
+
+    void testMultiCFRowkeyTTL(Map<String, List<String>> group2tableNames, Boolean useScan, Boolean isReversed) throws Exception {
+        disableTTL();
+        List<String> allTableNames = group2tableNames.values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+        // 0. prepare data
+        String keys[] = {"putKey1", "putKey2", "putKey3"};
+        String endKey = "putKey4";
+        String columns[] = {"putColumn1", "putColumn2"};
+        String values[] = {"putValue1", "putValue2", "putValue3", "putValue4"};
+        for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
+            String groupName = getTableName(entry.getKey());
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+            hTable.init();
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                for (String key : keys) {
+                    for (String column : columns) {
+                        for (int i = 0; i < values.length; i++) {
+                            Put put = new Put(toBytes(key));
+                            put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                            hTable.put(put);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1. sleep util data expired
+        sleep(12000);
+
+        // 2. enable kv ttl
+        enableTTL();
+
+        // 3. SQL can scan expired but not delete yet hbase data
+        for (String tableName : allTableNames) {
+            Assert.assertEquals(keys.length * columns.length * values.length,
+                    getSQLTableRowCnt(tableName));
+        }
+
+        // 4. use Hbase scan expired data to trigger ttl
+        for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
+            String groupName = getTableName(entry.getKey());
+            OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+            hTable.init();
+            if (useScan) {
+                Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
+                scan.setReversed(isReversed);
+                ResultScanner scanner = hTable.getScanner(scan);
+                List<Cell> cells = getCellsFromScanner(scanner);
+                assertEquals(0, cells.size());
+            } else {
+                for (String key : keys) {
+                    Get get = new Get(key.getBytes());
+                    Result result = hTable.get(get);
+                    assertEquals(0, result.rawCells().length);
+                }
+            }
+        }
+
+        // 5. wait to disable
+        checkUtilTimeout(()-> {
+            try {
+                Boolean passed = true;
+                for (int i = 0; passed && i < allTableNames.size(); i++) {
+                    if (getSQLTableRowCnt(allTableNames.get(i)) > 0) {
+                        passed = false;
+                    }
+                }
+                return passed;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }, 70000, 5000);
+
+        // 6. disable ttl
+        disableTTL();
     }
 
 
@@ -196,5 +349,21 @@ public class OHTableSecondaryPartTTLTest {
     @Test
     public void testMultiCFTTL() throws Throwable {
         testMultiCFTTLImpl(group2tableNames);
+    }
+
+    @Test
+    public void testRowkeyTTL() throws Exception {
+        testRowkeyTTL(tableNames, true, false);
+        testRowkeyTTL(tableNames, false, false);
+        // TODO: open the test after reverse scan is ok
+        // testRowkeyTTL(tableNames, true);
+    }
+
+    @Test
+    public void testMultiCFRowkeyTTL() throws Exception {
+        testMultiCFRowkeyTTL(group2tableNames, true, false);
+        testMultiCFRowkeyTTL(group2tableNames, false, false);
+        // TODO: open the test after reverse scan is ok
+        // testMultiCFRowkeyTTL(group2tableNames, true, true);
     }
 }
