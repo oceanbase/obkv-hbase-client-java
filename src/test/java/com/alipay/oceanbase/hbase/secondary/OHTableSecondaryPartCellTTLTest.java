@@ -39,8 +39,9 @@ import static org.junit.Assert.*;
 import static org.junit.Assert.assertTrue;
 
 public class OHTableSecondaryPartCellTTLTest {
-    private static List<String> tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
+    private static List<String>              tableNames       = new LinkedList<String>();
+    private static List<String>              NonTTLTable      = new LinkedList<String>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
@@ -53,7 +54,7 @@ public class OHTableSecondaryPartCellTTLTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-//        dropTables(tableNames, group2tableNames);
+        //        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -88,18 +89,11 @@ public class OHTableSecondaryPartCellTTLTest {
         Put put4 = new Put(key1.getBytes());
         put4.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
         put4.setTTL(0);
-        Put errorPut = new Put(key1.getBytes());
-        errorPut.addColumn("family1".getBytes(), column1.getBytes(), toBytes(11L));
-        errorPut.setTTL(10);
 
         Get get = new Get(key1.getBytes());
         get.addFamily(family.getBytes());
         get.setMaxVersions(10);
-        try {
-            hTable.put(errorPut);
-        } catch (Exception e) {
-            assertTrue(e.getCause().toString().contains("Unknown column 'TTL'"));
-        }
+
         // test put and get
         hTable.put(put1);
         hTable.put(put2);
@@ -131,11 +125,11 @@ public class OHTableSecondaryPartCellTTLTest {
 
         assertEquals(3, r.size());
         assertEquals(23L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(35L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
         assertEquals(5L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column3.getBytes()).get(0))));
+            column3.getBytes()).get(0))));
 
         Thread.sleep(10000);
         r = hTable.get(get);
@@ -150,9 +144,9 @@ public class OHTableSecondaryPartCellTTLTest {
 
         assertEquals(2, r.size());
         assertEquals(1L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(2L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
 
         Thread.sleep(5000);
         r = hTable.get(get);
@@ -165,9 +159,9 @@ public class OHTableSecondaryPartCellTTLTest {
         r = hTable.get(get);
         assertEquals(2, r.size());
         assertEquals(26L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(35L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
 
         // test append
         Thread.sleep(10000);
@@ -181,7 +175,7 @@ public class OHTableSecondaryPartCellTTLTest {
         hTable.put(put3);
         Append append = new Append(key1.getBytes());
         KeyValue kv = new KeyValue(key1.getBytes(), family.getBytes(), column1.getBytes(),
-                app.getBytes());
+            app.getBytes());
         append.add(kv);
         append.setTTL(-3000);
         hTable.append(append);
@@ -191,17 +185,17 @@ public class OHTableSecondaryPartCellTTLTest {
         r = hTable.get(get);
         assertEquals(2, r.size());
         assertEquals(
-                value1 + app,
-                Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                        column1.getBytes()).get(0))));
+            value1 + app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
 
         Thread.sleep(3000);
         r = hTable.get(get);
         assertEquals(2, r.size());
         assertEquals(
-                value1,
-                Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                        column1.getBytes()).get(0))));
+            value1,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
 
         Thread.sleep(7000);
         r = hTable.get(get);
@@ -212,9 +206,9 @@ public class OHTableSecondaryPartCellTTLTest {
         r = hTable.get(get);
         assertEquals(1, r.size());
         assertEquals(
-                app,
-                Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                        column1.getBytes()).get(0))));
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
 
         Thread.sleep(3000);
         append.add(family.getBytes(), column2.getBytes(), app.getBytes());
@@ -222,13 +216,13 @@ public class OHTableSecondaryPartCellTTLTest {
         r = hTable.get(get);
         assertEquals(2, r.size());
         assertEquals(
-                app,
-                Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                        column1.getBytes()).get(0))));
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column1.getBytes()).get(0))));
         assertEquals(
-                app,
-                Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                        column2.getBytes()).get(0))));
+            app,
+            Bytes.toString(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+                column2.getBytes()).get(0))));
 
         // test checkAndMutate
         Thread.sleep(3000);
@@ -241,14 +235,14 @@ public class OHTableSecondaryPartCellTTLTest {
         delete.addColumn(family.getBytes(), column1.getBytes());
         rowMutations.add(delete);
         boolean succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(),
-                column1.getBytes(), CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
+            column1.getBytes(), CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
         assertTrue(succ);
         r = hTable.get(get);
         assertEquals(r.size(), 2);
         assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
 
         Thread.sleep(10000);
         r = hTable.get(get);
@@ -262,26 +256,26 @@ public class OHTableSecondaryPartCellTTLTest {
         put4.setTTL(10000);
         rowMutations.add(put4);
         succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(), column1.getBytes(),
-                CompareFilter.CompareOp.EQUAL, toBytes(1L), rowMutations);
+            CompareFilter.CompareOp.EQUAL, toBytes(1L), rowMutations);
         assertFalse(succ);
         succ = hTable.checkAndMutate(key1.getBytes(), family.getBytes(), column1.getBytes(),
-                CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
+            CompareFilter.CompareOp.EQUAL, toBytes(11L), rowMutations);
         assertTrue(succ);
 
         r = hTable.get(get);
         assertEquals(r.size(), 2);
         assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
 
         Thread.sleep(5000);
         r = hTable.get(get);
         assertEquals(2, r.size());
         assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column1.getBytes()).get(0))));
+            column1.getBytes()).get(0))));
         assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
-                column2.getBytes()).get(0))));
+            column2.getBytes()).get(0))));
 
         Thread.sleep(5000);
         r = hTable.get(get);
@@ -312,6 +306,52 @@ public class OHTableSecondaryPartCellTTLTest {
         hTable.close();
     }
 
+    public static void testCellTTLWithRowkeyTTL(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+
+        String key1 = "key1";
+        String column1 = "cf1";
+        String column2 = "cf2";
+        String family = getColumnFamilyName(tableName);
+        Put put1 = new Put(key1.getBytes());
+        put1.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put1.setTTL(5000);
+        Put put2 = new Put(key1.getBytes());
+        put2.addColumn(family.getBytes(), column1.getBytes(), toBytes(22L));
+        put2.addColumn(family.getBytes(), column2.getBytes(), toBytes(33L));
+        put2.setTTL(10000);
+        Put put3 = new Put(key1.getBytes());
+        put3.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put3.setTTL(-3000);
+        Put put4 = new Put(key1.getBytes());
+        put4.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        put4.setTTL(0);
+        Put errorPut = new Put(key1.getBytes());
+        errorPut.addColumn("family1".getBytes(), column1.getBytes(), toBytes(11L));
+        errorPut.setTTL(10);
+
+        // test put and get
+        hTable.put(put1);
+        hTable.put(put2);
+        hTable.put(put3);
+        hTable.put(put4);
+
+        Assert.assertEquals(5, getSQLTableRowCnt(tableName));
+        Thread.sleep(10000);
+        enableTTL();
+        Get get = new Get(key1.getBytes());
+        get.addFamily(family.getBytes());
+        hTable.get(get);
+        Thread.sleep(10000);
+
+        Assert.assertEquals(0, getSQLTableRowCnt(tableName));
+
+        // 6. close ttl knob
+        disableTTL();
+        hTable.close();
+    }
+
     public static void testCellTTLSQL(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
@@ -319,11 +359,7 @@ public class OHTableSecondaryPartCellTTLTest {
         String key1 = "key1";
         String column1 = "cf1";
         String column2 = "cf2";
-        String column3 = "cf3";
         String family = getColumnFamilyName(tableName);
-        String value1 = "v1";
-        String value2 = "v2";
-        String app = "app";
 
         Result r;
         Put put1 = new Put(key1.getBytes());
@@ -351,8 +387,8 @@ public class OHTableSecondaryPartCellTTLTest {
 
         Assert.assertEquals(5, getSQLTableRowCnt(tableName));
         Thread.sleep(10000);
-        openTTLExecute();
-
+        enableTTL();
+        triggerTTL();
         checkUtilTimeout(()-> {
             try {
                 return getRunningNormalTTLTaskCnt() == 0;
@@ -364,7 +400,60 @@ public class OHTableSecondaryPartCellTTLTest {
         Assert.assertEquals(0, getSQLTableRowCnt(tableName));
 
         // 6. close ttl knob
-        closeTTLExecute();
+        disableTTL();
+        hTable.close();
+    }
+
+    public static void testMultiCFCellTTL(Map.Entry<String, List<String>> entry) throws Exception {
+        String groupName = getTableName(entry.getKey());
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        hTable.init();
+        List<String> tableNames = entry.getValue();
+        int familySize = tableNames.size();
+        int ttl;
+        String key1 = "key1";
+        String column1 = "cf1";
+        for (int i = 0; i < familySize; i++) {
+            String tableName = tableNames.get(i);
+            String family = getColumnFamilyName(tableName);
+            Put put = new Put(key1.getBytes());
+            put.addColumn(family.getBytes(), column1.getBytes(), toBytes("value"));
+            ttl = i * 5000;
+            put.setTTL(ttl);
+            hTable.put(put);
+        }
+        for (int i = 0; i < familySize; i++) {
+            int index = 0;
+            for (String tableName : tableNames) {
+                Get get = new Get(key1.getBytes());
+                String family = getColumnFamilyName(tableName);
+                get.addFamily(family.getBytes());
+                Result result = hTable.get(get);
+                int num = index <= i ? 0 : 1;
+                index++;
+                assertEquals(num, result.size());
+            }
+            Thread.sleep(5000);
+        }
+
+        hTable.close();
+    }
+
+    public static void testCellTTLWithNonTTLTable(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        String family = getColumnFamilyName(tableName);
+        String key1 = "key1";
+        String column1 = "cf1";
+        Put errorPut = new Put(key1.getBytes());
+        errorPut.addColumn(family.getBytes(), column1.getBytes(), toBytes(11L));
+        errorPut.setTTL(10);
+        try {
+            hTable.put(errorPut);
+            fail("unexpect error, put with ttl field and table not have ttl column should occur error");
+        } catch (Exception e) {
+            assertTrue(e.getCause().getMessage().contains("Unknown column 'TTL'"));
+        }
         hTable.close();
     }
 
@@ -374,8 +463,24 @@ public class OHTableSecondaryPartCellTTLTest {
     }
 
     @Test
+    public void testMultiCFCellTTL() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartCellTTLTest::testMultiCFCellTTL);
+    }
+
+    @Test
     public void testCellTTLSQL() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartCellTTLTest::testCellTTLSQL);
     }
 
+    @Test
+    public void testCellTTLWithRowkeyTTL() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartCellTTLTest::testCellTTLWithRowkeyTTL);
+    }
+
+    @Test
+    public void testCellTTLWithNonTTLTable() throws Throwable {
+        createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, group2tableNames, true);
+        FOR_EACH(NonTTLTable, OHTableSecondaryPartCellTTLTest::testCellTTLWithNonTTLTable);
+        dropTables(NonTTLTable, group2tableNames);
+    }
 }

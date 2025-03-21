@@ -139,7 +139,7 @@ public class OHTable implements HTableInterface {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put> writeBuffer            = new ArrayList<>();
+    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -1563,6 +1563,7 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
                     writeBuffer.size(), e);
+                throw new IOException("put table " + tableNameString + " error.", e);
             } finally {
                 // mutate list so that it is empty for complete success, or contains
                 // only failed records results are returned in the same order as the
@@ -2023,69 +2024,97 @@ public class OHTable implements HTableInterface {
         batch.setSamePropertiesNames(true);
         return batch;
     }
+
     private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
                                                      ObTableOperationType operationType,
                                                      boolean isTableGroup, Long TTL) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
-        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType, isTableGroup, TTL);
+        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
+            isTableGroup, TTL);
         ObNewRange range = new ObNewRange();
         ObTableQuery tableQuery = new ObTableQuery();
-        tableQuery.setObKVParams(buildOBKVParams((Scan)null));
+        tableQuery.setObKVParams(buildOBKVParams((Scan) null));
         ObHTableFilter filter = null;
         switch (kvType) {
             case Delete:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     filter = buildObHTableFilter(null, null, 1, kv.getQualifier());
-                }  else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), 1, kv.getQualifier());
+                } else {
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null,
+                        new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), 1,
+                        kv.getQualifier());
                 }
                 break;
             case DeleteColumn:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                        Integer.MAX_VALUE, kv.getQualifier());
                 }
                 break;
             case DeleteFamily:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
+                            kv.getQualifier());
                     }
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE, kv.getQualifier());
                     }
                 }
                 break;
             case DeleteFamilyVersion:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null,
+                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null,
+                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE, kv.getQualifier());
                     }
                 }
                 break;
@@ -2096,8 +2125,7 @@ public class OHTable implements HTableInterface {
         tableQuery.addKeyRange(range);
         return new QueryAndMutate(tableQuery, tableMutation);
     }
-    
-    
+
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup, Long TTL) {

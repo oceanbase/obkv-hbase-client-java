@@ -23,10 +23,7 @@ import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -38,12 +35,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static com.alipay.oceanbase.hbase.util.TableTemplateManager.NORMAL_TABLES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class OHTableSecondaryPartAppendTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = null;
+    private static List<String>              series_tables    = new LinkedList<String>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
@@ -56,7 +53,7 @@ public class OHTableSecondaryPartAppendTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        //        dropTables(tableNames, group2tableNames);
+        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -152,6 +149,7 @@ public class OHTableSecondaryPartAppendTest {
         a.add(FAMILY, QUALIFIERS[2], randomBytes);
         try {
             hTable.append(a);
+            fail("unexpect error, too long data should fail");
         } catch (IOException e) {
             assertTrue(e.getCause().getMessage().contains("Data too long for column 'V'"));
         }
@@ -199,6 +197,47 @@ public class OHTableSecondaryPartAppendTest {
         hTable.close();
     }
 
+    private static void testAppendMultiCF(Map.Entry<String, List<String>> entry) throws Exception {
+        String groupName = getTableName(entry.getKey());
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        hTable.init();
+        List<String> tableNames = entry.getValue();
+        String column = "appColumn";
+        byte[] ROW = "appendKey".getBytes();
+        byte[] v = "a".getBytes();
+        Append append = new Append(ROW);
+        for (String tableName : tableNames) {
+            byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+            append.add(FAMILY, column.getBytes(), v);
+        }
+        try {
+            hTable.append(append);
+            fail("unexpect error, append should not support multi cf");
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("multi family is not supported"));
+        }
+        hTable.close();
+    }
+
+    private static void testAppendSeires(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+        String column = "appColumn";
+        byte[] ROW = "appendKey".getBytes();
+        byte[] v = "a".getBytes();
+        Append append = new Append(ROW);
+        append.add(FAMILY, column.getBytes(), v);
+        try {
+            hTable.append(append);
+            fail("unexpect error, append should not support series table");
+        } catch (Exception e) {
+            assertTrue(e.getCause().getMessage()
+                .contains("query and mutate with hbase series type not supported"));
+        }
+        hTable.close();
+    }
+
     @Test
     public void testAppend() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartAppendTest::testAppend);
@@ -212,5 +251,17 @@ public class OHTableSecondaryPartAppendTest {
     @Test
     public void testAppendConcurrency() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartAppendTest::testAppendCon);
+    }
+
+    @Test
+    public void testAppendMultiCF() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartAppendTest::testAppendMultiCF);
+    }
+
+    @Test
+    public void testAppendSeires() throws Throwable {
+        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, group2tableNames, true);
+        FOR_EACH(series_tables, OHTableSecondaryPartAppendTest::testAppendSeires);
+        dropTables(series_tables, group2tableNames);
     }
 }

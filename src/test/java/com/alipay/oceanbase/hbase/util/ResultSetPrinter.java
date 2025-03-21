@@ -23,48 +23,43 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class ResultSetPrinter {
-    private static final int MAX_COL_WIDTH = 30;
-    private static final String VERTICAL = "│";
-    private static final String HORIZONTAL = "─";
-    private static final String TOP_LEFT = "┌";
-    private static final String TOP_RIGHT = "┐";
-    private static final String MID_LEFT = "├";
-    private static final String MID_RIGHT = "┤";
-    private static final String BOTTOM_LEFT = "└";
-    private static final String BOTTOM_RIGHT = "┘";
-    private static final String CROSS = "┼";
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final int              MAX_COL_WIDTH = 30;
+    private static final String           VERTICAL      = "│";
+    private static final String           HORIZONTAL    = "─";
+    private static final String           TOP_LEFT      = "┌";
+    private static final String           TOP_RIGHT     = "┐";
+    private static final String           MID_LEFT      = "├";
+    private static final String           MID_RIGHT     = "┤";
+    private static final String           BOTTOM_LEFT   = "└";
+    private static final String           BOTTOM_RIGHT  = "┘";
+    private static final String           CROSS         = "┼";
+    private static final SimpleDateFormat DATE_FORMAT   = new SimpleDateFormat(
+                                                            "yyyy-MM-dd HH:mm:ss");
 
     public static void print(ResultSet rs) throws SQLException {
         ResultSetMetaData meta = rs.getMetaData();
         int colCount = meta.getColumnCount();
-        
+
         List<ColumnMeta> columns = new ArrayList<ColumnMeta>();
         for (int i = 1; i <= colCount; i++) {
-            columns.add(new ColumnMeta(
-                    meta.getColumnLabel(i),
-                    meta.getColumnType(i),
-                    meta.getPrecision(i)
-            ));
+            columns.add(new ColumnMeta(meta.getColumnLabel(i), meta.getColumnType(i), meta
+                .getPrecision(i)));
         }
 
         // 计算初始列宽
         List<Integer> widths = new ArrayList<Integer>();
         for (ColumnMeta col : columns) {
-            int width = Math.min(
-                    Math.max(col.name.length(), getTypeWidth(col)),
-                    MAX_COL_WIDTH
-            );
+            int width = Math.min(Math.max(col.name.length(), getTypeWidth(col)), MAX_COL_WIDTH);
             widths.add(width);
         }
-        
+
         List<List<String>> rows = new ArrayList<List<String>>();
         while (rs.next()) {
             List<String> row = new ArrayList<String>();
             for (int i = 0; i < colCount; i++) {
                 Object value = rs.getObject(i + 1);
                 String str = formatValue(value, widths.get(i));
-                
+
                 int actualWidth = str.length();
                 if (actualWidth > widths.get(i)) {
                     widths.set(i, Math.min(actualWidth, MAX_COL_WIDTH));
@@ -73,12 +68,12 @@ public class ResultSetPrinter {
             }
             rows.add(row);
         }
-        
+
         StringBuilder fmt = new StringBuilder(VERTICAL);
         for (int w : widths) {
             fmt.append(" %-").append(w).append("s ").append(VERTICAL);
         }
-        
+
         printDivider(widths, TOP_LEFT, CROSS, TOP_RIGHT);
         System.out.printf(fmt.toString() + "%n", getHeaders(columns));
         printDivider(widths, MID_LEFT, CROSS, MID_RIGHT);
@@ -90,8 +85,8 @@ public class ResultSetPrinter {
 
     private static class ColumnMeta {
         final String name;
-        final int type;
-        final int precision;
+        final int    type;
+        final int    precision;
 
         ColumnMeta(String name, int type, int precision) {
             this.name = name;
@@ -102,17 +97,23 @@ public class ResultSetPrinter {
 
     private static int getTypeWidth(ColumnMeta col) {
         switch (col.type) {
-            case Types.DATE: return 10;
-            case Types.TIMESTAMP: return 19;
-            case Types.INTEGER: return 11;
+            case Types.DATE:
+                return 10;
+            case Types.TIMESTAMP:
+                return 19;
+            case Types.INTEGER:
+                return 11;
             case Types.DECIMAL:
-            case Types.NUMERIC: return col.precision + 2;
-            default: return Math.min(col.precision, MAX_COL_WIDTH);
+            case Types.NUMERIC:
+                return col.precision + 2;
+            default:
+                return Math.min(col.precision, MAX_COL_WIDTH);
         }
     }
 
     private static String formatValue(Object value, int maxWidth) {
-        if (value == null) return "NULL";
+        if (value == null)
+            return "NULL";
 
         if (value instanceof byte[]) {
             return formatByteArray((byte[]) value, maxWidth);
@@ -124,21 +125,23 @@ public class ResultSetPrinter {
     }
 
     private static String formatByteArray(byte[] bytes, int maxWidth) {
-        if (bytes.length == 0) return "[NULL]";
+        if (bytes.length == 0)
+            return "[NULL]";
         if (isPrintable(bytes)) {
             return truncateString(new String(bytes), maxWidth);
         }
-        
+
         if (bytes.length <= 4) {
             return hexFormat(bytes, maxWidth);
         }
-        
+
         return base64Format(bytes, maxWidth);
     }
 
     private static boolean isPrintable(byte[] bytes) {
         for (byte b : bytes) {
-            if (b < 0x20 || b > 0x7E) return false;
+            if (b < 0x20 || b > 0x7E)
+                return false;
         }
         return true;
     }
@@ -151,7 +154,8 @@ public class ResultSetPrinter {
         for (int i = 0; i < Math.min(bytes.length, maxBytes); i++) {
             sb.append(String.format("%02X ", bytes[i]));
         }
-        if (bytes.length > maxBytes) sb.append("...");
+        if (bytes.length > maxBytes)
+            sb.append("...");
         sb.setLength(sb.length() - 1);
         return sb.append("]").toString();
     }
@@ -162,7 +166,8 @@ public class ResultSetPrinter {
     }
 
     private static String truncateString(String str, int maxWidth) {
-        if (str.length() <= maxWidth) return str;
+        if (str.length() <= maxWidth)
+            return str;
         return str.substring(0, maxWidth - 3) + "...";
     }
 
@@ -182,5 +187,5 @@ public class ResultSetPrinter {
         }
         System.out.println(sb);
     }
-    
+
 }

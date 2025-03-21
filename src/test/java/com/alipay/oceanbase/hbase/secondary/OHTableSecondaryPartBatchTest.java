@@ -15,7 +15,6 @@
  * #L%
  */
 
-
 package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTableClient;
@@ -39,9 +38,8 @@ import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartBatchTest {
-    private static List<String> tableNames = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
+    private static List<String>              tableNames       = new LinkedList<String>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
@@ -431,8 +429,8 @@ public class OHTableSecondaryPartBatchTest {
         hTable.close();
     }
 
-
-    public static void testMultiCFBatchGetImpl(Map.Entry<String, List<String>> entry) throws Exception {
+    public static void testMultiCFBatchGetImpl(Map.Entry<String, List<String>> entry)
+                                                                                     throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(entry.getKey()));
         hTable.init();
         // prepare data
@@ -461,5 +459,4 @@ public class OHTableSecondaryPartBatchTest {
         FOR_EACH(group2tableNames, OHTableSecondaryPartBatchTest::testMultiCFBatchGetImpl);
         truncateTables(ObHTableTestUtil.getConnection(), group2tableNames);
     }
-    
 }
