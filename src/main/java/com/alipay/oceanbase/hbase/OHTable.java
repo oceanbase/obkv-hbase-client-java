@@ -2202,28 +2202,35 @@ public class OHTable implements Table {
                     }
                 }
             } else if (row instanceof Delete) {
+                boolean disExec = obTableClient.getServerCapacity().isSupportDistributedExecute();
                 Delete delete = (Delete) row;
                 if (delete.isEmpty()) {
                     singleOpResultNum++;
-                    KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                            KeyValue.Type.Maximum);
-                    com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE);
-                    ObNewRange range = new ObNewRange();
-                    ObTableQuery tableQuery = new ObTableQuery();
-                    ObHTableFilter filter = null;
-                    tableQuery.setObKVParams(buildOBKVParams((Scan)null));
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    if (kv.getTimestamp() == Long.MAX_VALUE) {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
-                    } else {
-                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
-                    }
-                    tableQuery.sethTableFilter(filter);
-                    tableQuery.addKeyRange(range);
+                    if (disExec) {
+                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
+                                KeyValue.Type.Maximum);
+                        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE);
+                        ObNewRange range = new ObNewRange();
+                        ObTableQuery tableQuery = new ObTableQuery();
+                        ObHTableFilter filter;
+                        tableQuery.setObKVParams(buildOBKVParams((Scan) null));
+                        range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
+                        range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                        if (kv.getTimestamp() == Long.MAX_VALUE) {
+                            filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                        } else {
+                            filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                        }
+                        tableQuery.sethTableFilter(filter);
+                        tableQuery.addKeyRange(range);
 
-                    tableMutation.setTable(tableName);
-                    batch.addOperation(new QueryAndMutate(tableQuery, tableMutation));
+                        tableMutation.setTable(tableName);
+                        batch.addOperation(new QueryAndMutate(tableQuery, tableMutation));
+                    } else {
+                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
+                                KeyValue.Type.Maximum);
+                        batch.addOperation(buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE));
+                    }
                 } else {
                     for (Map.Entry<byte[], List<Cell>> entry : delete.getFamilyCellMap().entrySet()) {
                         byte[] family = entry.getKey();
@@ -2232,11 +2239,19 @@ public class OHTable implements Table {
                             singleOpResultNum++;
                             if (isTableGroup) {
                                 KeyValue new_kv = modifyQualifier(kv,
-                                    (Bytes.toString(family) + "." + Bytes.toString(kv
-                                        .getQualifier())).getBytes());
-                                batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
+                                        (Bytes.toString(family) + "." + Bytes.toString(kv
+                                                .getQualifier())).getBytes());
+                                if (disExec) {
+                                    batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
+                                } else {
+                                    batch.addOperation(buildMutation(new_kv, DEL, true, Long.MAX_VALUE));
+                                }
                             } else {
-                                batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, false, Long.MAX_VALUE));
+                                if (disExec) {
+                                    batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, false, Long.MAX_VALUE));
+                                } else {
+                                    batch.addOperation(buildMutation(kv, DEL, false, Long.MAX_VALUE));
+                                }
                             }
                         }
                     }
