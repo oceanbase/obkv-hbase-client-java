@@ -42,19 +42,15 @@ import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
-
 public class OHTableSecondaryPartGetTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
-            if (!type.name().contains("TIME")) {
-                createTables(type, tableNames, group2tableNames, true);
-            }
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
+            createTables(type, tableNames, group2tableNames, true);
         }
     }
 
@@ -69,7 +65,6 @@ public class OHTableSecondaryPartGetTest {
         truncateTables(tableNames, group2tableNames);
     }
 
-
     public static void testGetImpl(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
@@ -77,10 +72,10 @@ public class OHTableSecondaryPartGetTest {
         // 0. prepare data
         String family = getColumnFamilyName(tableName);
         String key = "putKey";
-        String[] columns = {"putColumn1", "putColumn2", "putColumn3"};
-        String[] values = {"version1", "version2"}; // each column have two versions
+        String[] columns = { "putColumn1", "putColumn2", "putColumn3" };
+        String[] values = { "version1", "version2" }; // each column have two versions
         long curTs = System.currentTimeMillis();
-        long[] ts = {curTs, curTs+1}; // each column have two versions
+        long[] ts = { curTs, curTs + 1 }; // each column have two versions
         String latestValue = values[1];
         long lastTs = ts[1];
         for (int i = 0; i < values.length; i++) {
@@ -109,7 +104,8 @@ public class OHTableSecondaryPartGetTest {
             Cell[] cells = result.rawCells();
             assertEquals(columns.length, cells.length);
             for (int i = 0; i < columns.length; i++) {
-                ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue, cells[i]);
+                ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue,
+                    cells[i]);
             }
         }
 
@@ -144,7 +140,7 @@ public class OHTableSecondaryPartGetTest {
             get.addFamily(family.getBytes());
             get.setMaxVersions(2);
             ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-                    new BinaryComparator(toBytes(values[0])));
+                new BinaryComparator(toBytes(values[0])));
             get.setFilter(valueFilter);
             Result r = hTable.get(get);
             Assert.assertEquals(columns.length, r.raw().length);
@@ -155,19 +151,19 @@ public class OHTableSecondaryPartGetTest {
 
         hTable.close();
     }
-    
+
     public static void testMultiCFGetImpl(Map.Entry<String, List<String>> entry) throws Exception {
 
         // 0. prepare data
         String key = "putKey";
-        String[] columns = {"putColumn1", "putColumn2", "putColumn3"};
+        String[] columns = { "putColumn1", "putColumn2", "putColumn3" };
         String groupName = getTableName(entry.getKey());
-        String[] values = {"version1", "version2"}; // each column have two versions
+        String[] values = { "version1", "version2" }; // each column have two versions
         String latestValue = values[1];
         List<String> tableNames = entry.getValue();
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
         long timestamp = System.currentTimeMillis();
-        long[] ts = {timestamp, timestamp+1};
+        long[] ts = { timestamp, timestamp + 1 };
         long lastTs = ts[1];
         hTable.init();
 
@@ -205,7 +201,8 @@ public class OHTableSecondaryPartGetTest {
                 Cell[] cells = result.rawCells();
                 assertEquals(columns.length, cells.length);
                 for (int i = 0; i < columns.length; i++) {
-                    ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue, cells[i]);
+                    ObHTableSecondaryPartUtil.AssertKeyValue(key, columns[i], lastTs, latestValue,
+                        cells[i]);
                 }
             }
         }
@@ -279,7 +276,7 @@ public class OHTableSecondaryPartGetTest {
             Get get = new Get(key.getBytes());
             get.setMaxVersions(2);
             ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-                    new BinaryComparator(toBytes(values[0])));
+                new BinaryComparator(toBytes(values[0])));
             get.setFilter(valueFilter);
             Result r = hTable.get(get);
             Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
@@ -292,13 +289,14 @@ public class OHTableSecondaryPartGetTest {
                 }
             }
         }
+        hTable.close();
     }
 
     @Test
     public void testGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartGetTest::testGetImpl);
     }
-    
+
     @Test
     public void testMultiCFGet() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartGetTest::testMultiCFGetImpl);

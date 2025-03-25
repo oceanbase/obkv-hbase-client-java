@@ -35,16 +35,14 @@ import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
-
 public class OHTableSecondaryPartBatchGetTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -59,7 +57,6 @@ public class OHTableSecondaryPartBatchGetTest {
     public void prepareCase() throws Exception {
         truncateTables(tableNames, group2tableNames);
     }
-
 
     public static void testBatchGetImpl(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
@@ -97,6 +94,7 @@ public class OHTableSecondaryPartBatchGetTest {
                 System.out.println("Column: " + Q + ", Value: " + V);
             }
         }
+        hTable.close();
     }
     
     @Test

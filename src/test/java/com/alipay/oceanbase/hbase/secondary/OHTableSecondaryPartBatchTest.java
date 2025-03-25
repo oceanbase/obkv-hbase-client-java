@@ -441,25 +441,21 @@ public class OHTableSecondaryPartBatchTest {
     @Test
     public void testBatchPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartBatchTest::testBatchPutImpl);
-        truncateTables(ObHTableTestUtil.getConnection(), tableNames);
     }
 
     @Test
     public void testMultiCFPut() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartBatchTest::testMultiCFBatchPutImpl);
-        truncateTables(ObHTableTestUtil.getConnection(), group2tableNames);
     }
 
     @Test
     public void testBatchGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartBatchTest::testBatchGetImpl);
-        truncateTables(ObHTableTestUtil.getConnection(), tableNames);
     }
 
     @Test
     public void testMultiCFGet() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartBatchTest::testMultiCFBatchGetImpl);
-        truncateTables(ObHTableTestUtil.getConnection(), group2tableNames);
     }
     
 }

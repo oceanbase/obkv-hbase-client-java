@@ -69,9 +69,10 @@ public class OHTableSecondaryPartPutTest {
         String value = "value";
 
         { // put new key and get
+            long timestamp = System.currentTimeMillis();
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column1.getBytes(), toBytes(column1 + value));
-            put.add(family.getBytes(), column2.getBytes(), toBytes(column2 + value));
+            put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value));
+            put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value));
             hTable.put(put);
             
             Get get = new Get(toBytes(key));
@@ -198,8 +199,8 @@ public class OHTableSecondaryPartPutTest {
             Get get = new Get(toBytes(key));
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                put.add(family.getBytes(), column1.getBytes(), toBytes(column1 + value));
-                put.add(family.getBytes(), column2.getBytes(), toBytes(column2 + value));
+                put.add(family.getBytes(), column1.getBytes(), currentTime, toBytes(column1 + value));
+                put.add(family.getBytes(), column2.getBytes(), currentTime, toBytes(column2 + value));
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
             }
@@ -233,7 +234,6 @@ public class OHTableSecondaryPartPutTest {
             }
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                // TODO: Get/Scan返回的结果Q 带了cf, 这里预期跑不过
                 Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare((column1 + value).getBytes(), r.getValue(family.getBytes(), column1.getBytes()))));
                 Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare((column2 + value).getBytes(), r.getValue(family.getBytes(), column2.getBytes()))));
             }

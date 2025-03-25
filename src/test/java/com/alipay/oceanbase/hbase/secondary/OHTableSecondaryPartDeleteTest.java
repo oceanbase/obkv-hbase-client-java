@@ -93,6 +93,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert.assertTrue(cell.getTimestamp() != ts4);
             }
         }
+        hTable.close();
     }
     
     public static void testDeleteSpecifiedImpl(String tableName) throws Exception {
@@ -131,6 +132,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert(tableName, ()->Assert.assertTrue(cell.getTimestamp() != ts1));
             }
         }
+        hTable.close();
     }
     
     public static void testDeleteColumnImpl(String tableName) throws Exception {
@@ -169,6 +171,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert.assertTrue(cell.getTimestamp() != ts1);
             }
         }
+        hTable.close();
     }
     
     public static void testDeleteFamilyImpl(String tableName) throws Exception {
@@ -203,6 +206,7 @@ public class OHTableSecondaryPartDeleteTest {
             Result result = hTable.get(get);
             Assert.assertEquals(0, result.size());
         }
+        hTable.close();
     }
     
     public static void testDeleteFamilyVersionImpl(String tableName) throws Exception {
@@ -241,6 +245,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert(tableName, ()->Assert.assertTrue(cell.getTimestamp() != ts2));
             }
         }
+        hTable.close();
     }
 
     public static void testMultiCFDeleteLastVersionImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -286,6 +291,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert(tableName, ()->Assert.assertTrue("should not found last version ts4", cell.getTimestamp() != ts4));
             }
         }
+        hTable.close();
     }
 
     public static void testMultiCFDeleteSpecifiedImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -327,6 +333,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert(tableName, ()->Assert.assertTrue("should not found last version ts2",cell.getTimestamp() != ts2));
             }
         }
+        hTable.close();
     }
     
     public static void testMultiCFDeleteColumnImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -368,6 +375,7 @@ public class OHTableSecondaryPartDeleteTest {
                 Assert(tableName, ()->Assert.assertTrue("should not found last version ts2",cell.getTimestamp() != ts2));
             }
         }
+        hTable.close();
     }
     
     
@@ -405,6 +413,7 @@ public class OHTableSecondaryPartDeleteTest {
         }
         Result result = hTable.get(get);
         Assert.assertEquals(0, result.size());
+        hTable.close();
     }
     
     public static void testMultiCFDeleteFamilyVersionImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -441,6 +450,7 @@ public class OHTableSecondaryPartDeleteTest {
         }
         Result result = hTable.get(get);
         Assert(entry.getValue(), ()->Assert.assertEquals(6, result.size()));
+        hTable.close();
     }
     
     public static void testDeleteAllImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -476,6 +486,7 @@ public class OHTableSecondaryPartDeleteTest {
         }
         Result result = hTable.get(get);
         Assert(entry.getValue(), ()->Assert.assertEquals(0, result.size()));
+        hTable.close();
     }
     
     @Test
