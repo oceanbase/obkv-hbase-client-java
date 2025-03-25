@@ -36,12 +36,12 @@ import static org.junit.Assert.assertEquals;
 
 public class OHTableSecondaryPartScanTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
             if (!type.name().contains("TIME")) {
                 createTables(type, tableNames, group2tableNames, true);
             }
@@ -72,10 +72,10 @@ public class OHTableSecondaryPartScanTest {
         String family = getColumnFamilyName(tableName);
         long ts = System.currentTimeMillis();
 
-        String keys[] = {"putKey1", "putKey2", "putKey3"};
-        String columns[] = {"putColumn1", "putColumn2"};
-        String values[] = {"putValue1", "putValue2"};
-        long tss[] = {ts, ts + 1};
+        String keys[] = { "putKey1", "putKey2", "putKey3" };
+        String columns[] = { "putColumn1", "putColumn2" };
+        String values[] = { "putValue1", "putValue2" };
+        long tss[] = { ts, ts + 1 };
         long lastTs = tss[1];
         String latestValue = values[1];
 
@@ -163,7 +163,7 @@ public class OHTableSecondaryPartScanTest {
             scan.setMaxVersions(2);
             scan.addFamily(family.getBytes());
             ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-                    new BinaryComparator(toBytes(values[0])));
+                new BinaryComparator(toBytes(values[0])));
             scan.setFilter(valueFilter);
             ResultScanner scanner = hTable.getScanner(scan);
             List<Cell> cells = getCellsFromScanner(scanner);
@@ -226,20 +226,20 @@ public class OHTableSecondaryPartScanTest {
 
         // 8. scan in reverse
         {
-//            Scan scan = new Scan(keys[2].getBytes(), keys[0].getBytes());
-//            scan.addFamily(family.getBytes());
-//            scan.setReversed(true);
-//            ResultScanner scanner = hTable.getScanner(scan);
-//            List<Cell> cells = getCellsFromScanner(scanner);
-//
-//            int cellIndex = 0;
-//            for (int i = 1; i >= 0; i--) {
-//                for (String column : columns) {
-//                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
-//                    cellIndex++;
-//                }
-//            }
-//            assertEquals(columns.length * 2, cells.size());
+            //            Scan scan = new Scan(keys[2].getBytes(), keys[0].getBytes());
+            //            scan.addFamily(family.getBytes());
+            //            scan.setReversed(true);
+            //            ResultScanner scanner = hTable.getScanner(scan);
+            //            List<Cell> cells = getCellsFromScanner(scanner);
+            //
+            //            int cellIndex = 0;
+            //            for (int i = 1; i >= 0; i--) {
+            //                for (String column : columns) {
+            //                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
+            //                    cellIndex++;
+            //                }
+            //            }
+            //            assertEquals(columns.length * 2, cells.size());
         }
     }
 
@@ -255,10 +255,10 @@ public class OHTableSecondaryPartScanTest {
         hTable.init();
         long ts = System.currentTimeMillis();
 
-        String keys[] = {"putKey1", "putKey2", "putKey3"};
-        String columns[] = {"putColumn1", "putColumn2"};
-        String values[] = {"putValue1", "putValue2"};
-        long tss[] = {ts, ts + 1};
+        String keys[] = { "putKey1", "putKey2", "putKey3" };
+        String columns[] = { "putColumn1", "putColumn2" };
+        String values[] = { "putValue1", "putValue2" };
+        long tss[] = { ts, ts + 1 };
         long lastTs = tss[1];
         String latestValue = values[1];
         List<String> tableNames = entry.getValue();
@@ -303,7 +303,8 @@ public class OHTableSecondaryPartScanTest {
                 int cellIndex = 0;
                 for (int i = 0; i < 2; i++) {
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -324,7 +325,8 @@ public class OHTableSecondaryPartScanTest {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
                         Cell cell = cells.get(cellIndex);
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -349,7 +351,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -370,7 +373,8 @@ public class OHTableSecondaryPartScanTest {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
                         for (int j = values.length - 1; j >= 0; j--) {
-                            AssertKeyValue(keys[i], family, column, tss[j], values[j], cells.get(cellIndex));
+                            AssertKeyValue(keys[i], family, column, tss[j], values[j],
+                                cells.get(cellIndex));
                             cellIndex++;
                         }
                     }
@@ -391,7 +395,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -403,7 +408,7 @@ public class OHTableSecondaryPartScanTest {
             Scan scan = new Scan(keys[0].getBytes(), keys[2].getBytes());
             scan.setMaxVersions(2);
             ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-                    new BinaryComparator(toBytes(values[0])));
+                new BinaryComparator(toBytes(values[0])));
             scan.setFilter(valueFilter);
             ResultScanner scanner = hTable.getScanner(scan);
             List<Cell> cells = getCellsFromScanner(scanner);
@@ -413,7 +418,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, tss[0], values[0], cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, tss[0], values[0],
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -434,7 +440,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }
@@ -457,13 +464,12 @@ public class OHTableSecondaryPartScanTest {
             Assert.assertEquals(null, result);
         }
 
-
         // 10. multi cf scan with family scan and column-specific scan
         {
             Scan scan = new Scan(keys[0].getBytes(), keys[2].getBytes());
             for (int i = 0; i < tableNames.size(); i++) {
                 String family = getColumnFamilyName(tableNames.get(i));
-                if (i % 2 == 0 ) {
+                if (i % 2 == 0) {
                     scan.addFamily(family.getBytes());
                 } else {
                     for (String column : columns) {
@@ -479,7 +485,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        AssertKeyValue(keys[i], family, column, lastTs, latestValue, cells.get(cellIndex));
+                        AssertKeyValue(keys[i], family, column, lastTs, latestValue,
+                            cells.get(cellIndex));
                         cellIndex++;
                     }
                 }

@@ -33,6 +33,7 @@ import java.sql.Statement;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static org.junit.Assert.assertTrue;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
@@ -58,12 +59,11 @@ public class ObHTableTestUtil {
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
 
     public static String       SQL_FORMAT     = "truncate %s";
-    public static List<String> tableNameList;
+    public static List<String> tableNameList  = new LinkedList<String>();
     public static Connection   conn;
     public static Statement    stmt;
 
     static {
-        tableNameList = new LinkedList<>();
         conn = getConnection();
         try {
             stmt = conn.createStatement();
@@ -193,7 +193,11 @@ public class ObHTableTestUtil {
     
     public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Throwable {
         for (Map.Entry<String, List<String>> entry : group2Tables.entrySet()) {
-            consumer.accept(entry);
+            try {
+                consumer.accept(entry);
+            } catch (IOException e) {
+                assertTrue(e.getCause().getMessage().contains("timeseries hbase table with multi column family not supported"));
+            }
         }
     }
     

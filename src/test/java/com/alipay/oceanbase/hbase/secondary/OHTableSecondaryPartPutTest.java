@@ -15,7 +15,6 @@
  * #L%
  */
 
-
 package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTableClient;
@@ -36,13 +35,12 @@ import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartPutTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -122,7 +120,7 @@ public class OHTableSecondaryPartPutTest {
         
         hTable.close();
     }
-    
+
     public static void testBatchPutImpl(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
@@ -310,26 +308,24 @@ public class OHTableSecondaryPartPutTest {
         }
         hTable.close();
     }
-    
-    
+
     @Test
     public void testPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testPutImpl);
     }
-    
+
     @Test
     public void testBatchPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testBatchPutImpl);
     }
-    
+
     @Test
     public void testMultiCFPut() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMultiCFPutImpl);
     }
-    
+
     @Test
     public void testMultiCFPutBatch() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMltiCFPutBatchImpl);
     }
-
 }

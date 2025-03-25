@@ -15,22 +15,21 @@ import static java.lang.Thread.sleep;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
-
 public class OHTableSecondaryPartTTLTest {
-    private static List<String> tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
+    private static List<String>              tableNames       = new LinkedList<String>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.TableType.values()) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
             if (!type.name().contains("TIME")) {
                 createTables(type, tableNames, group2tableNames, true);
-                alterTableTimeToLive(tableNames, true, 10);
-                for (List<String> groupTableNames : group2tableNames.values()) {
-                    alterTableTimeToLive(groupTableNames, true, 10);
-                }
             }
+        }
+        alterTableTimeToLive(tableNames, true, 10);
+        for (List<String> groupTableNames : group2tableNames.values()) {
+            alterTableTimeToLive(groupTableNames, true, 10);
         }
     }
 
@@ -340,10 +339,9 @@ public class OHTableSecondaryPartTTLTest {
         disableTTL();
     }
 
-
     @Test
     public void testTTL() throws Throwable {
-      testTTLImpl(tableNames);
+        testTTLImpl(tableNames);
     }
 
     @Test

@@ -37,12 +37,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static com.alipay.oceanbase.hbase.util.TableTemplateManager.NORMAL_TABLES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class OHTableSecondaryPartIncrementTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = null;
+    private static List<String>              series_tables    = new LinkedList<String>();
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
@@ -55,7 +55,7 @@ public class OHTableSecondaryPartIncrementTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        //        dropTables(tableNames, group2tableNames);
+        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -116,6 +116,7 @@ public class OHTableSecondaryPartIncrementTest {
         inc.addColumn(FAMILY, QUALIFIERS[1], 2L);
         try {
             hTable.increment(inc);
+            fail("unexpect error, increment only support long value type");
         } catch (Exception e) {
             assertTrue(e.getCause().getMessage().contains("OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG"));
         }
@@ -187,6 +188,48 @@ public class OHTableSecondaryPartIncrementTest {
         hTable.close();
     }
 
+    private static void testIncrementMultiCF(Map.Entry<String, List<String>> entry)
+                                                                                   throws Exception {
+        String groupName = getTableName(entry.getKey());
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        hTable.init();
+        List<String> tableNames = entry.getValue();
+        String column = "appColumn";
+        byte[] ROW = "appendKey".getBytes();
+        Long v = 11L;
+        Increment increment = new Increment(ROW);
+        for (String tableName : tableNames) {
+            byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+            increment.addColumn(FAMILY, column.getBytes(), v);
+        }
+        try {
+            hTable.increment(increment);
+            fail("unexpect error, increment should not support multi cf");
+        } catch (Exception e) {
+            assertTrue(e.getMessage().contains("multi family is not supported"));
+        }
+        hTable.close();
+    }
+
+    private static void testIncrementSeires(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+        String column = "appColumn";
+        byte[] ROW = "appendKey".getBytes();
+        Long v = 11L;
+        Increment increment = new Increment(ROW);
+        increment.addColumn(FAMILY, column.getBytes(), v);
+        try {
+            hTable.increment(increment);
+            fail("unexpect error, increment should not support series table");
+        } catch (Exception e) {
+            assertTrue(e.getCause().getMessage()
+                .contains("query and mutate with hbase series type not supported"));
+        }
+        hTable.close();
+    }
+
     @Test
     public void testIncrement() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartIncrementTest::testIncrement);
@@ -200,5 +243,17 @@ public class OHTableSecondaryPartIncrementTest {
     @Test
     public void testIncConcurrency() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartIncrementTest::testIncCon);
+    }
+
+    @Test
+    public void testIncrementMultiCF() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartIncrementTest::testIncrementMultiCF);
+    }
+
+    @Test
+    public void testIncrementSeires() throws Throwable {
+        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, group2tableNames, true);
+        FOR_EACH(series_tables, OHTableSecondaryPartIncrementTest::testIncrementSeires);
+        dropTables(series_tables, group2tableNames);
     }
 }
