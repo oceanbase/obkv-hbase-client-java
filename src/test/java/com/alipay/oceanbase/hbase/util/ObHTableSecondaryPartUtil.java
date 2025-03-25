@@ -92,7 +92,16 @@ public class ObHTableSecondaryPartUtil {
             TimeGenerator.TimeRange timeRange = TimeGenerator.generateTestTimeRange();
             String tableGroup = TableTemplateManager.getTableGroupName(type, true);
             String tableGroupSql = TableTemplateManager.generateTableGroupSQL(tableGroup);
-            conn.createStatement().execute(tableGroupSql);
+            try {
+                conn.createStatement().execute(tableGroupSql);
+                System.out.println("============= create table_group: " + getTableName(tableGroup) + " =============\n" + (printSql ? tableGroupSql : "") + " \n============= done =============\n");
+            } catch (SQLSyntaxErrorException e) {
+                if (!e.getMessage().contains("already exists")) {
+                    throw e;
+                } else {
+                    System.out.println("============= table_group: " + getTableName(tableGroup) + " already exist =============");
+                }
+            }
             group2tableNames.put(tableGroup, new LinkedList<>());
             for (int i = 1; i <= 3; ++i) {
                 String tableName = TableTemplateManager.generateTableName(tableGroup, true, i);
@@ -267,6 +276,7 @@ public class ObHTableSecondaryPartUtil {
         if (resultSet.next()) {
             rowCnt = resultSet.getInt(1);
         }
+        System.out.println("============= rowCnt: " + rowCnt + " =============");
         return rowCnt;
     }
 
@@ -333,8 +343,8 @@ public class ObHTableSecondaryPartUtil {
         return cells;
     }
 
-    public static void checkUtilTimeout(Supplier<Boolean> function, long timeout, long interval)
-                                                                                                throws Exception {
+
+    public static void checkUtilTimeout(List<String> tableNames, Supplier<Boolean> function, long timeout, long interval) throws Exception {
         long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTime < timeout) {
             if (function.get()) {
@@ -342,7 +352,6 @@ public class ObHTableSecondaryPartUtil {
             }
             Thread.sleep(interval);
         }
-        Assert
-            .assertTrue("Timeout while waiting for the function to return expected result", false);
+        ObHTableTestUtil.Assert(tableNames, ()-> Assert.fail("Timeout while waiting for the function to return expected result"));
     }
 }

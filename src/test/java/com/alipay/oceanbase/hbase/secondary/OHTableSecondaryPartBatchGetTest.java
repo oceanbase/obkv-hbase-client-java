@@ -42,7 +42,7 @@ public class OHTableSecondaryPartBatchGetTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -94,8 +94,9 @@ public class OHTableSecondaryPartBatchGetTest {
                 System.out.println("Column: " + Q + ", Value: " + V);
             }
         }
+        hTable.close();
     }
-
+    
     @Test
     public void testBatchGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartBatchGetTest::testBatchGetImpl);

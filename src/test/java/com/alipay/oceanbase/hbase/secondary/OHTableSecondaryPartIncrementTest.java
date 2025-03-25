@@ -41,7 +41,6 @@ import static org.junit.Assert.*;
 
 public class OHTableSecondaryPartIncrementTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static List<String>              series_tables    = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
@@ -103,89 +102,94 @@ public class OHTableSecondaryPartIncrementTest {
     private static void testIncBorder(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
-
-        byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
-        byte[] ROW = "incKey".getBytes();
-        byte[] v1 = Bytes.toBytes("ab");
-        byte[][] QUALIFIERS = new byte[][] { Bytes.toBytes("b"), Bytes.toBytes("a"),
-                Bytes.toBytes("c") };
-        Put put = new Put(ROW);
-        put.addColumn(FAMILY, QUALIFIERS[1], v1);
-        hTable.put(put);
-        Increment inc = new Increment(ROW);
-        inc.addColumn(FAMILY, QUALIFIERS[1], 2L);
         try {
+            byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+            byte[] ROW = "incKey".getBytes();
+            byte[] v1 = Bytes.toBytes("ab");
+            byte[][] QUALIFIERS = new byte[][]{Bytes.toBytes("b"), Bytes.toBytes("a"),
+                    Bytes.toBytes("c")};
+            Put put = new Put(ROW);
+            put.addColumn(FAMILY, QUALIFIERS[1], v1);
+            hTable.put(put);
+            Increment inc = new Increment(ROW);
+            inc.addColumn(FAMILY, QUALIFIERS[1], 2L);
+            try {
+                hTable.increment(inc);
+                fail("unexpect error, increment only support long value type");
+            } catch (Exception e) {
+                assertTrue(e.getCause().getMessage().contains("OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG"));
+            }
+            Get get = new Get(ROW);
+            get.setMaxVersions(10);
+            get.addFamily(FAMILY);
+            Result result = hTable.get(get);
+            assertEquals(1, result.size());
+            byte[] ROW1 = "incKey1".getBytes();
+            inc = new Increment(ROW1);
+            inc.addColumn(FAMILY, QUALIFIERS[1], 2L);
             hTable.increment(inc);
-            fail("unexpect error, increment only support long value type");
-        } catch (Exception e) {
-            assertTrue(e.getCause().getMessage().contains("OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG"));
+            get = new Get(ROW1);
+            get.setMaxVersions(10);
+            get.addFamily(FAMILY);
+            result = hTable.get(get);
+            assertEquals(1, result.size());
+            assertEquals(2L, Bytes.toLong(result.raw()[0].getValue()));
+            inc.addColumn(FAMILY, QUALIFIERS[0], 2L);
+            hTable.increment(inc);
+            get.setMaxVersions(10);
+            get.addFamily(FAMILY);
+            result = hTable.get(get);
+            assertEquals(3, result.size());
+            assertEquals(4L,
+                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(0).getValue()));
+            assertEquals(2L,
+                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(1).getValue()));
+            assertEquals(2L,
+                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0).getValue()));
+        } finally {
+            hTable.close();
         }
-        Get get = new Get(ROW);
-        get.setMaxVersions(10);
-        get.addFamily(FAMILY);
-        Result result = hTable.get(get);
-        assertEquals(1, result.size());
-        byte[] ROW1 = "incKey1".getBytes();
-        inc = new Increment(ROW1);
-        inc.addColumn(FAMILY, QUALIFIERS[1], 2L);
-        hTable.increment(inc);
-        get = new Get(ROW1);
-        get.setMaxVersions(10);
-        get.addFamily(FAMILY);
-        result = hTable.get(get);
-        assertEquals(1, result.size());
-        assertEquals(2L, Bytes.toLong(result.raw()[0].getValue()));
-        inc.addColumn(FAMILY, QUALIFIERS[0], 2L);
-        hTable.increment(inc);
-        get.setMaxVersions(10);
-        get.addFamily(FAMILY);
-        result = hTable.get(get);
-        assertEquals(3, result.size());
-        assertEquals(4L,
-            Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(0).getValue()));
-        assertEquals(2L,
-            Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(1).getValue()));
-        assertEquals(2L,
-            Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0).getValue()));
-        hTable.close();
     }
 
     private static void testIncCon(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
-        byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
-        String column = "incColumn";
-        byte[] ROW = "incKey".getBytes();
-        long expect = 0;
-        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, 100,100);
-        AtomicInteger atomicInteger = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(100);
-        for (int i = 0; i < 100; i++) {
-            Increment inc = new Increment(ROW);
-            inc.addColumn(FAMILY, column.getBytes(), 2L);
-            threadPoolExecutor.submit(() -> {
-                try {
-                    hTable.increment(inc);
-                    atomicInteger.incrementAndGet();
-                } catch (Exception e) {
-                    if (!e.getCause().getMessage().contains("OB_TRY_LOCK_ROW_CONFLICT") && !e.getCause().getMessage().contains("OB_TIMEOUT")) {
-                        throw new RuntimeException(e);
+        try {
+            byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+            String column = "incColumn";
+            byte[] ROW = "incKey".getBytes();
+            long expect = 0;
+            ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, 100, 100);
+            AtomicInteger atomicInteger = new AtomicInteger(0);
+            CountDownLatch countDownLatch = new CountDownLatch(100);
+            for (int i = 0; i < 100; i++) {
+                Increment inc = new Increment(ROW);
+                inc.addColumn(FAMILY, column.getBytes(), 2L);
+                threadPoolExecutor.submit(() -> {
+                    try {
+                        hTable.increment(inc);
+                        atomicInteger.incrementAndGet();
+                    } catch (Exception e) {
+                        if (!e.getCause().getMessage().contains("OB_TRY_LOCK_ROW_CONFLICT") && !e.getCause().getMessage().contains("OB_TIMEOUT")) {
+                            throw new RuntimeException(e);
+                        }
+                    } finally {
+                        countDownLatch.countDown();
                     }
-                } finally {
-                    countDownLatch.countDown();
-                }
-            });
+                });
+            }
+            countDownLatch.await(100000, TimeUnit.MILLISECONDS);
+            for (int i = 0; i < atomicInteger.get(); i++) {
+                expect += 2;
+            }
+            Get get = new Get(ROW);
+            get.setMaxVersions(1);
+            get.addColumn(FAMILY, column.getBytes());
+            Result result = hTable.get(get);
+            assertEquals(expect, Bytes.toLong(result.getColumnCells(FAMILY, column.getBytes()).get(0).getValue()));
+        } finally {
+            hTable.close();
         }
-        countDownLatch.await(100000, TimeUnit.MILLISECONDS);
-        for (int i = 0; i < atomicInteger.get(); i++) {
-            expect += 2;
-        }
-        Get get = new Get(ROW);
-        get.setMaxVersions(1);
-        get.addColumn(FAMILY, column.getBytes());
-        Result result = hTable.get(get);
-        assertEquals(expect, Bytes.toLong(result.getColumnCells(FAMILY, column.getBytes()).get(0).getValue()));
-        hTable.close();
     }
 
     private static void testIncrementMultiCF(Map.Entry<String, List<String>> entry)
@@ -193,22 +197,25 @@ public class OHTableSecondaryPartIncrementTest {
         String groupName = getTableName(entry.getKey());
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
         hTable.init();
-        List<String> tableNames = entry.getValue();
-        String column = "appColumn";
-        byte[] ROW = "appendKey".getBytes();
-        Long v = 11L;
-        Increment increment = new Increment(ROW);
-        for (String tableName : tableNames) {
-            byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
-            increment.addColumn(FAMILY, column.getBytes(), v);
-        }
         try {
-            hTable.increment(increment);
-            fail("unexpect error, increment should not support multi cf");
-        } catch (Exception e) {
-            assertTrue(e.getMessage().contains("multi family is not supported"));
+            List<String> tableNames = entry.getValue();
+            String column = "appColumn";
+            byte[] ROW = "appendKey".getBytes();
+            Long v = 11L;
+            Increment increment = new Increment(ROW);
+            for (String tableName : tableNames) {
+                byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
+                increment.addColumn(FAMILY, column.getBytes(), v);
+            }
+            try {
+                hTable.increment(increment);
+                fail("unexpect error, increment should not support multi cf");
+            } catch (Exception e) {
+                assertTrue(e.getMessage().contains("multi family is not supported"));
+            }
+        } finally {
+            hTable.close();
         }
-        hTable.close();
     }
 
     private static void testIncrementSeires(String tableName) throws Exception {
@@ -252,8 +259,9 @@ public class OHTableSecondaryPartIncrementTest {
 
     @Test
     public void testIncrementSeires() throws Throwable {
-        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, group2tableNames, true);
+        List<String> series_tables = new LinkedList<String>();
+        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, null, true);
         FOR_EACH(series_tables, OHTableSecondaryPartIncrementTest::testIncrementSeires);
-        dropTables(series_tables, group2tableNames);
+        dropTables(series_tables, null);
     }
 }

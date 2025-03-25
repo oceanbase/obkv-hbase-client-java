@@ -21,8 +21,7 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.ConnectionConfiguration;
+
 
 import java.io.IOException;
 import java.util.Map;
@@ -38,7 +37,7 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
 public class ObTableClientManager {
 
     public static final ConcurrentHashMap<ObTableClientKey, ReentrantLock> OB_TABLE_CLIENT_LOCK     = new ConcurrentHashMap<ObTableClientKey, ReentrantLock>();
-    public static final Map<ObTableClientKey, ObTableClient>               OB_TABLE_CLIENT_INSTANCE = new ConcurrentHashMap<ObTableClientKey, ObTableClient>();
+    public static final Map<ObTableClientKey, ObTableClient> OB_TABLE_CLIENT_INSTANCE = new ConcurrentHashMap<>();
 
     public static ObTableClient getOrCreateObTableClient(OHConnectionConfiguration connectionConfig)
                                                                                                     throws IllegalArgumentException,
@@ -58,22 +57,27 @@ public class ObTableClientManager {
             obTableClientKey.setDatabase(connectionConfig.getDatabase());
         } else {
             checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
-                                                                      + " is blank");
-            obTableClientKey = new ObTableClientKey();
-            String paramUrl = connectionConfig.getParamUrl();
-            if (!paramUrl.contains("database")) {
-                paramUrl += "&database=default";
-            }
-            obTableClientKey.setParamUrl(paramUrl);
-            obTableClientKey.setSysUserName(connectionConfig.getSysUsername());
-            if (connectionConfig.getSysPassword() == null) {
-                obTableClientKey.setSysPassword(Constants.EMPTY_STRING);
-            } else {
-                obTableClientKey.setSysPassword(connectionConfig.getSysPassword());
-            }
+                    + " is blank");
+            obTableClientKey = generateObTableClientKey(connectionConfig);
+        }
+        return getOrCreateObTableClient(obTableClientKey, connectionConfig.getRpcConnectTimeout());
+    }
+    
+    public static ObTableClientKey generateObTableClientKey(OHConnectionConfiguration connectionConfig) {
+        ObTableClientKey obTableClientKey = new ObTableClientKey();
+        String paramUrl = connectionConfig.getParamUrl();
+        if (!paramUrl.contains("database")) {
+            paramUrl += "&database=default";
+        }
+        obTableClientKey.setParamUrl(paramUrl);
+        obTableClientKey.setSysUserName(connectionConfig.getSysUsername());
+        if (connectionConfig.getSysPassword() == null) {
+            obTableClientKey.setSysPassword(Constants.EMPTY_STRING);
+        } else {
+            obTableClientKey.setSysPassword(connectionConfig.getSysPassword());
         }
         checkArgument(isNotBlank(connectionConfig.getFullUsername()),
-            HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
+                HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
         obTableClientKey.setFullUserName(connectionConfig.getFullUsername());
 
         if (connectionConfig.getPassword() == null) {
@@ -85,8 +89,8 @@ public class ObTableClientManager {
         for (Map.Entry<Object, Object> property : connectionConfig.getProperties().entrySet()) {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
-
-        return getOrCreateObTableClient(obTableClientKey, connectionConfig.getRpcConnectTimeout());
+        
+        return obTableClientKey;
     }
 
     public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey,
