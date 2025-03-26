@@ -84,8 +84,6 @@ public class TableTemplateManager {
     private static final Map<TableType, String> SQL_TEMPLATES            = new EnumMap<TableType, String>(
                                                                              TableType.class);
 
-    private static final Map<TableType, String> SQL_TEMPLATES = new EnumMap<>(TableType.class);
-
     static {
         // 普通表非分区表模版
         SQL_TEMPLATES.put(TableType.NON_PARTITIONED_REGULAR,
