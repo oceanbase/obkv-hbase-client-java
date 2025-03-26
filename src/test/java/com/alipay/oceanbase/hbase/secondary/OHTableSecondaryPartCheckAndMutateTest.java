@@ -40,7 +40,6 @@ import static org.junit.Assert.*;
 public class OHTableSecondaryPartCheckAndMutateTest {
     private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
-    private static List<String>              series_tables    = new LinkedList<String>();
     private static byte[]                    ROW              = Bytes.toBytes("testRow");
     private static byte[]                    QUALIFIER        = Bytes.toBytes("testQualifier");
     private static byte[]                    VALUE_1          = Bytes.toBytes("testValue");
@@ -50,7 +49,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : NORMAL_TABLES) {
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -244,6 +243,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         ok = hTable
             .checkAndPut(ROW, FAMILY, QUALIFIER, CompareFilter.CompareOp.EQUAL, value2, put3);
         assertEquals(ok, true);
+        hTable.close();
     }
 
     public static void testCheckAndDeleteWithCompareOp(String tableName) throws Throwable {
@@ -339,6 +339,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         ok = hTable.checkAndDelete(ROW, FAMILY, QUALIFIER, CompareFilter.CompareOp.EQUAL, value2,
             delete);
         assertEquals(ok, true);
+        hTable.close();
     }
 
     private static void testCheckAndMutateMultiCF(Map.Entry<String, List<String>> entry)
@@ -436,8 +437,10 @@ public class OHTableSecondaryPartCheckAndMutateTest {
 
     @Test
     public void testCheckAndMutateSeires() throws Throwable {
-        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, group2tableNames, true);
-        FOR_EACH(series_tables, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateSeires);
-        dropTables(series_tables, group2tableNames);
+        List<String> seriesTables = new LinkedList<String>();
+        Map<String, List<String>> seriesTablesMultiCF = new LinkedHashMap<String, List<String>>();
+        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, seriesTables, seriesTablesMultiCF, true);
+        FOR_EACH(seriesTables, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateSeires);
+        dropTables(seriesTables, seriesTablesMultiCF);
     }
 }

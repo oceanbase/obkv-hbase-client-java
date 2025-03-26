@@ -27,10 +27,7 @@ import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
@@ -40,7 +37,6 @@ import static org.junit.Assert.assertTrue;
 
 public class OHTableSecondaryPartCellTTLTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static List<String>              NonTTLTable      = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
@@ -54,7 +50,7 @@ public class OHTableSecondaryPartCellTTLTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        //        dropTables(tableNames, group2tableNames);
+        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -389,7 +385,9 @@ public class OHTableSecondaryPartCellTTLTest {
         Thread.sleep(10000);
         enableTTL();
         triggerTTL();
-        checkUtilTimeout(()-> {
+        List<String> tableNames = new ArrayList<>();
+        tableNames.add(tableName);
+        checkUtilTimeout(tableNames, ()-> {
             try {
                 return getRunningNormalTTLTaskCnt() == 0;
             } catch (Exception e) {
@@ -479,8 +477,10 @@ public class OHTableSecondaryPartCellTTLTest {
 
     @Test
     public void testCellTTLWithNonTTLTable() throws Throwable {
-        createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, group2tableNames, true);
+        List<String>              NonTTLTable      = new LinkedList<String>();
+        Map<String, List<String>> NonTTLTableMultiCF = new LinkedHashMap<>();
+        createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, NonTTLTableMultiCF, true);
         FOR_EACH(NonTTLTable, OHTableSecondaryPartCellTTLTest::testCellTTLWithNonTTLTable);
-        dropTables(NonTTLTable, group2tableNames);
+        dropTables(NonTTLTable, NonTTLTableMultiCF);
     }
 }

@@ -49,10 +49,8 @@ public class OHTableSecondaryPartGetTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
-            if (!type.name().contains("TIME")) {
-                createTables(type, tableNames, group2tableNames, true);
-            }
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
+            createTables(type, tableNames, group2tableNames, true);
         }
     }
 
@@ -291,6 +289,7 @@ public class OHTableSecondaryPartGetTest {
                 }
             }
         }
+        hTable.close();
     }
 
     @Test

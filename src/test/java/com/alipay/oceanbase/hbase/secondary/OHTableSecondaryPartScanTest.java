@@ -41,10 +41,8 @@ public class OHTableSecondaryPartScanTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
-            if (!type.name().contains("TIME")) {
-                createTables(type, tableNames, group2tableNames, true);
-            }
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
+            createTables(type, tableNames, group2tableNames, true);
         }
     }
 
@@ -226,21 +224,22 @@ public class OHTableSecondaryPartScanTest {
 
         // 8. scan in reverse
         {
-            //            Scan scan = new Scan(keys[2].getBytes(), keys[0].getBytes());
-            //            scan.addFamily(family.getBytes());
-            //            scan.setReversed(true);
-            //            ResultScanner scanner = hTable.getScanner(scan);
-            //            List<Cell> cells = getCellsFromScanner(scanner);
-            //
-            //            int cellIndex = 0;
-            //            for (int i = 1; i >= 0; i--) {
-            //                for (String column : columns) {
-            //                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
-            //                    cellIndex++;
-            //                }
-            //            }
-            //            assertEquals(columns.length * 2, cells.size());
+            Scan scan = new Scan(keys[1].getBytes(), "putKey".getBytes());
+            scan.addFamily(family.getBytes());
+            scan.setReversed(true);
+            ResultScanner scanner = hTable.getScanner(scan);
+            List<Cell> cells = getCellsFromScanner(scanner);
+
+            int cellIndex = 0;
+            for (int i = 1; i >= 0; i--) {
+                for (String column : columns) {
+                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
+                    cellIndex++;
+                }
+            }
+            assertEquals(columns.length * 2, cells.size());
         }
+        hTable.close();
     }
 
     public static void testMultiCFScanImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -492,6 +491,7 @@ public class OHTableSecondaryPartScanTest {
                 }
             }
         }
+        hTable.close();
     }
 
     @Test

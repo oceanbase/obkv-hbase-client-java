@@ -22,10 +22,8 @@ public class OHTableSecondaryPartTTLTest {
     @BeforeClass
     public static void before() throws Exception {
         openDistributedExecute();
-        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_AND_SERIES_TABLES) {
-            if (!type.name().contains("TIME")) {
-                createTables(type, tableNames, group2tableNames, true);
-            }
+        for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
+            createTables(type, tableNames, group2tableNames, true);
         }
         alterTableTimeToLive(tableNames, true, 10);
         for (List<String> groupTableNames : group2tableNames.values()) {
@@ -64,6 +62,7 @@ public class OHTableSecondaryPartTTLTest {
                     }
                 }
             }
+            hTable.close();
         }
 
         // 1. sleep util data expired
@@ -84,6 +83,7 @@ public class OHTableSecondaryPartTTLTest {
             get.addFamily(family.getBytes());
             Result result = hTable.get(get);
             Assert.assertEquals(0, result.rawCells().length);
+            hTable.close();
         }
 
         // 3. using sql to scan expired but not delete yet hbase data
@@ -97,7 +97,7 @@ public class OHTableSecondaryPartTTLTest {
         triggerTTL();
 
         // 5. check util expired hbase data is deleted by ttl tasks
-        checkUtilTimeout(()-> {
+        checkUtilTimeout(tableNames, ()-> {
             try {
                 return getRunningNormalTTLTaskCnt() == 0;
             } catch (Exception e) {
@@ -139,7 +139,7 @@ public class OHTableSecondaryPartTTLTest {
                     }
                 }
             }
-
+            hTable.close();
         }
 
         // 1. sleep util data expired
@@ -158,6 +158,7 @@ public class OHTableSecondaryPartTTLTest {
             Get get = new Get(keys[0].getBytes());
             Result result = hTable.get(get);
             Assert.assertEquals(0, result.rawCells().length);
+            hTable.close();
         }
 
         // 3. using sql to scan expired but not delete yet hbase data
@@ -171,7 +172,7 @@ public class OHTableSecondaryPartTTLTest {
         triggerTTL();
 
         // 5. check util expired hbase data is deleted by ttl tasks
-        checkUtilTimeout(()-> {
+        checkUtilTimeout(allTableNames, ()-> {
             try {
                 return getRunningNormalTTLTaskCnt() == 0;
             } catch (Exception e) {
@@ -192,6 +193,7 @@ public class OHTableSecondaryPartTTLTest {
         // 0. prepare data
         String keys[] = {"putKey1", "putKey2", "putKey3"};
         String endKey = "putKey4";
+        String reversedEndKey = "putKey";
         String columns[] = {"putColumn1", "putColumn2"};
         String values[] = {"putValue1", "putValue2", "putValue3", "putValue4"};
         for (String tableName : tableNames) {
@@ -202,11 +204,12 @@ public class OHTableSecondaryPartTTLTest {
                 for (String column : columns) {
                     for (int i = 0; i < values.length; i++) {
                         Put put = new Put(toBytes(key));
-                        put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                        put.add(family.getBytes(), column.getBytes(),  values[i].getBytes());
                         hTable.put(put);
                     }
                 }
             }
+            hTable.close();
         }
 
         // 1. sleep util data expired
@@ -217,8 +220,14 @@ public class OHTableSecondaryPartTTLTest {
 
         // 3. SQL can scan expired but not delete yet hbase data
         for (String tableName : tableNames) {
-            Assert.assertEquals(keys.length * columns.length * values.length,
-                    getSQLTableRowCnt(tableName));
+            ObHTableTestUtil.Assert(tableName, ()-> {
+                try {
+                    Assert.assertEquals(keys.length * columns.length * values.length,
+                            getSQLTableRowCnt(tableName));
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
         }
 
         // 4. use Hbase scan/get expired data to trigger ttl
@@ -227,9 +236,16 @@ public class OHTableSecondaryPartTTLTest {
             hTable.init();
             String family = getColumnFamilyName(tableName);
             if (useScan) {
-                Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
+                Scan scan = new Scan();
+                if (isReversed) {
+                    scan.setReversed(true);
+                    scan.setStartRow(keys[2].getBytes());
+                    scan.setStopRow(reversedEndKey.getBytes());
+                } else {
+                    scan.setStartRow(keys[0].getBytes());
+                    scan.setStopRow(endKey.getBytes());
+                }
                 scan.addFamily(family.getBytes());
-                scan.setReversed(isReversed);
                 ResultScanner scanner = hTable.getScanner(scan);
                 List<Cell> cells = getCellsFromScanner(scanner);
                 assertEquals(0, cells.size());
@@ -241,10 +257,11 @@ public class OHTableSecondaryPartTTLTest {
                     assertEquals(0, result.rawCells().length);
                 }
             }
+            hTable.close();
         }
 
         // 5. wait to disable
-        checkUtilTimeout(()-> {
+        checkUtilTimeout(tableNames, ()-> {
             try {
                 Boolean passed = true;
                 for (int i = 0; passed && i < tableNames.size(); i++) {
@@ -286,6 +303,7 @@ public class OHTableSecondaryPartTTLTest {
                     }
                 }
             }
+            hTable.close();
         }
 
         // 1. sleep util data expired
@@ -318,10 +336,11 @@ public class OHTableSecondaryPartTTLTest {
                     assertEquals(0, result.rawCells().length);
                 }
             }
+            hTable.close();
         }
 
         // 5. wait to disable
-        checkUtilTimeout(()-> {
+        checkUtilTimeout(allTableNames, ()-> {
             try {
                 Boolean passed = true;
                 for (int i = 0; passed && i < allTableNames.size(); i++) {
@@ -354,7 +373,7 @@ public class OHTableSecondaryPartTTLTest {
         testRowkeyTTL(tableNames, true, false);
         testRowkeyTTL(tableNames, false, false);
         // TODO: open the test after reverse scan is ok
-        // testRowkeyTTL(tableNames, true);
+//         testRowkeyTTL(tableNames, true, true);
     }
 
     @Test
