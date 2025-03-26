@@ -41,7 +41,6 @@ import static org.junit.Assert.*;
 
 public class OHTableSecondaryPartAppendTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static List<String>              series_tables    = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
@@ -55,6 +54,7 @@ public class OHTableSecondaryPartAppendTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
+        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -74,8 +74,8 @@ public class OHTableSecondaryPartAppendTest {
             byte[] ROW = "appendKey".getBytes();
             byte[] v1 = Bytes.toBytes("42");
             byte[] v2 = Bytes.toBytes("23");
-            byte[][] QUALIFIERS = new byte[][]{Bytes.toBytes("b"), Bytes.toBytes("a"),
-                    Bytes.toBytes("c")};
+            byte[][] QUALIFIERS = new byte[][] { Bytes.toBytes("b"), Bytes.toBytes("a"),
+                    Bytes.toBytes("c") };
             Append a = new Append(ROW);
             a.add(FAMILY, QUALIFIERS[0], v1);
             a.add(FAMILY, QUALIFIERS[1], v2);
@@ -91,8 +91,8 @@ public class OHTableSecondaryPartAppendTest {
             assertEquals(0, Bytes.compareTo(Bytes.add(v2, v1), r.getValue(FAMILY, QUALIFIERS[1])));
             // QUALIFIERS[2] previously not exist, verify both value and timestamp are correct
             assertEquals(0, Bytes.compareTo(v2, r.getValue(FAMILY, QUALIFIERS[2])));
-            assertEquals(r.getColumnLatest(FAMILY, QUALIFIERS[0]).getTimestamp(),
-                    r.getColumnLatest(FAMILY, QUALIFIERS[2]).getTimestamp());
+            assertEquals(r.getColumnLatest(FAMILY, QUALIFIERS[0]).getTimestamp(), r
+                .getColumnLatest(FAMILY, QUALIFIERS[2]).getTimestamp());
 
             Get get = new Get(ROW);
             get.setMaxVersions(10);
@@ -102,11 +102,11 @@ public class OHTableSecondaryPartAppendTest {
             assertEquals(2, result.getColumnCells(FAMILY, QUALIFIERS[1]).size());
             assertEquals(1, result.getColumnCells(FAMILY, QUALIFIERS[2]).size());
             assertEquals(
-                    0,
-                    Bytes.compareTo(Bytes.add(v1, v2), result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0)
-                            .getValue()));
+                0,
+                Bytes.compareTo(Bytes.add(v1, v2), result.getColumnCells(FAMILY, QUALIFIERS[0])
+                    .get(0).getValue()));
             assertEquals(0,
-                    Bytes.compareTo(v2, result.getColumnCells(FAMILY, QUALIFIERS[2]).get(0).getValue()));
+                Bytes.compareTo(v2, result.getColumnCells(FAMILY, QUALIFIERS[2]).get(0).getValue()));
         } finally {
             hTable.close();
         }
@@ -119,8 +119,8 @@ public class OHTableSecondaryPartAppendTest {
             byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
             byte[] ROW = "appendKey".getBytes();
             byte[] v1 = Bytes.toBytes("ab");
-            byte[][] QUALIFIERS = new byte[][]{Bytes.toBytes("b"), Bytes.toBytes("a"),
-                    Bytes.toBytes("c")};
+            byte[][] QUALIFIERS = new byte[][] { Bytes.toBytes("b"), Bytes.toBytes("a"),
+                    Bytes.toBytes("c") };
             Put put = new Put(ROW);
             put.addColumn(FAMILY, QUALIFIERS[1], v1);
             hTable.put(put);
@@ -267,7 +267,9 @@ public class OHTableSecondaryPartAppendTest {
 
     @Test
     public void testAppendSeires() throws Throwable {
+        List<String> series_tables = new LinkedList<String>();
         createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, null, true);
         FOR_EACH(series_tables, OHTableSecondaryPartAppendTest::testAppendSeires);
+        dropTables(series_tables, null);
     }
 }
