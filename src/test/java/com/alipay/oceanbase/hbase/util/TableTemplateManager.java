@@ -76,8 +76,15 @@ public class TableTemplateManager {
                                                                                  SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
                                                                                  SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL);
 
+    public static List<TableType> TIMESERIES_TABLES = Arrays.asList(NON_PARTITIONED_TIME_SERIES,
+            SINGLE_PARTITIONED_TIME_SERIES,
+            SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+            SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+
     private static final Map<TableType, String> SQL_TEMPLATES            = new EnumMap<TableType, String>(
                                                                              TableType.class);
+
+    private static final Map<TableType, String> SQL_TEMPLATES = new EnumMap<>(TableType.class);
 
     static {
         // 普通表非分区表模版
