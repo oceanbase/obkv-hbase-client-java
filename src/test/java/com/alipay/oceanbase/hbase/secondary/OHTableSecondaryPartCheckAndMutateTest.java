@@ -57,7 +57,6 @@ public class OHTableSecondaryPartCheckAndMutateTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -441,6 +440,5 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         Map<String, List<String>> seriesTablesMultiCF = new LinkedHashMap<String, List<String>>();
         createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, seriesTables, seriesTablesMultiCF, true);
         FOR_EACH(seriesTables, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateSeires);
-        dropTables(seriesTables, seriesTablesMultiCF);
     }
 }
