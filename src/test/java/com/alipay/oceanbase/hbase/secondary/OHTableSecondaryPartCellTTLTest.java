@@ -477,10 +477,9 @@ public class OHTableSecondaryPartCellTTLTest {
 
     @Test
     public void testCellTTLWithNonTTLTable() throws Throwable {
-        List<String>              NonTTLTable      = new LinkedList<String>();
-        Map<String, List<String>> NonTTLTableMultiCF = new LinkedHashMap<>();
-        createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, NonTTLTableMultiCF, true);
+        List<String> NonTTLTable = new LinkedList<String>();
+        createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, null, true);
         FOR_EACH(NonTTLTable, OHTableSecondaryPartCellTTLTest::testCellTTLWithNonTTLTable);
-        dropTables(NonTTLTable, NonTTLTableMultiCF);
+        dropTables(NonTTLTable, null);
     }
 }

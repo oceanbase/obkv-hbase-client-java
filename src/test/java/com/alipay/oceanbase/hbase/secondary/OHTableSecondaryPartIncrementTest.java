@@ -106,8 +106,8 @@ public class OHTableSecondaryPartIncrementTest {
             byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
             byte[] ROW = "incKey".getBytes();
             byte[] v1 = Bytes.toBytes("ab");
-            byte[][] QUALIFIERS = new byte[][]{Bytes.toBytes("b"), Bytes.toBytes("a"),
-                    Bytes.toBytes("c")};
+            byte[][] QUALIFIERS = new byte[][] { Bytes.toBytes("b"), Bytes.toBytes("a"),
+                    Bytes.toBytes("c") };
             Put put = new Put(ROW);
             put.addColumn(FAMILY, QUALIFIERS[1], v1);
             hTable.put(put);
@@ -141,11 +141,11 @@ public class OHTableSecondaryPartIncrementTest {
             result = hTable.get(get);
             assertEquals(3, result.size());
             assertEquals(4L,
-                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(0).getValue()));
+                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(0).getValue()));
             assertEquals(2L,
-                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(1).getValue()));
+                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(1).getValue()));
             assertEquals(2L,
-                    Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0).getValue()));
+                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0).getValue()));
         } finally {
             hTable.close();
         }

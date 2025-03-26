@@ -343,7 +343,6 @@ public class ObHTableSecondaryPartUtil {
         return cells;
     }
 
-
     public static void checkUtilTimeout(List<String> tableNames, Supplier<Boolean> function, long timeout, long interval) throws Exception {
         long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTime < timeout) {

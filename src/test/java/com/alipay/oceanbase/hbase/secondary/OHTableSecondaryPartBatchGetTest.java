@@ -96,7 +96,7 @@ public class OHTableSecondaryPartBatchGetTest {
         }
         hTable.close();
     }
-    
+
     @Test
     public void testBatchGet() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartBatchGetTest::testBatchGetImpl);

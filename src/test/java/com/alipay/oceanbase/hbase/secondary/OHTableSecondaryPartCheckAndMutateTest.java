@@ -33,7 +33,6 @@ import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
-import static com.alipay.oceanbase.hbase.util.TableTemplateManager.COLUMN_FAMILY;
 import static com.alipay.oceanbase.hbase.util.TableTemplateManager.NORMAL_TABLES;
 import static org.junit.Assert.*;
 
@@ -437,10 +436,9 @@ public class OHTableSecondaryPartCheckAndMutateTest {
 
     @Test
     public void testCheckAndMutateSeires() throws Throwable {
-        List<String> seriesTables = new LinkedList<String>();
-        Map<String, List<String>> seriesTablesMultiCF = new LinkedHashMap<String, List<String>>();
-        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, seriesTables, seriesTablesMultiCF, true);
-        FOR_EACH(seriesTables, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateSeires);
-        dropTables(seriesTables, seriesTablesMultiCF);
+        List<String> series_tables = new LinkedList<String>();
+        createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, null, true);
+        FOR_EACH(series_tables, OHTableSecondaryPartCheckAndMutateTest::testCheckAndMutateSeires);
+        dropTables(series_tables, null);
     }
 }

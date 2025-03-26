@@ -43,6 +43,7 @@ public class TableTemplateManager {
         SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL, // RANGE-KEY分区（使用生成列）
         SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL, // KEY-RANGE分区（使用K）
         SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL, // KEY-RANGE分区（使用生成列）
+        NON_PARTITIONED_TIME_CELL_TTL, // 时序表带CELL TTL列
     }
 
     public static List<TableType>               NORMAL_AND_SERIES_TABLES = Arrays
@@ -55,6 +56,13 @@ public class TableTemplateManager {
                                                                                  SECONDARY_PARTITIONED_RANGE_KEY_GEN,
                                                                                  SECONDARY_PARTITIONED_KEY_RANGE,
                                                                                  SECONDARY_PARTITIONED_KEY_RANGE_GEN,
+                                                                                 SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+                                                                                 SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+
+    public static List<TableType>               SERIES_TABLES            = Arrays
+                                                                             .asList(
+                                                                                 NON_PARTITIONED_TIME_SERIES,
+                                                                                 SINGLE_PARTITIONED_TIME_SERIES,
                                                                                  SECONDARY_PARTITIONED_TIME_RANGE_KEY,
                                                                                  SECONDARY_PARTITIONED_TIME_KEY_RANGE);
 
@@ -258,6 +266,15 @@ public class TableTemplateManager {
                     + "  SUBPARTITION `p1` VALUES LESS THAN (%d),\n"
                     + "  SUBPARTITION `p2` VALUES LESS THAN (%d),\n"
                     + "  SUBPARTITION `p3` VALUES LESS THAN MAXVALUE) ");
+
+        SQL_TEMPLATES.put(NON_PARTITIONED_TIME_CELL_TTL, "CREATE TABLE IF NOT EXISTS `%s` (\n"
+                                                         + "  `K` varbinary(1024) NOT NULL,\n"
+                                                         + "  `T` bigint(20) NOT NULL,\n"
+                                                         + "  `S` bigint(20) NOT NULL,\n"
+                                                         + "  `V` json NOT NULL,\n"
+                                                         + "  `TTL` bigint(20) DEFAULT NULL,\n"
+                                                         + "  PRIMARY KEY (`K`, `T`, `S`)\n"
+                                                         + ") TABLEGROUP = %s");
     }
 
     public static String getCreateTableSQL(TableType type, String tableName,
@@ -271,6 +288,7 @@ public class TableTemplateManager {
             case NON_PARTITIONED_REGULAR:
             case NON_PARTITIONED_TIME_SERIES:
             case NON_PARTITIONED_REGULAR_CELL_TTL:
+            case NON_PARTITIONED_TIME_CELL_TTL:
                 params = new Object[] { tableName, tableGroup };
                 break;
             case SINGLE_PARTITIONED_REGULAR:
