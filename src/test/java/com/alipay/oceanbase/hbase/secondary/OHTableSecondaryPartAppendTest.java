@@ -54,7 +54,6 @@ public class OHTableSecondaryPartAppendTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -270,6 +269,5 @@ public class OHTableSecondaryPartAppendTest {
         List<String> series_tables = new LinkedList<String>();
         createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, null, true);
         FOR_EACH(series_tables, OHTableSecondaryPartAppendTest::testAppendSeires);
-        dropTables(series_tables, null);
     }
 }

@@ -54,7 +54,6 @@ public class OHTableSecondaryPartIncrementTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -262,6 +261,5 @@ public class OHTableSecondaryPartIncrementTest {
         List<String> series_tables = new LinkedList<String>();
         createTables(TableTemplateManager.TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY, series_tables, null, true);
         FOR_EACH(series_tables, OHTableSecondaryPartIncrementTest::testIncrementSeires);
-        dropTables(series_tables, null);
     }
 }

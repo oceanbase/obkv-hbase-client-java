@@ -52,7 +52,6 @@ public class OHTableSecondaryPartBatchTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before

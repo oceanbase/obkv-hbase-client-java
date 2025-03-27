@@ -26,10 +26,7 @@ import org.junit.Assert;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLSyntaxErrorException;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Supplier;
 
 public class ObHTableSecondaryPartUtil {
@@ -352,5 +349,28 @@ public class ObHTableSecondaryPartUtil {
             Thread.sleep(interval);
         }
         ObHTableTestUtil.Assert(tableNames, ()-> Assert.fail("Timeout while waiting for the function to return expected result"));
+    }
+
+    public static void sortCells(Cell[] cells) {
+        if (cells == null || cells.length <= 1) { return; }
+
+        Arrays.sort(cells, new Comparator<Cell>() {
+            @Override
+            public int compare(Cell c1, Cell c2) {
+                if (c1 == null) return 1;
+                if (c2 == null) return -1;
+                int cmpRet = Bytes.compareTo(c1.getRow(), c2.getRow());
+                if (cmpRet != 0) { return cmpRet; }
+
+                cmpRet = Bytes.compareTo(c1.getFamily(), c2.getFamily());
+                if (cmpRet != 0) { return cmpRet; }
+
+                cmpRet = Bytes.compareTo(c1.getQualifier(), c2.getQualifier());
+                if (cmpRet != 0) { return cmpRet; }
+
+                cmpRet = Long.compare(c2.getTimestamp(), c1.getTimestamp());
+                return cmpRet;
+            }
+        });
     }
 }
