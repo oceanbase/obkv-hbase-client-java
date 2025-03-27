@@ -373,7 +373,7 @@ public class OHTableSecondaryPartTTLTest {
         testRowkeyTTL(tableNames, true, false);
         testRowkeyTTL(tableNames, false, false);
         // TODO: open the test after reverse scan is ok
-//         testRowkeyTTL(tableNames, true, true);
+        //         testRowkeyTTL(tableNames, true, true);
     }
 
     @Test
