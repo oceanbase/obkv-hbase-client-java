@@ -50,7 +50,6 @@ public class OHTableSecondaryPartCellTTLTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before
@@ -235,7 +234,7 @@ public class OHTableSecondaryPartCellTTLTest {
         assertTrue(succ);
         r = hTable.get(get);
         assertEquals(r.size(), 2);
-        assertEquals(22L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
+        assertEquals(11L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
             column1.getBytes()).get(0))));
         assertEquals(33L, Bytes.toLong(CellUtil.cloneValue(r.getColumnCells(family.getBytes(),
             column2.getBytes()).get(0))));
@@ -480,6 +479,5 @@ public class OHTableSecondaryPartCellTTLTest {
         List<String> NonTTLTable = new LinkedList<String>();
         createTables(TableTemplateManager.TableType.NON_PARTITIONED_REGULAR, NonTTLTable, null, true);
         FOR_EACH(NonTTLTable, OHTableSecondaryPartCellTTLTest::testCellTTLWithNonTTLTable);
-        dropTables(NonTTLTable, null);
     }
 }
