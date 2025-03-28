@@ -21,6 +21,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.util.Arrays;
 
+import static java.lang.String.format;
+
 @InterfaceAudience.Private
 public class OHBaseFuncUtils {
     public static byte[][] extractFamilyFromQualifier(byte[] qualifier) throws Exception {
@@ -41,5 +43,14 @@ public class OHBaseFuncUtils {
         }
         byte[] newQualifier = Arrays.copyOfRange(qualifier, familyLen + 1, qualifier.length);
         return new byte[][] { family, newQualifier };
+    }
+
+    public static String generateIncrFieldErrMsg(String errMsg) {
+        // [-10516][OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG][When invoking the Increment interface, only HBase cells with a length of 8 can be converted to int64_t. the current length of the HBase cell is '4'.][ip:port][trace_id]
+        int start = errMsg.indexOf('\'');
+        int stop = errMsg.lastIndexOf('\'');
+        String errByte = errMsg.substring(start + 1, stop);
+        errMsg = format("Field is not a long, it's %s bytes wide", errByte);
+        return errMsg;
     }
 }
