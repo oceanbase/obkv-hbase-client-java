@@ -34,7 +34,6 @@ public class OHTableSecondaryPartTTLTest {
     @AfterClass
     public static void finish() throws Exception {
         closeDistributedExecute();
-        dropTables(tableNames, group2tableNames);
     }
 
     @Before
