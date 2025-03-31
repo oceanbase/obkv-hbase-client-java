@@ -1357,13 +1357,10 @@ public class OHTable implements HTableInterface {
             // the later hbase has supported timeRange
             ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
             ObTableQuery obTableQuery = buildObTableQuery(filter, r, true, r, true, false);
-            ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
-            queryAndMutate.setTableQuery(obTableQuery);
-            queryAndMutate.setMutations(batchOperation);
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batchOperation,
                 getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(append.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
@@ -1412,7 +1409,7 @@ public class OHTable implements HTableInterface {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
+            request.setReturningAffectedEntity(increment.isReturnResults());
             ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                 .execute(request);
             ObTableQueryResult queryResult = result.getAffectedEntity();
@@ -2161,7 +2158,6 @@ public class OHTable implements HTableInterface {
         request.setTableName(targetTableName);
         request.setTableQueryAndMutate(queryAndMutate);
         request.setEntityType(ObTableEntityType.HKV);
-        request.setReturningAffectedEntity(true);
         return request;
     }
 
