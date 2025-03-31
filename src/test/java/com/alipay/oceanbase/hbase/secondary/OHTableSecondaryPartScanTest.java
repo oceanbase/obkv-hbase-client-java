@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.secondary;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
@@ -503,55 +504,16 @@ public class OHTableSecondaryPartScanTest {
             put.add(family.getBytes(), (column + 2).getBytes(), timestamp, toBytes(value + i));
             hTable.put(put);
         }
-
+        
         {
             Scan scan = new Scan("putKey8".getBytes(), "putKey".getBytes());
             scan.addColumn(family.getBytes(), (column + "2").getBytes());
             scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                ObHTableTestUtil.Assert(tableName, ()->Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(value + (8 - c)), result.getValue(family.getBytes(), (column + "2").getBytes()))));
-                count++;
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage().contains("OB_NOT_SUPPORTED"));
             }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(tableName, ()->Assert.assertEquals(9, finalCount));
-        }
-
-        {
-            Scan scan = new Scan("putKey8".getBytes(), "putKey".getBytes());
-            scan.addFamily(family.getBytes());
-            scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                ObHTableTestUtil.Assert(tableName, () -> Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(value + (8 - c)), result.getValue(family.getBytes(), (column + "1").getBytes()))));
-                ObHTableTestUtil.Assert(tableName, () -> Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(value + (8 - c)), result.getValue(family.getBytes(), (column + "2").getBytes()))));
-                count++;
-            }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(tableName, ()->Assert.assertEquals(9, finalCount));
-        }
-
-        {
-            Scan scan = new Scan();
-            scan.addFamily(family.getBytes());
-            scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                ObHTableTestUtil.Assert(tableName, () -> Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(value + (9 - c)), result.getValue(family.getBytes(), (column + "1").getBytes()))));
-                ObHTableTestUtil.Assert(tableName, () -> Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(value + (9 - c)), result.getValue(family.getBytes(), (column + "2").getBytes()))));
-                count++;
-            }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(tableName, ()->Assert.assertEquals(10, finalCount));
         }
     }
     
@@ -582,66 +544,12 @@ public class OHTableSecondaryPartScanTest {
                 scan.addFamily(family.getBytes());
             }
             scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                for (String tableName : entry.getValue()) {
-                    String family = getColumnFamilyName(tableName);
-                    ObHTableTestUtil.Assert(entry.getValue(), ()->Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(family + value + (8 - c)), result.getValue(family.getBytes(), (column + "1").getBytes()))));
-                }
-                count++;
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage().contains("OB_NOT_SUPPORTED"));
             }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(entry.getKey(), ()->Assert.assertEquals(9, finalCount));
         }
-
-        {
-            Scan scan = new Scan();
-            for (String tableName : entry.getValue()) {
-                String family = getColumnFamilyName(tableName);
-                scan.addColumn(family.getBytes(), (column + 2).getBytes());
-            }
-            scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                for (String tableName : entry.getValue()) {
-                    String family = getColumnFamilyName(tableName);
-                    ObHTableTestUtil.Assert(entry.getValue(), ()->Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(family + value + (9 - c)), result.getValue(family.getBytes(), (column + "2").getBytes()))));
-                }
-                count++;
-            }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(entry.getKey(), ()->Assert.assertEquals(10, finalCount));
-        }
-        
-        {
-            Scan scan = new Scan();
-            for (String tableName : entry.getValue()) {
-                String family = getColumnFamilyName(tableName);
-                scan.addFamily(family.getBytes());
-            }
-            scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int count = 0;
-            for (Result result : scanner) {
-                int c = count;
-                System.out.println(Arrays.toString(result.raw()));
-                for (String tableName : entry.getValue()) {
-                    String family = getColumnFamilyName(tableName);
-                    ObHTableTestUtil.Assert(entry.getValue(), ()->Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(family + value + (9 - c)), result.getValue(family.getBytes(), (column + "1").getBytes()))));
-                    ObHTableTestUtil.Assert(entry.getValue(), ()->Assert.assertTrue(ObHTableTestUtil.secureCompare(toBytes(family + value + (9 - c)), result.getValue(family.getBytes(), (column + "2").getBytes()))));
-                }
-                count++;
-            }
-            final int finalCount = count;
-            ObHTableTestUtil.Assert(entry.getKey(), ()->Assert.assertEquals(10, finalCount));
-        }
-        
     }
 
     @Test
