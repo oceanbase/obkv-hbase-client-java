@@ -1128,7 +1128,8 @@ public class OHTable implements Table {
                         List<Partition> partitions = obTableClient.getPartition(phyTableName, false);
                         for (Partition partition : partitions) {
                             request.getObTableQueryRequest().setTableQueryPartId(
-                                    partition.getPartId());
+                                partition.getPartId());
+                            request.setAllowDistributeScan(false);
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                     .execute(request);
                             ClientStreamScanner clientScanner = new ClientStreamScanner(
