@@ -1095,6 +1095,7 @@ public class OHTable implements HTableInterface {
                         for (Partition partition : partitions) {
                             request.getObTableQueryRequest().setTableQueryPartId(
                                 partition.getPartId());
+                            request.setAllowDistributeScan(false);
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             ClientStreamScanner clientScanner = new ClientStreamScanner(

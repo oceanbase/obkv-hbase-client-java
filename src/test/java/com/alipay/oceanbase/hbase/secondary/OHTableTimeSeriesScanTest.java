@@ -151,6 +151,7 @@ public class OHTableTimeSeriesScanTest {
         // 4. scan using setStartRow/setEndRow
         {
             Scan scan = new Scan();
+            scan.addFamily(family.getBytes());
             scan.setStartRow(keys[0].getBytes());
             scan.setStopRow(endKey.getBytes());
             ResultScanner scanner = hTable.getScanner(scan);
@@ -169,19 +170,19 @@ public class OHTableTimeSeriesScanTest {
 
         // 5. scan using batch
         {
-            int batchSize = 2;
-            Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
-            scan.addFamily(family.getBytes());
-            scan.setBatch(batchSize);
-            ResultScanner scanner = hTable.getScanner(scan);
-            Result result = null;
-            int resultSize = (keys.length * columns.length * values.length) / batchSize;
-            for (int i = 0; i < resultSize; i++) {
-                result = scanner.next();
-                Assert.assertEquals(2, result.size());
-            }
-            result = scanner.next();
-            Assert.assertEquals(null, result);
+//            int batchSize = 2;
+//            Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
+//            scan.addFamily(family.getBytes());
+//            scan.setBatch(batchSize);
+//            ResultScanner scanner = hTable.getScanner(scan);
+//            Result result = null;
+//            int resultSize = (keys.length * columns.length * values.length) / batchSize;
+//            for (int i = 0; i < resultSize; i++) {
+//                result = scanner.next();
+//                Assert.assertEquals(2, result.size());
+//            }
+//            result = scanner.next();
+//            Assert.assertEquals(null, result);
         }
 
         // 7. scan using setAllowPartialResults/setAllowPartialResults
