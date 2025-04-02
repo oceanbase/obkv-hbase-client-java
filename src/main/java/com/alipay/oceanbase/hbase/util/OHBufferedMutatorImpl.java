@@ -236,7 +236,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (closed) {
             return;
         }
@@ -279,7 +279,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * do not care whether the pool is shut down or this BufferedMutator is closed
      */
     @Override
-    public void flush() throws IOException {
+    public synchronized void flush() throws IOException {
         batchExecute(true);
     }
 

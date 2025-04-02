@@ -44,7 +44,7 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     private OHTable             ohTable;
     private volatile boolean    initialized = false;
     private final Configuration conf;
-    private ExecutorService     runtimeBatchExecutor;
+    private ExecutorService     runtimeBatchExecutor = null;
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
         this.runtimeBatchExecutor = runtimeBatchExecutor;
@@ -82,7 +82,11 @@ public class OHTableClient implements HTableInterface, Lifecycle {
             lock.lock();
             try {
                 if (!initialized) {
-                    ohTable = new OHTable(conf, tableNameString);
+                    if (runtimeBatchExecutor != null) {
+                        ohTable = new OHTable(conf, tableName, runtimeBatchExecutor);
+                    } else {
+                        ohTable = new OHTable(conf, tableNameString);
+                    }
                     initialized = true;
                 }
             } finally {
