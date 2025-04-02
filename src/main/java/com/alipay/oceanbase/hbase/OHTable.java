@@ -1917,9 +1917,7 @@ public class OHTable implements Table {
         obTableQuery.setIndexName("PRIMARY");
         obTableQuery.sethTableFilter(filter);
         obTableQuery.addKeyRange(obNewRange);
-        if (obTableClient.isOdpMode()) {
-            obTableQuery.setScanRangeColumns("K", "Q", "T");
-        }
+        obTableQuery.setScanRangeColumns("K", "Q", "T");
         return obTableQuery;
     }
 
@@ -1945,9 +1943,7 @@ public class OHTable implements Table {
             : configuration.getLong(HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY,
                 HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
         obTableQuery.setObKVParams(buildOBKVParams(scan));
-        if (obTableClient.isOdpMode()) {
-            obTableQuery.setScanRangeColumns("K", "Q", "T");
-        }
+        obTableQuery.setScanRangeColumns("K", "Q", "T");
         return obTableQuery;
     }
 
@@ -1964,9 +1960,7 @@ public class OHTable implements Table {
                 get.getTimeRange());
         }
         obTableQuery.setObKVParams(buildOBKVParams(get));
-        if (obTableClient.isOdpMode()) {
-            obTableQuery.setScanRangeColumns("K", "Q", "T");
-        }
+        obTableQuery.setScanRangeColumns("K", "Q", "T");
         return obTableQuery;
     }
 
