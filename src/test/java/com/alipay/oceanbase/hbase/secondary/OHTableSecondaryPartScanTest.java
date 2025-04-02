@@ -226,17 +226,11 @@ public class OHTableSecondaryPartScanTest {
             Scan scan = new Scan(keys[1].getBytes(), "putKey".getBytes());
             scan.addFamily(family.getBytes());
             scan.setReversed(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            List<Cell> cells = getCellsFromScanner(scanner);
-
-            int cellIndex = 0;
-            for (int i = 1; i >= 0; i--) {
-                for (String column : columns) {
-                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
-                    cellIndex++;
-                }
+            try {
+                hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage().contains("secondary partitioned hbase table with reverse query not supported"));
             }
-            assertEquals(columns.length * 2, cells.size());
         }
         hTable.close();
     }

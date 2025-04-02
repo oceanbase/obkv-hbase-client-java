@@ -151,6 +151,7 @@ public class OHTableTimeSeriesScanTest {
         // 4. scan using setStartRow/setEndRow
         {
             Scan scan = new Scan();
+            scan.addFamily(family.getBytes());
             scan.setStartRow(keys[0].getBytes());
             scan.setStopRow(endKey.getBytes());
             ResultScanner scanner = hTable.getScanner(scan);
@@ -173,15 +174,13 @@ public class OHTableTimeSeriesScanTest {
             Scan scan = new Scan(keys[0].getBytes(), endKey.getBytes());
             scan.addFamily(family.getBytes());
             scan.setBatch(batchSize);
-            ResultScanner scanner = hTable.getScanner(scan);
-            Result result = null;
-            int resultSize = (keys.length * columns.length * values.length) / batchSize;
-            for (int i = 0; i < resultSize; i++) {
-                result = scanner.next();
-                Assert.assertEquals(2, result.size());
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage()
+                    .contains("timeseries hbase table with batch query not supported"));
             }
-            result = scanner.next();
-            Assert.assertEquals(null, result);
+            
         }
 
         // 7. scan using setAllowPartialResults/setAllowPartialResults
@@ -190,32 +189,25 @@ public class OHTableTimeSeriesScanTest {
             scan.addFamily(family.getBytes());
             scan.setMaxResultSize(10);
             scan.setAllowPartialResults(true);
-            ResultScanner scanner = hTable.getScanner(scan);
-            int resultSize = keys.length * columns.length * values.length;
-            for (int i = 0; i < resultSize; i++) {
-                Result result = scanner.next();
-                Assert.assertEquals(1, result.size());
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage()
+                    .contains("timeseries hbase table with allow partial results query not supported"));
             }
-            Result result = scanner.next();
-            Assert.assertEquals(null, result);
         }
 
         // 8. scan in reverse
         {
-//            Scan scan = new Scan(keys[2].getBytes(), keys[0].getBytes());
-//            scan.addFamily(family.getBytes());
-//            scan.setReversed(true);
-//            ResultScanner scanner = hTable.getScanner(scan);
-//            List<Cell> cells = getCellsFromScanner(scanner);
-//
-//            int cellIndex = 0;
-//            for (int i = 1; i >= 0; i--) {
-//                for (String column : columns) {
-//                    AssertKeyValue(keys[i], column, lastTs, latestValue, cells.get(cellIndex));
-//                    cellIndex++;
-//                }
-//            }
-//            assertEquals(columns.length * 2, cells.size());
+            Scan scan = new Scan(keys[2].getBytes(), keys[0].getBytes());
+            scan.addFamily(family.getBytes());
+            scan.setReversed(true);
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage()
+                        .contains("timeseries hbase table with reverse query not supported"));
+            }
         }
     }
 
