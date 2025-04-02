@@ -312,7 +312,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (closed) {
             return;
         }
