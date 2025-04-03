@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.secondary;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
@@ -31,6 +32,8 @@ import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
+import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.secureCompare;
+import static com.alipay.oceanbase.hbase.util.TableTemplateManager.TableType.SINGLE_PARTITIONED_REGULAR;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.assertEquals;
 
@@ -486,14 +489,88 @@ public class OHTableSecondaryPartScanTest {
         }
         hTable.close();
     }
+    
+    public static void testReverseScanImpl(String tableName) throws Throwable {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column = "putColumn";
+        long timestamp = System.currentTimeMillis();
+        String value = "value";
+        
+        for (int i = 0; i < 10; ++i) {
+            Put put = new Put(toBytes(key + i));
+            put.add(family.getBytes(), (column + 1).getBytes(), timestamp, toBytes(value + i));
+            put.add(family.getBytes(), (column + 2).getBytes(), timestamp, toBytes(value + i));
+            hTable.put(put);
+        }
+        
+        {
+            Scan scan = new Scan("putKey8".getBytes(), "putKey".getBytes());
+            scan.addColumn(family.getBytes(), (column + "2").getBytes());
+            scan.setReversed(true);
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage().contains("OB_NOT_SUPPORTED"));
+            }
+        }
+    }
+    
+    public static void testReverseScanMultiCFImpl(Map.Entry<String, List<String>> entry) throws Throwable {
+        String groupName = getTableName(entry.getKey());
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        hTable.init();
+
+        String key = "putKey";
+        String column = "putColumn";
+        long timestamp = System.currentTimeMillis();
+        String value = "value";
+        // prepare data
+        for (int i = 0; i < 10; ++i) {
+            Put put = new Put(toBytes(key + i));
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                put.add(family.getBytes(), (column + 1).getBytes(), timestamp, toBytes(family + value + i));
+                put.add(family.getBytes(), (column + 2).getBytes(), timestamp, toBytes(family + value + i));
+            }
+            hTable.put(put);
+        }
+        
+        {
+            Scan scan = new Scan("putKey8".getBytes(), "putKey".getBytes());
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                scan.addFamily(family.getBytes());
+            }
+            scan.setReversed(true);
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+            } catch (Exception e) {
+                Assert.assertTrue(e.getCause().getMessage().contains("OB_NOT_SUPPORTED"));
+            }
+        }
+    }
 
     @Test
     public void testScan() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testScanImpl);
     }
+    
+    @Test
+    public void testReverseScan() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testReverseScanImpl);
+    }
 
     @Test
     public void testMultiCFScan() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testMultiCFScanImpl);
+    }
+    
+    @Test
+    public void testMultiCFReverseScan() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testReverseScanMultiCFImpl);
     }
 }
