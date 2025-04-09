@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
+    private final ArrayList<Put>  writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -1123,13 +1123,13 @@ public class OHTable implements Table {
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString));
+                        request.setAllowDistributeScan(false);
                         String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
                                 request.getObTableQueryRequest(), tableNameString);
                         List<Partition> partitions = obTableClient.getPartition(phyTableName, false);
                         for (Partition partition : partitions) {
                             request.getObTableQueryRequest().setTableQueryPartId(
                                 partition.getPartId());
-                            request.setAllowDistributeScan(false);
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                     .execute(request);
                             ClientStreamScanner clientScanner = new ClientStreamScanner(
@@ -1159,6 +1159,7 @@ public class OHTable implements Table {
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            request.setAllowDistributeScan(false);
                             List<Partition> partitions = obTableClient
                                     .getPartition(targetTableName, false);
                             for (Partition partition : partitions) {
