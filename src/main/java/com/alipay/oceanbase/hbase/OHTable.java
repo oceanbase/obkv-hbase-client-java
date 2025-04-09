@@ -83,58 +83,58 @@ import static org.apache.hadoop.hbase.KeyValue.Type.*;
 
 public class OHTable implements HTableInterface {
 
-    private static final Logger  logger                 = TableHBaseLoggerFactory
-                                                            .getLogger(OHTable.class);
+    private static final Logger   logger                 = TableHBaseLoggerFactory
+                                                             .getLogger(OHTable.class);
     /**
      * the table client for oceanbase
      */
-    private final ObTableClient  obTableClient;
+    private final ObTableClient   obTableClient;
 
     /**
      * the ohTable name in byte array
      */
-    private final byte[]         tableName;
+    private final byte[]          tableName;
 
     /**
      * the ohTable name in string
      */
-    private final String         tableNameString;
+    private final String          tableNameString;
 
     /**
      * operation timeout whose default value is <code>Integer.MaxValue</code> decide the timeout of executing in pool.
      * <p>
      * if operation timeout is not equal to the default value mean the <code>Get</code> execute in the pool
      */
-    private int                  operationTimeout;
+    private int                   operationTimeout;
 
     /**
      * timeout for each rpc request
      */
-    private int                  rpcTimeout;
+    private int                   rpcTimeout;
 
     /**
      * if the <code>Get</code> executing pool is specified by user cleanupPoolOnClose will be false ,
      * which means that user is responsible for the pool
      */
-    private boolean              cleanupPoolOnClose     = true;
+    private boolean               cleanupPoolOnClose     = true;
 
     /**
      * if the obTableClient is specified by user closeClientOnClose will be false ,
      * which means that user is responsible for obTableClient
      */
-    private boolean              closeClientOnClose     = true;
+    private boolean               closeClientOnClose     = true;
 
     /**
      * when the operationExecuteInPool is true the <code>Get</code>
      * will be executed in the pool.
      */
-    private ExecutorService      executePool;
+    private ExecutorService       executePool;
 
     /**
      * decide whether the <code>Get</code> request will be executed
      * in the pool.
      */
-    private boolean              operationExecuteInPool = false;
+    private boolean               operationExecuteInPool = false;
 
     /**
      * the buffer of put request
@@ -144,41 +144,36 @@ public class OHTable implements HTableInterface {
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
      */
-    private long                 writeBufferSize;
-    /**
-     * the do put check write buffer every putWriteBufferCheck puts
-     */
-    private int                  putWriteBufferCheck;
-
-    /**
-     * decide whether clear the buffer when meet exception.the default
-     * value is true. Be careful about the correctness when set it false
-     */
-    private boolean              clearBufferOnFail      = true;
+    private long                  writeBufferSize;
 
     /**
      * whether flush the put automatically
      */
-    private boolean              autoFlush              = true;
-
-    /**
-     * current buffer size
-     */
-    private long                 currentWriteBufferSize;
+    private boolean               autoFlush              = true;
 
     /**
      * the max size of put key value
      */
-    private int                  maxKeyValueSize;
+    private int                   maxKeyValueSize;
 
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
      * <code>Configuration</code> extends from hbase configuration
      */
-    private final Configuration  configuration;
+    private final Configuration   configuration;
 
-    private int                  scannerTimeout;
+    private int                   scannerTimeout;
+
+    /**
+     * the bufferedMutator to execute Puts
+     */
+    private OHBufferedMutatorImpl mutator;
+
+    /**
+     * flag for whether closed
+     */
+    private boolean               isClosed               = false;
 
     /**
      * Creates an object to access a HBase table.
@@ -293,7 +288,7 @@ public class OHTable implements HTableInterface {
         this.closeClientOnClose = false;
         this.executePool = executePool;
         this.obTableClient = obTableClient;
-        this.configuration = new Configuration();
+        this.configuration = HBaseConfiguration.create();
         finishSetUp();
     }
 
@@ -325,8 +320,6 @@ public class OHTable implements HTableInterface {
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
-        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
         int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
@@ -388,8 +381,6 @@ public class OHTable implements HTableInterface {
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = this.configuration.getInt(MAX_KEYVALUE_SIZE_KEY,
             MAX_KEYVALUE_SIZE_DEFAULT);
-        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
     }
@@ -430,7 +421,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public TableName getName() {
-        throw new FeatureNotSupportedException("not supported yet.");
+        return TableName.valueOf(this.tableNameString);
     }
 
     @Override
@@ -805,16 +796,16 @@ public class OHTable implements HTableInterface {
 
     private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
                                      List<KeyValue> keyValueList, boolean isTableGroup,
-                                     byte[] family) throws Exception {
+                                     byte[] family, boolean checkExistenceOnly) throws Exception {
         byte[][] familyAndQualifier = new byte[2][];
         KeyValue kv = null;
         while (clientQueryStreamResult.next()) {
-            List<ObObj> row = clientQueryStreamResult.getRow();
-            if (row.isEmpty()) {
+            if (checkExistenceOnly) {
                 // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
                 keyValueList.add(new KeyValue());
                 return;
             } else {
+                List<ObObj> row = clientQueryStreamResult.getRow();
                 if (kv == null
                     || compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) <= 0) {
                     if (kv != null
@@ -900,7 +891,7 @@ public class OHTable implements HTableInterface {
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
+                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family, get.isCheckExistenceOnly());
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                             .entrySet()) {
@@ -923,7 +914,7 @@ public class OHTable implements HTableInterface {
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                 .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
-                                family);
+                                family, get.isCheckExistenceOnly());
                         }
                     }
                 } catch (Exception e) {
@@ -1158,29 +1149,16 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void put(Put put) throws IOException {
-        doPut(Collections.singletonList(put));
+        getBufferedMutator().mutate(put);
+        if (autoFlush) {
+            flushCommits();
+        }
     }
 
     @Override
     public void put(List<Put> puts) throws IOException {
-        doPut(puts);
-    }
-
-    private void doPut(List<Put> puts) throws IOException {
-        int n = 0;
-        for (Put put : puts) {
-            validatePut(put);
-            checkFamilyViolation(put.getFamilyMap().keySet(), true);
-            writeBuffer.add(put);
-            currentWriteBufferSize += put.heapSize();
-
-            // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
-            n++;
-            if (n % putWriteBufferCheck == 0 && currentWriteBufferSize > writeBufferSize) {
-                flushCommits();
-            }
-        }
-        if (autoFlush || currentWriteBufferSize > writeBufferSize) {
+        getBufferedMutator().mutate(puts);
+        if (autoFlush) {
             flushCommits();
         }
     }
@@ -1189,11 +1167,10 @@ public class OHTable implements HTableInterface {
      * 校验 put 里的参数是否合法，需要传入 family ，并且 keyvalue 的 size 不能太大
      * @param put the put
      */
-    private void validatePut(Put put) {
+    public static void validatePut(Put put, int maxKeyValueSize) {
         if (put.isEmpty()) {
             throw new IllegalArgumentException("No columns to insert");
         }
-
         if (maxKeyValueSize > 0) {
             for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
                 if (entry.getKey() == null || entry.getKey().length == 0) {
@@ -1335,8 +1312,6 @@ public class OHTable implements HTableInterface {
                                      RowMutations rowMutations) throws Exception {
         checkArgument(row != null, "row is null");
         checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
-        checkArgument(Bytes.equals(row, rowMutations.getRow()),
-            "mutation row is not equal check row");
         checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
         List<Mutation> mutations = rowMutations.getMutations();
         // only one family operation is allowed
@@ -1537,71 +1512,22 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void flushCommits() throws IOException {
-
-        try {
-            if (writeBuffer.isEmpty()){
-                return;
-            }
-            Map<ObTableException, Row> exceptionRowMap = new LinkedHashMap();
-            boolean[] resultSuccess = new boolean[writeBuffer.size()];
-            try {
-                String realTableName = getTargetTableName(writeBuffer);
-                List<Integer> resultMapSingleOp = new LinkedList<>();
-                BatchOperation batch = buildBatchOperation(realTableName, writeBuffer, tableNameString.equals(realTableName), resultMapSingleOp);
-                BatchOperationResult results = batch.execute();
-                if (results != null) {
-                    int index = 0;
-                    for (int i = 0; i != resultSuccess.length; ++i) {
-                        if (results.getResults().get(index) instanceof ObTableException) {
-                            resultSuccess[i] = false;
-                            exceptionRowMap.put((ObTableException)results.getResults().get(index), writeBuffer.get(i));
-                        } else {
-                            resultSuccess[i] = true;
-                        }
-                        index += resultMapSingleOp.get(i);
-                    }
-                }
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
-                    writeBuffer.size(), e);
-                throw new IOException("put table " + tableNameString + " error.", e);
-            } finally {
-                // mutate list so that it is empty for complete success, or contains
-                // only failed records results are returned in the same order as the
-                // requests in list walk the list backwards, so we can remove from list
-                // without impacting the indexes of earlier members
-                for (int i = resultSuccess.length - 1; i >= 0; i--) {
-                    if (resultSuccess[i]) {
-                        // successful Puts are removed from the list here.
-                        writeBuffer.remove(i);
-                    }
-                }
-                if (!exceptionRowMap.isEmpty()) {
-                    exceptionRowMap.forEach((e, row)->{
-                        logger.error(LCD.convert("01-00008"), row, tableNameString, autoFlush,
-                                writeBuffer.size(), e);
-                    });
-                }
-            }
-        } finally {
-            if (clearBufferOnFail) {
-                writeBuffer.clear();
-                currentWriteBufferSize = 0;
-            } else {
-                // the write buffer was adjusted by processBatchOfPuts
-                currentWriteBufferSize = 0;
-                for (Put aPut : writeBuffer) {
-                    currentWriteBufferSize += aPut.heapSize();
-                }
-            }
+        if (mutator == null) {
+            return;
         }
+        mutator.flush();
     }
 
     @Override
     public void close() throws IOException {
+        if (isClosed) {
+            return;
+        }
+        flushCommits();
         if (cleanupPoolOnClose) {
             executePool.shutdown();
         }
+        this.isClosed = true;
     }
 
     @Override
@@ -1641,7 +1567,7 @@ public class OHTable implements HTableInterface {
      * Turns 'auto-flush' on or off.
      * <p>
      * When enabled (default), {@link Put} operations don't get buffered/delayed
-     * and are immediately executed. Failed operations are not retried. This is
+     * and are immediately executed. Failed operations will be retried in batch. This is
      * slower but safer.
      * <p>
      * Turning off {@link #autoFlush} means that multiple {@link Put}s will be
@@ -1649,28 +1575,24 @@ public class OHTable implements HTableInterface {
      * application dies before pending writes get flushed to HBase, data will be
      * lost.
      * <p>
-     * When you turn {@link #autoFlush} off, you should also consider the
-     * {@link #clearBufferOnFail} option. By default, asynchronous {@link Put}
+     * By default, asynchronous {@link Put}
      * requests will be retried on failure until successful. However, this can
      * pollute the writeBuffer and slow down batching performance. Additionally,
      * you may want to issue a number of Put requests and call
-     * {@link #flushCommits()} as a barrier. In both use cases, consider setting
-     * clearBufferOnFail to true to erase the buffer after {@link #flushCommits()}
-     * has been called, regardless of success.
+     * {@link #flushCommits()} as a barrier.
      *
      * @param autoFlush         Whether or not to enable 'auto-flush'.
-     * @param clearBufferOnFail Whether to keep Put failures in the writeBuffer
+     * @param clearBufferOnFail Whether to keep Put failures in the writeBuffer (UNUSED for this version)
      * @see #flushCommits
      */
     @Override
     public void setAutoFlush(boolean autoFlush, boolean clearBufferOnFail) {
         this.autoFlush = autoFlush;
-        this.clearBufferOnFail = autoFlush || clearBufferOnFail;
     }
 
     @Override
     public void setAutoFlushTo(boolean autoFlush) {
-        throw new FeatureNotSupportedException("not supported yet'");
+        this.autoFlush = autoFlush;
     }
 
     /**
@@ -1683,7 +1605,11 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public long getWriteBufferSize() {
-        return writeBufferSize;
+        if (mutator == null) {
+            return writeBufferSize;
+        } else {
+            return mutator.getWriteBufferSize();
+        }
     }
 
     /**
@@ -1698,9 +1624,10 @@ public class OHTable implements HTableInterface {
     @Override
     public void setWriteBufferSize(long writeBufferSize) throws IOException {
         this.writeBufferSize = writeBufferSize;
-        if (currentWriteBufferSize > writeBufferSize) {
-            flushCommits();
+        if (this.mutator == null) {
+            getBufferedMutator();
         }
+        this.mutator.setWriteBufferSize(writeBufferSize);
     }
 
     @Override
@@ -2463,5 +2390,14 @@ public class OHTable implements HTableInterface {
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
         return new Pair<>(getStartKeys(), getEndKeys());
+    }
+
+    private BufferedMutator getBufferedMutator() throws IOException {
+        if (this.mutator == null) {
+            this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
+                TableName.valueOf(this.tableNameString)).pool(this.executePool)
+                .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
+        }
+        return this.mutator;
     }
 }

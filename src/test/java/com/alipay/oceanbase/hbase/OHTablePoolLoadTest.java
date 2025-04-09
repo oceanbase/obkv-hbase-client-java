@@ -167,8 +167,13 @@ public class OHTablePoolLoadTest extends HTableTestBase {
 
     @AfterClass
     public static void finish() throws IOException, SQLException {
-        hTable.close();
-        multiCfHTable.close();
-        ObHTableTestUtil.closeConn();
+        try {
+            hTable.close();
+            multiCfHTable.close();
+            ObHTableTestUtil.closeConn();
+        } catch (Exception e) {
+            Assert.assertSame(e.getClass(), IOException.class);
+            Assert.assertTrue(e.getMessage().contains("put table"));
+        }
     }
 }

@@ -35,10 +35,6 @@ public class OHBaseFuncUtils {
             throw new RuntimeException("Cannot get family name");
         }
         byte[] family = Arrays.copyOfRange(qualifier, 0, familyLen);
-        int qualifierLen = qualifier.length - familyLen - 1;
-        if (qualifierLen <= 0) {
-            throw new RuntimeException("Cannot get qualifier name");
-        }
         byte[] newQualifier = Arrays.copyOfRange(qualifier, familyLen + 1, qualifier.length);
         return new byte[][] { family, newQualifier };
     }
