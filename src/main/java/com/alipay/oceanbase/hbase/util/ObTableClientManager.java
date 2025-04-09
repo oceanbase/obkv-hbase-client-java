@@ -56,7 +56,7 @@ public class ObTableClientManager {
             obTableClientKey.setDatabase(connectionConfig.getDatabase());
         } else {
             checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
-                                                                      + " is blank");
+                    + " is blank");
             obTableClientKey = new ObTableClientKey();
             String paramUrl = connectionConfig.getParamUrl();
             if (!paramUrl.contains("database")) {
@@ -71,7 +71,7 @@ public class ObTableClientManager {
             }
         }
         checkArgument(isNotBlank(connectionConfig.getFullUsername()),
-            HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
+                HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
         obTableClientKey.setFullUserName(connectionConfig.getFullUsername());
 
         if (connectionConfig.getPassword() == null) {
@@ -83,7 +83,7 @@ public class ObTableClientManager {
         for (Map.Entry<Object, Object> property : connectionConfig.getProperties().entrySet()) {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
-
+        
         return getOrCreateObTableClient(obTableClientKey, connectionConfig.getRpcConnectTimeout());
     }
 

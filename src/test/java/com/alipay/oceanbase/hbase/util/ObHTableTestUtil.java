@@ -33,6 +33,7 @@ import java.sql.Statement;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static org.junit.Assert.assertTrue;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
@@ -52,14 +53,17 @@ public class ObHTableTestUtil {
                                                 + JDBC_DATABASE + "?" + "useUnicode=TRUE&"
                                                 + "characterEncoding=utf-8&"
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
+    public static String       SYS_JDBC_URL   = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
+                                                +  "oceanbase?" + "useUnicode=TRUE&"
+                                                + "characterEncoding=utf-8&"
+                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
 
     public static String       SQL_FORMAT     = "truncate %s";
-    public static List<String> tableNameList;
+    public static List<String> tableNameList  = new LinkedList<String>();
     public static Connection   conn;
     public static Statement    stmt;
 
     static {
-        tableNameList = new LinkedList<>();
         conn = getConnection();
         try {
             stmt = conn.createStatement();
@@ -155,5 +159,82 @@ public class ObHTableTestUtil {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    static public Connection getSysConnection() {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(SYS_JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
+
+            return conn;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @FunctionalInterface
+    public interface CheckedConsumer<T> {
+        void accept(T t) throws Throwable;
+        default CheckedConsumer<T> andThen(CheckedConsumer<? super T> after) throws Exception {
+            if (after == null) { throw new NullPointerException();}
+            return (T t) -> {
+                accept(t);
+                after.accept(t);
+            };
+        }
+    }
+    
+    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer) throws Throwable {
+        for (String tableName : tableNames) {
+            System.out.println("============================= table::{" + tableName + "} =============================");
+            consumer.accept(tableName);
+        }
+    }
+    
+    public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Throwable {
+        for (Map.Entry<String, List<String>> entry : group2Tables.entrySet()) {
+            try {
+                consumer.accept(entry);
+            } catch (IOException e) {
+                assertTrue(e.getCause().getMessage().contains("timeseries hbase table with multi column family not supported"));
+            }
+        }
+    }
+    
+    public static void Assert(String tableName, Runnable assertMethod) throws SQLException {
+        try {
+            assertMethod.run();
+        } catch (AssertionError e) {
+            Connection conn = ObHTableTestUtil.getConnection();
+            String selectSql = "select * from " + tableName;
+            System.out.println("assert fail, execute sql: " + selectSql);
+            java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
+            ResultSetPrinter.print(resultSet);
+            throw e;
+        }
+    }
+    
+    public static void Assert(List<String> tableNames, Runnable assertMethod) throws SQLException {
+        try {
+            assertMethod.run();
+        } catch (AssertionError e) {
+            for (String tableName : tableNames) {
+                Connection conn = ObHTableTestUtil.getConnection();
+                String selectSql = "select * from " + tableName;
+                System.out.println("assert fail, execute sql: " + selectSql);
+                java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
+                ResultSetPrinter.print(resultSet);
+            }
+            throw e;
+        }
+    }
+    
+    
+    public static boolean secureCompare(byte[] a, byte[] b) {
+        int diff = a.length ^ b.length;
+        for (int i = 0; i < a.length && i < b.length; i++) {
+            diff |= a[i] ^ b[i];
+        }
+        return diff == 0;
     }
 }
