@@ -46,7 +46,7 @@ public class OHTableSecondaryPartBatchTest {
     public static void before() throws Exception {
         openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
-                createTables(type, tableNames, group2tableNames, true);
+            createTables(type, tableNames, group2tableNames, true);
         }
     }
 
@@ -177,10 +177,10 @@ public class OHTableSecondaryPartBatchTest {
             Put put = new Put(toBytes("row-" + i));
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                put.add(toBytes(family), toBytes(qualifier[0]), timestamp, toBytes(value[0]));
-                put.add(toBytes(family), toBytes(qualifier[1]), timestamp, toBytes(value[1]));
-                put.add(toBytes(family), toBytes(qualifier[2]), toBytes(value[2]));
-                put.add(toBytes(family), toBytes(qualifier[3]), toBytes(value[3]));
+                put.addColumn(toBytes(family), toBytes(qualifier[0]), timestamp, toBytes(value[0]));
+                put.addColumn(toBytes(family), toBytes(qualifier[1]), timestamp, toBytes(value[1]));
+                put.addColumn(toBytes(family), toBytes(qualifier[2]), toBytes(value[2]));
+                put.addColumn(toBytes(family), toBytes(qualifier[3]), toBytes(value[3]));
             }
             puts.add(put);
         }
@@ -216,10 +216,10 @@ public class OHTableSecondaryPartBatchTest {
             Put put = new Put(toBytes("row-" + i));
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                put.add(toBytes(family), toBytes(qualifier[0]), timestamp, toBytes(updateValue[0]));
-                put.add(toBytes(family), toBytes(qualifier[1]), timestamp, toBytes(updateValue[1]));
-                put.add(toBytes(family), toBytes(qualifier[2]), toBytes(updateValue[2]));
-                put.add(toBytes(family), toBytes(qualifier[3]), toBytes(updateValue[3]));
+                put.addColumn(toBytes(family), toBytes(qualifier[0]), timestamp, toBytes(updateValue[0]));
+                put.addColumn(toBytes(family), toBytes(qualifier[1]), timestamp, toBytes(updateValue[1]));
+                put.addColumn(toBytes(family), toBytes(qualifier[2]), toBytes(updateValue[2]));
+                put.addColumn(toBytes(family), toBytes(qualifier[3]), toBytes(updateValue[3]));
             }
             puts.add(put);
         }
@@ -286,8 +286,8 @@ public class OHTableSecondaryPartBatchTest {
         for (int i = 0; i < batchSize; i++) {
             Put put = new Put(toBytes(keyPrefix + i));
             for (int j = 0; j < columns.length; j++) {
-                put.add(toBytes(family), toBytes(columns[j]), ts[0], toBytes(valuePrefix + "1_" +i));
-                put.add(toBytes(family), toBytes(columns[j]), ts[1], toBytes(valuePrefix + "2_" +i));
+                put.addColumn(toBytes(family), toBytes(columns[j]), ts[0], toBytes(valuePrefix + "1_" +i));
+                put.addColumn(toBytes(family), toBytes(columns[j]), ts[1], toBytes(valuePrefix + "2_" +i));
             }
             puts.add(put);
         }
@@ -311,13 +311,13 @@ public class OHTableSecondaryPartBatchTest {
                 List<Cell> cells = r.listCells();
                 for (int j = 0; j < r.size(); j++) {
                     Cell cell = cells.get(j);
-                    Assert.assertEquals(keyPrefix+i, Bytes.toString(cell.getRow()));
-                    Assert.assertEquals(columns[index], Bytes.toString(cell.getQualifier()));
+                    Assert.assertEquals(keyPrefix+i, Bytes.toString(CellUtil.cloneRow(cell)));
+                    Assert.assertEquals(columns[index], Bytes.toString(CellUtil.cloneQualifier(cell)));
                     Assert.assertEquals(ts[j], cell.getTimestamp());
                     if (j == 0) {
-                        Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(cell.getValue()));
+                        Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(CellUtil.cloneValue(cell)));
                     } else {
-                        Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(cell.getValue()));
+                        Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(CellUtil.cloneValue(cell)));
                     }
                 }
             }
@@ -342,9 +342,9 @@ public class OHTableSecondaryPartBatchTest {
                    for (int k = 0; k < cells.size(); k++) {
                        Assert.assertEquals(ts[k], cells.get(k).getTimestamp());
                        if (k == 0) {
-                           Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(cells.get(k).getValue()));
+                           Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(k))));
                        } else {
-                           Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(cells.get(k).getValue()));
+                           Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(k))));
                        }
                    }
                 }
@@ -370,9 +370,9 @@ public class OHTableSecondaryPartBatchTest {
                     for (int k = 0; k < cells.size(); k++) {
                         Assert.assertEquals(ts[k], cells.get(k).getTimestamp());
                         if (k == 0) {
-                            Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(cells.get(k).getValue()));
+                            Assert.assertEquals(valuePrefix+"1_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(k))));
                         } else {
-                            Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(cells.get(k).getValue()));
+                            Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(k))));
                         }
                     }
                 }
@@ -397,7 +397,7 @@ public class OHTableSecondaryPartBatchTest {
                     List<Cell> cells = r.getColumnCells(family.getBytes(), toBytes(columns[j]));
                     Assert.assertEquals(1, cells.size());
                     Assert.assertEquals(ts[1], cells.get(0).getTimestamp());
-                    Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(cells.get(0).getValue()));
+                    Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(0))));
                 }
             }
         }
@@ -422,7 +422,7 @@ public class OHTableSecondaryPartBatchTest {
                     List<Cell> cells = r.getColumnCells(family.getBytes(), toBytes(columns[j]));
                     Assert.assertEquals(1, cells.size());
                     Assert.assertEquals(ts[1], cells.get(0).getTimestamp());
-                    Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(cells.get(0).getValue()));
+                    Assert.assertEquals(valuePrefix+"2_"+i, Bytes.toString(CellUtil.cloneValue(cells.get(0))));
                 }
             }
         }
@@ -438,20 +438,21 @@ public class OHTableSecondaryPartBatchTest {
         long[] ts = {curTs, curTs - 1000};
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
-        List<Row> batchLsit = new LinkedList<>();
+        List<Row> batchList = new LinkedList<>();
         // 0. load data
         for (int i = 0; i < keys.length; i++) {
             Put put = new Put(keys[i]);
             for (int j = 0; j < qualifiers.length; j++) {
                 for (int k = 0; k < values.length; k++) {
-                    put.add(family, qualifiers[j], ts[k], values[k]);
+                    put.addColumn(family, qualifiers[j], ts[k], values[k]);
                 }
             }
-            batchLsit.add(put);
+            batchList.add(put);
         }
-        hTable.batch(batchLsit);
+        Result[] results = new Result[batchList.size()];
+        hTable.batch(batchList, results);
         // 1. get + put + get
-        batchLsit.clear();
+        batchList.clear();
         {
             // get old result
             Get get1 = new Get(keys[0]);
@@ -465,10 +466,10 @@ public class OHTableSecondaryPartBatchTest {
             // put new value
             byte[] newValue = "new_value".getBytes();
             Put put1 = new Put(keys[0]);
-            put1.add(family, qualifiers[0], newValue);
+            put1.addColumn(family, qualifiers[0], newValue);
             // put new value
             Put put2 = new Put(keys[1]);
-            put2.add(family, qualifiers[1], newValue);
+            put2.addColumn(family, qualifiers[1], newValue);
             // get new result
             Get get3 = new Get(keys[0]);
             get3.setMaxVersions(1);
@@ -480,13 +481,14 @@ public class OHTableSecondaryPartBatchTest {
             get4.addColumn(family, qualifiers[1]);
 
             // execute
-            batchLsit.addAll(Arrays.asList(get1 ,get2, put1, put2, get3, get4));
-            Object[] results = hTable.batch(batchLsit);
+            batchList.addAll(Arrays.asList(get1 ,get2, put1, put2, get3, get4));
+            results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             // verify result
             Assert.assertEquals(6, results.length);
             // get1
             Result get1Result = (Result) results[0];
-            Assert.assertEquals(4, get1Result.raw().length);
+            Assert.assertEquals(4, get1Result.size());
             List<Cell> k0cq0 = get1Result.getColumnCells(family, qualifiers[0]);
             Assert.assertEquals(2, k0cq0.size());
             AssertKeyValue(Bytes.toString(keys[0]), Bytes.toString(qualifiers[0]), ts[0], Bytes.toString(values[0]), k0cq0.get(0));
@@ -497,25 +499,25 @@ public class OHTableSecondaryPartBatchTest {
             AssertKeyValue(Bytes.toString(keys[0]), Bytes.toString(qualifiers[1]), ts[1], Bytes.toString(values[1]), k0cq1.get(1));
             // get2
             Result get2Result = (Result) results[1];
-            Assert.assertEquals(1, get2Result.raw().length);
+            Assert.assertEquals(1, get2Result.size());
             List<Cell> k1cq1 = get2Result.getColumnCells(family, qualifiers[1]);
             Assert.assertEquals(1, k1cq1.size());
             AssertKeyValue(Bytes.toString(keys[1]), Bytes.toString(qualifiers[1]), ts[0], Bytes.toString(values[0]), k1cq1.get(0));
             // get3
             Result get3Result = (Result) results[4];
-            Assert.assertEquals(1, get3Result.raw().length);
+            Assert.assertEquals(1, get3Result.size());
             k0cq0 = get3Result.getColumnCells(family, qualifiers[0]);
             Assert.assertEquals(1, k0cq0.size());
             AssertKeyValue(Bytes.toString(keys[0]), Bytes.toString(qualifiers[0]), Bytes.toString(newValue), k0cq0.get(0));
             // get4
             Result get4Result = (Result) results[5];
-            Assert.assertEquals(1, get4Result.raw().length);
+            Assert.assertEquals(1, get4Result.size());
             k1cq1 = get4Result.getColumnCells(family, qualifiers[1]);
             Assert.assertEquals(1, k1cq1.size());
             AssertKeyValue(Bytes.toString(keys[1]), Bytes.toString(qualifiers[1]), Bytes.toString(newValue), k1cq1.get(0));
         }
         // 2. delete + get + delete + get
-        batchLsit.clear();
+        batchList.clear();
         {
             // delete all version keys[0]-qualifiers[0]
             Delete delete1 =  new Delete(keys[0]);
@@ -533,8 +535,9 @@ public class OHTableSecondaryPartBatchTest {
             get2.addFamily(family);
             get2.setMaxVersions();
             // execute
-            batchLsit.addAll(Arrays.asList(delete1, get1, delete2, get2));
-            Object[] results = hTable.batch(batchLsit);
+            batchList.addAll(Arrays.asList(delete1, get1, delete2, get2));
+            results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             // verify result
             Assert.assertEquals(4, results.length);
             Result get1Result = (Result) results[1];
@@ -547,14 +550,14 @@ public class OHTableSecondaryPartBatchTest {
             Assert.assertEquals(0, get2Result.size());
         }
         // 3. put + delete + get
-        batchLsit.clear();
+        batchList.clear();
         {
             Put put1 = new Put(keys[0]);
-            put1.add(family, qualifiers[0], "new_new_value".getBytes());
-            put1.add(family, qualifiers[1], "new_new_value".getBytes());
+            put1.addColumn(family, qualifiers[0], "new_new_value".getBytes());
+            put1.addColumn(family, qualifiers[1], "new_new_value".getBytes());
             Put put2 = new Put(keys[1]);
-            put2.add(family, qualifiers[0], "new_new_value".getBytes());
-            put2.add(family, qualifiers[1], "new_new_value".getBytes());
+            put2.addColumn(family, qualifiers[0], "new_new_value".getBytes());
+            put2.addColumn(family, qualifiers[1], "new_new_value".getBytes());
             Delete delete = new Delete(keys[0]);
             delete.addColumns(family, qualifiers[0]);
             Get get1 = new Get(keys[0]);
@@ -565,8 +568,9 @@ public class OHTableSecondaryPartBatchTest {
             get2.setMaxVersions(1);
             get2.addFamily(family);
 
-            batchLsit.addAll(Arrays.asList(put1, put2, delete, get1, get2));
-            Object[] results = hTable.batch(batchLsit);
+            batchList.addAll(Arrays.asList(put1, put2, delete, get1, get2));
+            results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             Assert.assertEquals(5, results.length);
             Result getResult1 = (Result) results[3];
             Assert.assertEquals(1, getResult1.size());
@@ -603,7 +607,7 @@ public class OHTableSecondaryPartBatchTest {
                 String family = getColumnFamilyName(tableName);
                 for (int i = 0; i < values.length; i++) {
                     for (int j = 0; j < columns.length; j++) {
-                        put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]+k));
+                        put.addColumn(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]+k));
                     }
                 }
             }
@@ -818,7 +822,7 @@ public class OHTableSecondaryPartBatchTest {
                     String family = getColumnFamilyName(tableName);
                     for (int i = 0; i < values.length; i++) {
                         for (int j = 0; j < columns.length; j++) {
-                            put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i] + k));
+                            put.addColumn(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i] + k));
                         }
                     }
                 }
@@ -836,7 +840,8 @@ public class OHTableSecondaryPartBatchTest {
                 batchList.add(createPutOp(key, families, columns[0], ts[1], "new_value_"+i));
                 batchList.add(createGetOp(key, families, columns[0], ts[1]));
             }
-            Object[] results = hTable.batch(batchList);
+            Result[] results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             Assert.assertEquals(batchSize*3, results.length);
             for (int i = 0; i < batchSize; i++) {
                 Result get1Result = (Result) results[3*i+0];
@@ -857,7 +862,8 @@ public class OHTableSecondaryPartBatchTest {
                 batchList.add(createDeleteOp(key, families, columns[0], ts[1]));
                 batchList.add(createGetOp(key, families, columns[0], ts[1]));
             }
-            Object[] results = hTable.batch(batchList);
+            Result[] results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             Assert.assertEquals(batchSize*5, results.length);
             for (int i = 0; i < batchSize; i++) {
                 Result get1Result = (Result) results[5*i+1];
@@ -879,7 +885,8 @@ public class OHTableSecondaryPartBatchTest {
                 batchList.add(createDeleteOp(key, families, columns[0], ts[1]));
                 batchList.add(createGetOp(key, families, columns[0], ts[1]));
             }
-            Object[] results = hTable.batch(batchList);
+            Result[] results = new Result[batchList.size()];
+            hTable.batch(batchList, results);
             Assert.assertEquals(batchSize*4, results.length);
             for (int i = 0; i < batchSize; i++) {
                 Result get1Result = (Result) results[4*i+1];
@@ -899,30 +906,28 @@ public class OHTableSecondaryPartBatchTest {
         return families;
     }
 
-    private static void checkResult(String key, String[] families, String qualifier,
-                               long ts, String value, Result result) {
+    private static void checkResult(String key, String[] families, String qualifier, long ts,
+                                    String value, Result result) {
         Assert.assertEquals(families.length, result.size());
-        for (String family: families) {
+        for (String family : families) {
             Cell cell = result.getColumnCells(family.getBytes(), qualifier.getBytes()).get(0);
             AssertKeyValue(key, family, qualifier, ts, value, cell);
         }
     }
 
-
-    private static Put createPutOp(String key, String[] families, String qualifier,
-                                   long ts, String value) {
+    private static Put createPutOp(String key, String[] families, String qualifier, long ts,
+                                   String value) {
         if (families == null || qualifier == null || value == null) {
             throw new IllegalArgumentException("input parameters is illegal");
         }
         Put put = new Put(key.getBytes());
         for (int i = 0; i < families.length; i++) {
-            put.add(families[i].getBytes(), qualifier.getBytes(), ts, value.getBytes());
+            put.addColumn(families[i].getBytes(), qualifier.getBytes(), ts, value.getBytes());
         }
         return put;
     }
 
-    private static Delete createDeleteOp(String key, String[] families, String qualifier,
-                                         long ts) {
+    private static Delete createDeleteOp(String key, String[] families, String qualifier, long ts) {
         if (families == null || qualifier == null) {
             throw new IllegalArgumentException("input parameters is illegal");
         }
@@ -933,8 +938,8 @@ public class OHTableSecondaryPartBatchTest {
         return delete;
     }
 
-    private static Get createGetOp(String key, String[] families, String qualifier,
-                                   long ts) throws IOException {
+    private static Get createGetOp(String key, String[] families, String qualifier, long ts)
+                                                                                            throws IOException {
         if (families == null || qualifier == null) {
             throw new IllegalArgumentException("input parameters is illegal");
         }

@@ -284,7 +284,7 @@ public class OHTableSecondaryPartCellTTLTest {
         hTable.increment(increment);
         r = hTable.get(get);
         assertEquals(r.size(), 1);
-        assertEquals(Bytes.toLong(r.raw()[0].getValue()), 12L);
+        assertEquals(Bytes.toLong(CellUtil.cloneValue(r.rawCells()[0])), 12L);
         get.setMaxVersions(10);
         r = hTable.get(get);
         assertEquals(r.size(), 2);
@@ -297,7 +297,7 @@ public class OHTableSecondaryPartCellTTLTest {
         get.setMaxVersions(10);
         r = hTable.get(get);
         assertEquals(r.size(), 1);
-        assertEquals(Bytes.toLong(r.raw()[0].getValue()), 11L);
+        assertEquals(Bytes.toLong(CellUtil.cloneValue(r.rawCells()[0])), 11L);
         hTable.close();
     }
 

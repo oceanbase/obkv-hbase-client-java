@@ -15,7 +15,6 @@
  * #L%
  */
 
-
 package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTableClient;
@@ -36,8 +35,7 @@ import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartPutTest {
     private static List<String>              tableNames       = new LinkedList<String>();
-    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<>();
-
+    private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
     @BeforeClass
     public static void before() throws Exception {
@@ -70,8 +68,8 @@ public class OHTableSecondaryPartPutTest {
         { // put new key and get
             long timestamp = System.currentTimeMillis();
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value));
-            put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value));
+            put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value));
+            put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value));
             hTable.put(put);
             
             Get get = new Get(toBytes(key));
@@ -85,7 +83,7 @@ public class OHTableSecondaryPartPutTest {
         { // put exist key and get
             long timestamp = System.currentTimeMillis();
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
+            put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
             hTable.put(put);
             
             Get get = new Get(toBytes(key));
@@ -98,7 +96,7 @@ public class OHTableSecondaryPartPutTest {
         { // test timestamp update
             long timestamp = System.currentTimeMillis();
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
+            put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
             hTable.put(put);
             
             Get get = new Get(toBytes(key));
@@ -109,7 +107,7 @@ public class OHTableSecondaryPartPutTest {
             Assert(tableName, ()->Assert.assertEquals(timestamp, r.rawCells()[0].getTimestamp()));
             
             Put put1 = new Put(toBytes(key));
-            put1.add(family.getBytes(), column1.getBytes(), timestamp + 100, toBytes(column1 + value));
+            put1.addColumn(family.getBytes(), column1.getBytes(), timestamp + 100, toBytes(column1 + value));
             hTable.put(put1);
             
             Result r2 = hTable.get(get);
@@ -122,7 +120,7 @@ public class OHTableSecondaryPartPutTest {
         
         hTable.close();
     }
-    
+
     public static void testBatchPutImpl(String tableName) throws Exception {
         OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
         hTable.init();
@@ -137,14 +135,14 @@ public class OHTableSecondaryPartPutTest {
             Get get = new Get(toBytes(key));
             for (int i = 0; i < 10; ++i) {
                 Put put = new Put(toBytes(key));
-                put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp + i));
-                put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp + i));
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp + i));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp + i));
                 puts.add(put);
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
             }
-
-            hTable.batch(puts);
+            Result[] results = new Result[puts.size()];
+            hTable.batch(puts, results);
             Result result = hTable.get(get);
             Assert(tableName, ()->Assert.assertEquals(2, result.size()));
             for (Cell cell : result.rawCells()) {
@@ -159,16 +157,17 @@ public class OHTableSecondaryPartPutTest {
             
             for (int i = 0; i < 10; ++i) {
                 Put put = new Put(toBytes(key + i));
-                put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp + i));
-                put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp + i));
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp + i));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp + i));
                 puts.add(put);
                 Get get = new Get(toBytes(key + i));
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
                 gets.add(get);
             }
-            
-            hTable.batch(puts);
+
+            Result[] results = new Result[puts.size()];
+            hTable.batch(puts, results);
             
             for (int i = 0; i < 10; ++i) {
                 Result result = hTable.get(gets.get(i));
@@ -198,8 +197,8 @@ public class OHTableSecondaryPartPutTest {
             Get get = new Get(toBytes(key));
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                put.add(family.getBytes(), column1.getBytes(), currentTime, toBytes(column1 + value));
-                put.add(family.getBytes(), column2.getBytes(), currentTime, toBytes(column2 + value));
+                put.addColumn(family.getBytes(), column1.getBytes(), currentTime, toBytes(column1 + value));
+                put.addColumn(family.getBytes(), column2.getBytes(), currentTime, toBytes(column2 + value));
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
             }
@@ -219,8 +218,8 @@ public class OHTableSecondaryPartPutTest {
             Get get = new Get(toBytes(key));
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
-                put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value));
-                put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value));
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value));
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
             }
@@ -256,13 +255,14 @@ public class OHTableSecondaryPartPutTest {
             for (String tableName : entry.getValue()) {
                 String family = getColumnFamilyName(tableName);
                 Put put = new Put(toBytes(key));
-                put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
-                put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp));
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp));
                 puts.add(put);
                 get.addColumn(family.getBytes(), column1.getBytes());
                 get.addColumn(family.getBytes(), column2.getBytes());
             }
-            hTable.batch(puts);
+            Result[] results = new Result[puts.size()];
+            hTable.batch(puts, results);
             Result result = hTable.get(get);
             Assert(entry.getValue(), ()->Assert.assertEquals(entry.getValue().size() * 2, result.size()));
             for (Cell cell : result.rawCells()) {
@@ -285,8 +285,8 @@ public class OHTableSecondaryPartPutTest {
                 String family = getColumnFamilyName(tableName);
                 for (int i = 0; i < 10; ++i) {
                     Put put = new Put(toBytes(key + i));
-                    put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
-                    put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp));
+                    put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + timestamp));
+                    put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + timestamp));
                     puts.add(put);
                     Get get = new Get(toBytes(key + i));
                     get.addColumn(family.getBytes(), column1.getBytes());
@@ -294,7 +294,8 @@ public class OHTableSecondaryPartPutTest {
                     gets.add(new Pair<>(get, family));
                 }
             }
-            hTable.batch(puts);
+            Result[] results = new Result[puts.size()];
+            hTable.batch(puts, results);
             for (int i = 0; i < 10; ++i) {
                 Result result = hTable.get(gets.get(i).getFirst());
                 Assert(entry.getValue(), () -> Assert.assertEquals(2, result.size()));
@@ -309,26 +310,24 @@ public class OHTableSecondaryPartPutTest {
         }
         hTable.close();
     }
-    
-    
+
     @Test
     public void testPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testPutImpl);
     }
-    
+
     @Test
     public void testBatchPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testBatchPutImpl);
     }
-    
+
     @Test
     public void testMultiCFPut() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMultiCFPutImpl);
     }
-    
+
     @Test
     public void testMultiCFPutBatch() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMltiCFPutBatchImpl);
     }
-
 }

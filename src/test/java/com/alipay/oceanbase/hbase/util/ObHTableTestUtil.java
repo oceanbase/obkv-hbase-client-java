@@ -20,7 +20,6 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HTableDescriptor;
 
 import java.sql.Connection;
 
@@ -53,17 +52,16 @@ public class ObHTableTestUtil {
                                                 + "characterEncoding=utf-8&"
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
     public static String       SYS_JDBC_URL   = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
-                                                +  "oceanbase?" + "useUnicode=TRUE&"
+                                                + "oceanbase?" + "useUnicode=TRUE&"
                                                 + "characterEncoding=utf-8&"
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
 
     public static String       SQL_FORMAT     = "truncate %s";
-    public static List<String> tableNameList;
+    public static List<String> tableNameList  = new LinkedList<String>();
     public static Connection   conn;
     public static Statement    stmt;
 
     static {
-        tableNameList = new LinkedList<>();
         conn = getConnection();
         try {
             stmt = conn.createStatement();
@@ -125,29 +123,28 @@ public class ObHTableTestUtil {
     }
 
     static public List<String> getOHTableNameList(String tableGroup) throws IOException {
-        // 读取建表语句
-        List<String> res = new LinkedList<>();
-        String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
-        String[] sqlList = sql.split(";");
-        Map<String, HTableDescriptor> tableMap = new LinkedHashMap<>();
-        for (String singleSql : sqlList) {
-            String realTableName;
-            if (singleSql.contains("CREATE TABLE ")) {
-                singleSql.trim();
-                String[] splits = singleSql.split(" ");
-                String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
-                if (tableGroupName.contains(":")) {
-                    String[] tmpStr = tableGroupName.split(":", 2);
-                    tableGroupName = tmpStr[1];
-                }
-                realTableName = tableGroupName.split("\\$", 2)[0];
-                if (realTableName.equals(tableGroup)) {
-                    res.add(tableGroupName);
+            // 读取建表语句
+            List<String> res = new LinkedList<>();
+            String sql = new String(Files.readAllBytes(Paths.get(NativeHBaseUtil.SQL_PATH)));
+            String[] sqlList = sql.split(";");
+            for (String singleSql : sqlList) {
+                String realTableName;
+                if (singleSql.contains("CREATE TABLE ")) {
+                    singleSql.trim();
+                    String[] splits = singleSql.split(" ");
+                    String tableGroupName = splits[2].substring(1, splits[2].length() - 1);
+                    if (tableGroupName.contains(":")) {
+                        String[] tmpStr = tableGroupName.split(":", 2);
+                        tableGroupName = tmpStr[1];
+                    }
+                    realTableName = tableGroupName.split("\\$", 2)[0];
+                    if (realTableName.equals(tableGroup)) {
+                        res.add(tableGroupName);
+                    }
                 }
             }
+            return res;
         }
-        return res;
-    }
 
     static public Connection getConnection() {
         try {
@@ -164,7 +161,8 @@ public class ObHTableTestUtil {
     static public Connection getSysConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            Connection conn = DriverManager.getConnection(SYS_JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
+            Connection conn = DriverManager
+                .getConnection(SYS_JDBC_URL, SYS_USER_NAME, SYS_PASSWORD);
 
             return conn;
         } catch (Exception e) {
@@ -175,28 +173,25 @@ public class ObHTableTestUtil {
     @FunctionalInterface
     public interface CheckedConsumer<T> {
         void accept(T t) throws Throwable;
-        default CheckedConsumer<T> andThen(CheckedConsumer<? super T> after) throws Exception {
-            if (after == null) { throw new NullPointerException();}
-            return (T t) -> {
-                accept(t);
-                after.accept(t);
-            };
-        }
     }
-    
-    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer) throws Throwable {
+
+    public static void FOR_EACH(List<String> tableNames, CheckedConsumer<String> consumer)
+                                                                                          throws Throwable {
         for (String tableName : tableNames) {
-            System.out.println("============================= table::{" + tableName + "} =============================");
+            System.out.println("============================= table::{" + tableName
+                               + "} =============================");
             consumer.accept(tableName);
         }
     }
-    
-    public static void FOR_EACH(Map<String, List<String>> group2Tables, CheckedConsumer<Map.Entry<String, List<String>>> consumer) throws Throwable {
+
+    public static void FOR_EACH(Map<String, List<String>> group2Tables,
+                                CheckedConsumer<Map.Entry<String, List<String>>> consumer)
+                                                                                          throws Throwable {
         for (Map.Entry<String, List<String>> entry : group2Tables.entrySet()) {
             consumer.accept(entry);
         }
     }
-    
+
     public static void Assert(String tableName, Runnable assertMethod) throws SQLException {
         try {
             assertMethod.run();
@@ -209,7 +204,7 @@ public class ObHTableTestUtil {
             throw e;
         }
     }
-    
+
     public static void Assert(List<String> tableNames, Runnable assertMethod) throws SQLException {
         try {
             assertMethod.run();
@@ -224,8 +219,7 @@ public class ObHTableTestUtil {
             throw e;
         }
     }
-    
-    
+
     public static boolean secureCompare(byte[] a, byte[] b) {
         int diff = a.length ^ b.length;
         for (int i = 0; i < a.length && i < b.length; i++) {

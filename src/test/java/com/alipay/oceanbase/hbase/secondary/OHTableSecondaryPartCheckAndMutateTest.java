@@ -71,9 +71,9 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         final byte[] ROW = Bytes.toBytes("12345");
         final byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
         Put put = new Put(ROW);
-        put.add(FAMILY, Bytes.toBytes("A"), Bytes.toBytes("a"));
-        put.add(FAMILY, Bytes.toBytes("B"), Bytes.toBytes("b"));
-        put.add(FAMILY, Bytes.toBytes("C"), Bytes.toBytes("c"));
+        put.addColumn(FAMILY, Bytes.toBytes("A"), Bytes.toBytes("a"));
+        put.addColumn(FAMILY, Bytes.toBytes("B"), Bytes.toBytes("b"));
+        put.addColumn(FAMILY, Bytes.toBytes("C"), Bytes.toBytes("c"));
         hTable.put(put);
         // get row back and assert the values
         Get get = new Get(ROW);
@@ -89,11 +89,11 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         // put the same row again with C column deleted
         RowMutations rm = new RowMutations(ROW);
         put = new Put(ROW);
-        put.add(FAMILY, Bytes.toBytes("A"), Bytes.toBytes("a"));
-        put.add(FAMILY, Bytes.toBytes("B"), Bytes.toBytes("b"));
+        put.addColumn(FAMILY, Bytes.toBytes("A"), Bytes.toBytes("a"));
+        put.addColumn(FAMILY, Bytes.toBytes("B"), Bytes.toBytes("b"));
         rm.add(put);
         Delete del = new Delete(ROW);
-        del.deleteColumn(FAMILY, Bytes.toBytes("C"));
+        del.addColumn(FAMILY, Bytes.toBytes("C"));
         rm.add(del);
         boolean res = hTable.checkAndMutate(ROW, FAMILY, Bytes.toBytes("A"),
             CompareFilter.CompareOp.EQUAL, Bytes.toBytes("a"), rm);
@@ -112,7 +112,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         //Test that we get a hTable level exception
         try {
             Put p = new Put(ROW);
-            p.add(new byte[] { 'b', 'o', 'g', 'u', 's' }, new byte[] { 'A' }, new byte[0]);
+            p.addColumn(new byte[] { 'b', 'o', 'g', 'u', 's' }, new byte[] { 'A' }, new byte[0]);
             rm = new RowMutations(ROW);
             rm.add(p);
             hTable.checkAndMutate(ROW, FAMILY, Bytes.toBytes("A"), CompareFilter.CompareOp.EQUAL,
@@ -131,7 +131,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
 
         Put put1 = new Put(ROW);
-        put1.add(FAMILY, QUALIFIER, VALUE_1);
+        put1.addColumn(FAMILY, QUALIFIER, VALUE_1);
 
         // row doesn't exist, so using non-null value should be considered "not match".
         boolean ok = hTable.checkAndPut(ROW, FAMILY, QUALIFIER, VALUE_1, put1);
@@ -146,14 +146,14 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         assertEquals(ok, false);
 
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY, QUALIFIER, VALUE_2);
 
         // row now exists, use the matching value to check
         ok = hTable.checkAndPut(ROW, FAMILY, QUALIFIER, VALUE_1, put2);
         assertEquals(ok, true);
 
         Put put3 = new Put(ROW_1);
-        put3.add(FAMILY, QUALIFIER, VALUE_1);
+        put3.addColumn(FAMILY, QUALIFIER, VALUE_1);
 
         // try to do CheckAndPut on different rows
         try {
@@ -174,10 +174,10 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
 
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, value2);
+        put2.addColumn(FAMILY, QUALIFIER, value2);
 
         Put put3 = new Put(ROW);
-        put3.add(FAMILY, QUALIFIER, value3);
+        put3.addColumn(FAMILY, QUALIFIER, value3);
 
         // row doesn't exist, so using "null" to check for existence should be considered "match".
         boolean ok = hTable.checkAndPut(ROW, FAMILY, QUALIFIER, null, put2);
@@ -255,14 +255,14 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
 
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, value2);
+        put2.addColumn(FAMILY, QUALIFIER, value2);
         hTable.put(put2);
 
         Put put3 = new Put(ROW);
-        put3.add(FAMILY, QUALIFIER, value3);
+        put3.addColumn(FAMILY, QUALIFIER, value3);
 
         Delete delete = new Delete(ROW);
-        delete.deleteColumns(FAMILY, QUALIFIER);
+        delete.addColumns(FAMILY, QUALIFIER);
 
         // cell = "bbbb", using "aaaa" to compare only LESS/LESS_OR_EQUAL/NOT_EQUAL
         // turns out "match"
@@ -350,7 +350,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         List<String> tableNames = entry.getValue();
         byte[] FAMILY_1 = getColumnFamilyName(tableNames.get(0)).getBytes();
         Put put2 = new Put(ROW);
-        put2.add(FAMILY_1, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY_1, QUALIFIER, VALUE_2);
         hTable.put(put2);
         RowMutations mutations = new RowMutations(ROW);
 
@@ -372,7 +372,7 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         mutations = new RowMutations(ROW);
         byte[] FAMILY_2 = tableNames.get(1).getBytes();
         Put put3 = new Put(ROW);
-        put3.add(FAMILY_2, QUALIFIER, VALUE_1);
+        put3.addColumn(FAMILY_2, QUALIFIER, VALUE_1);
         mutations.add(put2);
         mutations.add(put3);
         try {
@@ -393,10 +393,10 @@ public class OHTableSecondaryPartCheckAndMutateTest {
         byte[] ROW = "appendKey".getBytes();
         RowMutations mutations = new RowMutations(ROW);
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY, QUALIFIER, VALUE_2);
         hTable.put(put2);
         Put put3 = new Put(ROW);
-        put3.add(FAMILY, QUALIFIER, VALUE_1);
+        put3.addColumn(FAMILY, QUALIFIER, VALUE_1);
         mutations.add(put3);
         try {
             hTable.checkAndMutate(ROW, FAMILY, QUALIFIER, CompareFilter.CompareOp.GREATER, VALUE_2,

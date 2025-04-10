@@ -80,7 +80,7 @@ public class OHTableSecondaryPartGetTest {
         for (int i = 0; i < values.length; i++) {
             for (int j = 0; j < columns.length; j++) {
                 Put put = new Put(toBytes(key));
-                put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]));
+                put.addColumn(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]));
                 hTable.put(put);
             }
         }
@@ -91,7 +91,7 @@ public class OHTableSecondaryPartGetTest {
             Get get = new Get(key.getBytes());
             get.addColumn(family.getBytes(), columns[index].getBytes());
             Result r = hTable.get(get);
-            Assert.assertEquals(1, r.raw().length);
+            Assert.assertEquals(1, r.size());
             AssertKeyValue(key, columns[index], lastTs, latestValue, r.rawCells()[0]);
         }
 
@@ -115,9 +115,9 @@ public class OHTableSecondaryPartGetTest {
             get.addColumn(family.getBytes(), columns[index].getBytes());
             get.setMaxVersions(2);
             Result r = hTable.get(get);
-            Assert.assertEquals(2, r.raw().length);
-            AssertKeyValue(key, columns[index], ts[1], values[1], r.raw()[0]);
-            AssertKeyValue(key, columns[index], ts[0], values[0], r.raw()[1]);
+            Assert.assertEquals(2, r.size());
+            AssertKeyValue(key, columns[index], ts[1], values[1], r.rawCells()[0]);
+            AssertKeyValue(key, columns[index], ts[0], values[0], r.rawCells()[1]);
         }
 
         // 4. get specify time range
@@ -127,9 +127,9 @@ public class OHTableSecondaryPartGetTest {
             get.setMaxVersions(2);
             get.setTimeStamp(ts[1]);
             Result r = hTable.get(get);
-            Assert.assertEquals(columns.length, r.raw().length);
+            Assert.assertEquals(columns.length, r.size());
             for (int i = 0; i < columns.length; i++) {
-                AssertKeyValue(key, columns[i], values[1], r.raw()[i]);
+                AssertKeyValue(key, columns[i], values[1], r.rawCells()[i]);
             }
         }
 
@@ -142,9 +142,9 @@ public class OHTableSecondaryPartGetTest {
                 new BinaryComparator(toBytes(values[0])));
             get.setFilter(valueFilter);
             Result r = hTable.get(get);
-            Assert.assertEquals(columns.length, r.raw().length);
+            Assert.assertEquals(columns.length, r.size());
             for (int i = 0; i < columns.length; i++) {
-                AssertKeyValue(key, columns[i], values[0], r.raw()[i]);
+                AssertKeyValue(key, columns[i], values[0], r.rawCells()[i]);
             }
         }
 
@@ -171,7 +171,8 @@ public class OHTableSecondaryPartGetTest {
             for (int i = 0; i < values.length; i++) {
                 for (int j = 0; j < columns.length; j++) {
                     Put put = new Put(toBytes(key));
-                    put.add(family.getBytes(), columns[j].getBytes(), ts[i], toBytes(values[i]));
+                    put.addColumn(family.getBytes(), columns[j].getBytes(), ts[i],
+                        toBytes(values[i]));
                     hTable.put(put);
                 }
             }
@@ -185,7 +186,7 @@ public class OHTableSecondaryPartGetTest {
                 Get get = new Get(key.getBytes());
                 get.addColumn(family.getBytes(), columns[columnIndex].getBytes());
                 Result r = hTable.get(get);
-                Assert.assertEquals(1, r.raw().length);
+                Assert.assertEquals(1, r.size());
                 AssertKeyValue(key, columns[columnIndex], lastTs, latestValue, r.rawCells()[0]);
             }
         }
@@ -210,11 +211,11 @@ public class OHTableSecondaryPartGetTest {
         {
             Get get = new Get(key.getBytes());
             Result r = hTable.get(get);
-            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            Assert.assertEquals(tableNames.size() * columns.length, r.size());
             int cur = 0;
             for (String tableName : tableNames) {
                 for (int i = 0; i < columns.length; i++) {
-                    AssertKeyValue(key, columns[i], lastTs, latestValue, r.raw()[cur]);
+                    AssertKeyValue(key, columns[i], lastTs, latestValue, r.rawCells()[cur]);
                     cur++;
                 }
             }
@@ -240,13 +241,13 @@ public class OHTableSecondaryPartGetTest {
             Get get = new Get(key.getBytes());
             get.setMaxVersions(2);
             Result r = hTable.get(get);
-            Assert.assertEquals(tableNames.size() * columns.length * ts.length, r.raw().length);
+            Assert.assertEquals(tableNames.size() * columns.length * ts.length, r.size());
             int cur = 0;
             for (String tableName : tableNames) {
                 String family = getColumnFamilyName(tableName);
                 for (int i = 0; i < columns.length; i++) {
                     for (int k = ts.length - 1; k >= 0; k--) {
-                        AssertKeyValue(key, family, columns[i], ts[k], values[k], r.raw()[cur]);
+                        AssertKeyValue(key, family, columns[i], ts[k], values[k], r.rawCells()[cur]);
                         cur++;
                     }
                 }
@@ -259,12 +260,12 @@ public class OHTableSecondaryPartGetTest {
             get.setMaxVersions(2);
             get.setTimeStamp(ts[1]);
             Result r = hTable.get(get);
-            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            Assert.assertEquals(tableNames.size() * columns.length, r.size());
             int cur = 0;
             for (String tableName : tableNames) {
                 String family = getColumnFamilyName(tableName);
                 for (int i = 0; i < columns.length; i++) {
-                    AssertKeyValue(key, family, columns[i], ts[1], values[1], r.raw()[cur]);
+                    AssertKeyValue(key, family, columns[i], ts[1], values[1], r.rawCells()[cur]);
                     cur++;
                 }
             }
@@ -278,12 +279,12 @@ public class OHTableSecondaryPartGetTest {
                 new BinaryComparator(toBytes(values[0])));
             get.setFilter(valueFilter);
             Result r = hTable.get(get);
-            Assert.assertEquals(tableNames.size() * columns.length, r.raw().length);
+            Assert.assertEquals(tableNames.size() * columns.length, r.size());
             int cur = 0;
             for (String tableName : tableNames) {
                 String family = getColumnFamilyName(tableName);
                 for (int i = 0; i < columns.length; i++) {
-                    AssertKeyValue(key, family, columns[i], ts[0], values[0], r.raw()[cur]);
+                    AssertKeyValue(key, family, columns[i], ts[0], values[0], r.rawCells()[cur]);
                     cur++;
                 }
             }

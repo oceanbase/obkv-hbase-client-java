@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.util;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -309,25 +310,25 @@ public class ObHTableSecondaryPartUtil {
 
     public static void AssertKeyValue(String key, String qualifier, long timestamp, String value,
                                       Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
         Assert.assertEquals(timestamp, cell.getTimestamp());
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static void AssertKeyValue(String key, String qualifier, String value, Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static void AssertKeyValue(String key, String family, String qualifier, long timestamp,
                                       String value, Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(family, Bytes.toString(cell.getFamily()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(family, Bytes.toString(CellUtil.cloneFamily(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
         Assert.assertEquals(timestamp, cell.getTimestamp());
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static List<Cell> getCellsFromScanner(ResultScanner scanner) {
@@ -352,21 +353,31 @@ public class ObHTableSecondaryPartUtil {
     }
 
     public static void sortCells(Cell[] cells) {
-        if (cells == null || cells.length <= 1) { return; }
+        if (cells == null || cells.length <= 1) {
+            return;
+        }
 
         Arrays.sort(cells, new Comparator<Cell>() {
             @Override
             public int compare(Cell c1, Cell c2) {
-                if (c1 == null) return 1;
-                if (c2 == null) return -1;
-                int cmpRet = Bytes.compareTo(c1.getRow(), c2.getRow());
-                if (cmpRet != 0) { return cmpRet; }
+                if (c1 == null)
+                    return 1;
+                if (c2 == null)
+                    return -1;
+                int cmpRet = Bytes.compareTo(CellUtil.cloneRow(c1), CellUtil.cloneRow(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
-                cmpRet = Bytes.compareTo(c1.getFamily(), c2.getFamily());
-                if (cmpRet != 0) { return cmpRet; }
+                cmpRet = Bytes.compareTo(CellUtil.cloneFamily(c1), CellUtil.cloneFamily(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
-                cmpRet = Bytes.compareTo(c1.getQualifier(), c2.getQualifier());
-                if (cmpRet != 0) { return cmpRet; }
+                cmpRet = Bytes.compareTo(CellUtil.cloneQualifier(c1), CellUtil.cloneQualifier(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
                 cmpRet = Long.compare(c2.getTimestamp(), c1.getTimestamp());
                 return cmpRet;

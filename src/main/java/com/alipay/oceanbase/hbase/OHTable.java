@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put> writeBuffer            = new ArrayList<>();
+    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -1423,7 +1423,7 @@ public class OHTable implements Table {
                 "mutation family is not equal check family");
         }
         byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
-        ObHTableFilter filter = buildObHTableFilter(filterString, null, 1, qualifier);
+        ObHTableFilter filter = buildObHTableFilter(filterString, timeRange, 1, qualifier);
         ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false,
             new TimeRange());
         ObTableBatchOperation batch = buildObTableBatchOperation(mutations, null);
@@ -2004,69 +2004,98 @@ public class OHTable implements Table {
         batch.setSamePropertiesNames(true);
         return batch;
     }
+
     private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
                                                      ObTableOperationType operationType,
-                                                     boolean isTableGroup, Long TTL) {
-        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
-        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType, isTableGroup, TTL);
+                                                     boolean isTableGroup, byte[] family, Long TTL) {
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
+        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
+            isTableGroup, family, TTL);
         ObNewRange range = new ObNewRange();
         ObTableQuery tableQuery = new ObTableQuery();
-        tableQuery.setObKVParams(buildOBKVParams((Scan)null));
+        tableQuery.setObKVParams(buildOBKVParams((Scan) null));
         ObHTableFilter filter = null;
         switch (kvType) {
             case Delete:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, null, 1, kv.getQualifier());
-                }  else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), 1, kv.getQualifier());
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null, null, 1, CellUtil.cloneQualifier(kv));
+                } else {
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null,
+                        new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), 1,
+                        CellUtil.cloneQualifier(kv));
                 }
                 break;
             case DeleteColumn:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
+                        CellUtil.cloneQualifier(kv));
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
-                    filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
+                    filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                        Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                 }
                 break;
             case DeleteFamily:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
+                            CellUtil.cloneQualifier(kv));
                     }
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 }
                 break;
             case DeleteFamilyVersion:
                 if (kv.getTimestamp() == Long.MAX_VALUE) {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
                     filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                 } else {
-                    range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                    range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                    range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
+                        ObObj.getMin()));
+                    range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
+                        ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null,
+                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1), Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null,
+                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 }
                 break;
@@ -2077,7 +2106,6 @@ public class OHTable implements Table {
         tableQuery.addKeyRange(range);
         return new QueryAndMutate(tableQuery, tableMutation);
     }
-
 
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(Cell kv,
                                                                      ObTableOperationType operationType,
@@ -2212,14 +2240,14 @@ public class OHTable implements Table {
                     singleOpResultNum++;
                     if (disExec) {
                         KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                                KeyValue.Type.Maximum);
-                        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE);
+                                KeyValue.Type.DeleteFamily);
+                        com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, DEL, isTableGroup, null, Long.MAX_VALUE);
                         ObNewRange range = new ObNewRange();
                         ObTableQuery tableQuery = new ObTableQuery();
                         ObHTableFilter filter;
                         tableQuery.setObKVParams(buildOBKVParams((Scan) null));
-                        range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(), ObObj.getMin()));
-                        range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(), ObObj.getMax()));
+                        range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(), ObObj.getMin()));
+                        range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(), ObObj.getMax()));
                         if (kv.getTimestamp() == Long.MAX_VALUE) {
                             filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                         } else {
@@ -2231,9 +2259,10 @@ public class OHTable implements Table {
                         tableMutation.setTable(tableName);
                         batch.addOperation(new QueryAndMutate(tableQuery, tableMutation));
                     } else {
-                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp(),
-                                KeyValue.Type.Maximum);
-                        batch.addOperation(buildMutation(kv, DEL, isTableGroup, Long.MAX_VALUE));
+                        KeyValue kv = new KeyValue(delete.getRow(), delete.getTimeStamp());
+                        batch.addOperation(com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
+                                new Object[] { CellUtil.cloneRow(kv), null, -kv.getTimestamp() },
+                                null, null));
                     }
                 } else {
                     for (Map.Entry<byte[], List<Cell>> entry : delete.getFamilyCellMap().entrySet()) {
@@ -2241,21 +2270,10 @@ public class OHTable implements Table {
                         List<Cell> keyValueList = entry.getValue();
                         for (Cell kv : keyValueList) {
                             singleOpResultNum++;
-                            if (isTableGroup) {
-                                KeyValue new_kv = modifyQualifier(kv,
-                                        (Bytes.toString(family) + "." + Bytes.toString(kv
-                                                .getQualifier())).getBytes());
-                                if (disExec) {
-                                    batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
-                                } else {
-                                    batch.addOperation(buildMutation(new_kv, DEL, true, Long.MAX_VALUE));
-                                }
+                            if (disExec) {
+                                batch.addOperation(buildDeleteQueryAndMutate((KeyValue) kv, DEL, false, family, Long.MAX_VALUE));
                             } else {
-                                if (disExec) {
-                                    batch.addOperation(buildDeleteQueryAndMutate(kv, DEL, false, Long.MAX_VALUE));
-                                } else {
-                                    batch.addOperation(buildMutation(kv, DEL, false, Long.MAX_VALUE));
-                                }
+                                batch.addOperation(buildMutation(kv, DEL, isTableGroup, family, Long.MAX_VALUE));
                             }
                         }
                     }

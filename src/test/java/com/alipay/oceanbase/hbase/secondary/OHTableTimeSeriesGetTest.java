@@ -79,7 +79,7 @@ public class OHTableTimeSeriesGetTest {
         for (int i = 0; i < values.length; i++) {
             for (int j = 0; j < columns1.length; j++) {
                 Put put = new Put(toBytes(key));
-                put.add(family.getBytes(), columns1[j].getBytes(), ts[i], toBytes(values[i]));
+                put.addColumn(family.getBytes(), columns1[j].getBytes(), ts[i], toBytes(values[i]));
                 hTable.put(put);
             }
         }
@@ -87,7 +87,7 @@ public class OHTableTimeSeriesGetTest {
         Put put = new Put(toBytes(key));
         for (int i = 0; i < values.length; i++) {
             for (int j = 0; j < columns2.length; j++) {
-                put.add(family.getBytes(), columns2[j].getBytes(), ts[i], toBytes(values[i]));
+                put.addColumn(family.getBytes(), columns2[j].getBytes(), ts[i], toBytes(values[i]));
             }
         }
         hTable.put(put);

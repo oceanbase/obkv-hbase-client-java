@@ -80,7 +80,8 @@ public class OHTableSecondaryPartScanTest {
             for (String column : columns) {
                 for (int i = 0; i < values.length; i++) {
                     Put put = new Put(toBytes(key));
-                    put.add(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
+                    put.addColumn(family.getBytes(), column.getBytes(), tss[i],
+                        values[i].getBytes());
                     hTable.put(put);
                 }
             }
@@ -229,7 +230,12 @@ public class OHTableSecondaryPartScanTest {
             try {
                 hTable.getScanner(scan);
             } catch (Exception e) {
-                Assert.assertTrue(e.getCause().getMessage().contains("secondary partitioned hbase table with reverse query not supported"));
+                Assert
+                    .assertTrue(e
+                        .getCause()
+                        .getMessage()
+                        .contains(
+                            "secondary partitioned hbase table with reverse query not supported"));
             }
         }
         hTable.close();
@@ -261,7 +267,8 @@ public class OHTableSecondaryPartScanTest {
                 for (String column : columns) {
                     for (int i = 0; i < values.length; i++) {
                         Put put = new Put(toBytes(key));
-                        put.add(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
+                        put.addColumn(family.getBytes(), column.getBytes(), tss[i],
+                            values[i].getBytes());
                         hTable.put(put);
                     }
                 }
@@ -316,7 +323,6 @@ public class OHTableSecondaryPartScanTest {
                 for (String tableName : tableNames) {
                     String family = getColumnFamilyName(tableName);
                     for (String column : columns) {
-                        Cell cell = cells.get(cellIndex);
                         AssertKeyValue(keys[i], family, column, lastTs, latestValue,
                             cells.get(cellIndex));
                         cellIndex++;
@@ -488,12 +494,12 @@ public class OHTableSecondaryPartScanTest {
     }
 
     @Test
-    public void testScan() throws Throwable {
-        FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testScanImpl);
-    }
+        public void testScan() throws Throwable {
+            FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testScanImpl);
+        }
 
     @Test
-    public void testMultiCFScan() throws Throwable {
-        FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testMultiCFScanImpl);
-    }
+        public void testMultiCFScan() throws Throwable {
+            FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testMultiCFScanImpl);
+        }
 }

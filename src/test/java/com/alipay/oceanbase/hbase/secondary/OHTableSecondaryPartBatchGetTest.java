@@ -67,8 +67,8 @@ public class OHTableSecondaryPartBatchGetTest {
         String column2 = "putColumn2";
         long timestamp = System.currentTimeMillis();
         Put put = new Put(toBytes(key));
-        put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes("1"));
-        put.add(family.getBytes(), column2.getBytes(), timestamp, toBytes("1"));
+        put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes("1"));
+        put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes("1"));
         hTable.put(put);
 
         List<Get> gets = new ArrayList<>();

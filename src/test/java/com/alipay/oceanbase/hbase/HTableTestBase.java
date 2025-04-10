@@ -2219,7 +2219,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
             scan.addFamily(family.getBytes());
             scan.setMaxVersions(10);
             filter = new ColumnValueFilter(Bytes.toBytes(family), Bytes.toBytes(column2),
-                CompareOperator.GREATER, Bytes.toBytes(value1));
+                CompareOperator.LESS, Bytes.toBytes(value1));
             scan.setFilter(filter);
             scanner = hTable.getScanner(scan);
 
@@ -2890,7 +2890,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
-        valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
+        valueFilter = new ValueFilter(CompareFilter.CompareOp.LESS, new BinaryComparator(
             toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
@@ -2908,7 +2908,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
-        valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
+        valueFilter = new ValueFilter(CompareFilter.CompareOp.LESS, new BinaryComparator(
             toBytes(value3)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
@@ -2948,7 +2948,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
-        qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
+        qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.LESS,
             new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
@@ -3073,7 +3073,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(1));
-        filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.GREATER,
+        filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.LESS,
             new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3274,7 +3274,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(7, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-            Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -5014,16 +5014,16 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertTrue(ret);
 
         ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.GREATER, "value1".getBytes(), put);
+            CompareFilter.CompareOp.LESS, "value1".getBytes(), put);
         Assert.assertFalse(ret);
         ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.GREATER_OR_EQUAL, "value1".getBytes(), put);
+            CompareFilter.CompareOp.LESS_OR_EQUAL, "value1".getBytes(), put);
         Assert.assertTrue(ret);
         ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.LESS, "".getBytes(), put);
+            CompareFilter.CompareOp.GREATER, "".getBytes(), put);
         Assert.assertFalse(ret);
         ret = hTable.checkAndPut(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.LESS_OR_EQUAL, "".getBytes(), put);
+            CompareFilter.CompareOp.GREATER_OR_EQUAL, "".getBytes(), put);
         Assert.assertFalse(ret);
 
         get = new Get(key.getBytes());
@@ -5061,16 +5061,16 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         });
 
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.GREATER, toBytes("value1")).thenPut(put);
+            .ifMatches(CompareOperator.LESS, toBytes("value1")).thenPut(put);
         Assert.assertFalse(ret);
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("value1")).thenPut(put);
+            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("value1")).thenPut(put);
         Assert.assertTrue(ret);
-        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.LESS, toBytes(""))
+        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.GREATER, toBytes(""))
             .thenPut(put);
         Assert.assertFalse(ret);
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("")).thenPut(put);
+            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("")).thenPut(put);
         Assert.assertFalse(ret);
 
         get = new Get(key.getBytes());
@@ -5121,22 +5121,22 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         put.addColumn(family.getBytes(), column.getBytes(), "value6".getBytes());
         hTable.put(put);
         ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.GREATER, "value5".getBytes(), delete);
+            CompareFilter.CompareOp.LESS, "value5".getBytes(), delete);
         Assert.assertTrue(ret);
         put = new Put(key.getBytes());
         put.addColumn(family.getBytes(), column.getBytes(), "value5".getBytes());
         hTable.put(put);
         ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.GREATER_OR_EQUAL, "value5".getBytes(), delete);
+            CompareFilter.CompareOp.LESS_OR_EQUAL, "value5".getBytes(), delete);
         Assert.assertTrue(ret);
         put = new Put(key.getBytes());
         put.addColumn(family.getBytes(), column.getBytes(), "value1".getBytes());
         hTable.put(put);
         ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.LESS, "value1".getBytes(), delete);
+            CompareFilter.CompareOp.GREATER, "value1".getBytes(), delete);
         Assert.assertFalse(ret);
         ret = hTable.checkAndDelete(key.getBytes(), "family1".getBytes(), column.getBytes(),
-            CompareFilter.CompareOp.LESS_OR_EQUAL, "value1".getBytes(), delete);
+            CompareFilter.CompareOp.GREATER_OR_EQUAL, "value1".getBytes(), delete);
         Assert.assertTrue(ret);
 
         Get get = new Get(key.getBytes());
@@ -5209,22 +5209,22 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         put.addColumn(family.getBytes(), column.getBytes(), "value6".getBytes());
         hTable.put(put);
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.GREATER, toBytes("value5")).thenDelete(delete);
+            .ifMatches(CompareOperator.LESS, toBytes("value5")).thenDelete(delete);
         Assert.assertTrue(ret);
         put = new Put(key.getBytes());
         put.addColumn(family.getBytes(), column.getBytes(), "value5".getBytes());
         hTable.put(put);
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("value5")).thenDelete(delete);
+            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("value5")).thenDelete(delete);
         Assert.assertTrue(ret);
         put = new Put(key.getBytes());
         put.addColumn(family.getBytes(), column.getBytes(), "value1".getBytes());
         hTable.put(put);
-        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.LESS, toBytes("value1"))
+        ret = builder.qualifier(toBytes(column)).ifMatches(CompareOperator.GREATER, toBytes("value1"))
             .thenDelete(delete);
         Assert.assertFalse(ret);
         ret = builder.qualifier(toBytes(column))
-            .ifMatches(CompareOperator.LESS_OR_EQUAL, toBytes("value1")).thenDelete(delete);
+            .ifMatches(CompareOperator.GREATER_OR_EQUAL, toBytes("value1")).thenDelete(delete);
         Assert.assertTrue(ret);
 
         get = new Get(key.getBytes());
@@ -5349,9 +5349,9 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         rowMutations.add(put1);
         rowMutations.add(put2);
         rowMutations.add(put3);
-        // test greater op
+        // test GREATER op
         ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
-            CompareFilter.CompareOp.LESS, value1.getBytes(), rowMutations);
+            CompareFilter.CompareOp.GREATER, value1.getBytes(), rowMutations);
         Assert.assertFalse(ret);
         get = new Get(key.getBytes());
         get.addFamily(family.getBytes());
@@ -5361,7 +5361,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         // test less op
         ret = hTable.checkAndMutate(key.getBytes(), family.getBytes(), column1.getBytes(),
-            CompareFilter.CompareOp.LESS, value2.getBytes(), rowMutations);
+            CompareFilter.CompareOp.GREATER, value2.getBytes(), rowMutations);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.addFamily(family.getBytes());
@@ -5487,7 +5487,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         rowMutations.add(put1);
         rowMutations.add(put2);
         rowMutations.add(put3);
-        // test greater op
+        // test LESS op
         ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value1))
             .thenMutate(rowMutations);
         Assert.assertFalse(ret);
@@ -5498,7 +5498,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(6, r.rawCells().length);
 
         // test less op
-        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.LESS, toBytes(value2))
+        ret = builder.qualifier(toBytes(column1)).ifMatches(CompareOperator.GREATER, toBytes(value2))
             .thenMutate(rowMutations);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());

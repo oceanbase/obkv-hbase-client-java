@@ -80,7 +80,7 @@ public class OHTableTimeSeriesScanTest {
             Put put = new Put(toBytes(key));
             for (String column : columns) {
                 for (int i = 0; i < values.length; i++) {
-                    put.add(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
+                    put.addColumn(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
                 }
             }
             hTable.put(put);
@@ -90,7 +90,7 @@ public class OHTableTimeSeriesScanTest {
             for (String column : columns) {
                 for (int i = 0; i < values.length; i++) {
                     Put put = new Put(toBytes(key));
-                    put.add(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
+                    put.addColumn(family.getBytes(), column.getBytes(), tss[i], values[i].getBytes());
                     hTable.put(put);
                 }
             }

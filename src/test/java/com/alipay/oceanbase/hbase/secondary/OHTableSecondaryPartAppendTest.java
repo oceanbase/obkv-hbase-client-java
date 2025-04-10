@@ -22,6 +22,7 @@ import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import com.google.common.base.Strings;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.*;
@@ -91,8 +92,8 @@ public class OHTableSecondaryPartAppendTest {
             assertEquals(0, Bytes.compareTo(Bytes.add(v2, v1), r.getValue(FAMILY, QUALIFIERS[1])));
             // QUALIFIERS[2] previously not exist, verify both value and timestamp are correct
             assertEquals(0, Bytes.compareTo(v2, r.getValue(FAMILY, QUALIFIERS[2])));
-            assertEquals(r.getColumnLatest(FAMILY, QUALIFIERS[0]).getTimestamp(), r
-                .getColumnLatest(FAMILY, QUALIFIERS[2]).getTimestamp());
+            assertEquals(r.getColumnLatestCell(FAMILY, QUALIFIERS[0]).getTimestamp(), r
+                .getColumnLatestCell(FAMILY, QUALIFIERS[2]).getTimestamp());
 
             Get get = new Get(ROW);
             get.setMaxVersions(10);
@@ -103,10 +104,12 @@ public class OHTableSecondaryPartAppendTest {
             assertEquals(1, result.getColumnCells(FAMILY, QUALIFIERS[2]).size());
             assertEquals(
                 0,
-                Bytes.compareTo(Bytes.add(v1, v2), result.getColumnCells(FAMILY, QUALIFIERS[0])
-                    .get(0).getValue()));
-            assertEquals(0,
-                Bytes.compareTo(v2, result.getColumnCells(FAMILY, QUALIFIERS[2]).get(0).getValue()));
+                Bytes.compareTo(Bytes.add(v1, v2),
+                    CellUtil.cloneValue(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0))));
+            assertEquals(
+                0,
+                Bytes.compareTo(v2,
+                    CellUtil.cloneValue(result.getColumnCells(FAMILY, QUALIFIERS[2]).get(0))));
         } finally {
             hTable.close();
         }
@@ -198,7 +201,7 @@ public class OHTableSecondaryPartAppendTest {
             get.setMaxVersions(1);
             get.addColumn(FAMILY, column.getBytes());
             Result result = hTable.get(get);
-            ObHTableTestUtil.Assert(tableName, ()-> assertTrue(0 <= Bytes.compareTo(expect, result.getColumnCells(FAMILY, column.getBytes()).get(0).getValue())));
+            ObHTableTestUtil.Assert(tableName, ()-> assertTrue(0 <= Bytes.compareTo(expect, CellUtil.cloneValue(result.getColumnCells(FAMILY, column.getBytes()).get(0)))));
         } finally {
             hTable.close();
         }

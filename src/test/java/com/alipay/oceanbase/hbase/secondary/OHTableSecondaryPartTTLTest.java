@@ -56,7 +56,7 @@ public class OHTableSecondaryPartTTLTest {
                 for (String column : columns) {
                     for (int i = 0; i < values.length; i++) {
                         Put put = new Put(toBytes(key));
-                        put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                        put.addColumn(family.getBytes(), column.getBytes(), values[i].getBytes());
                         hTable.put(put);
                     }
                 }
@@ -132,7 +132,7 @@ public class OHTableSecondaryPartTTLTest {
                     for (String column : columns) {
                         for (int i = 0; i < values.length; i++) {
                             Put put = new Put(toBytes(key));
-                            put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                            put.addColumn(family.getBytes(), column.getBytes(), values[i].getBytes());
                             hTable.put(put);
                         }
                     }
@@ -203,7 +203,7 @@ public class OHTableSecondaryPartTTLTest {
                 for (String column : columns) {
                     for (int i = 0; i < values.length; i++) {
                         Put put = new Put(toBytes(key));
-                        put.add(family.getBytes(), column.getBytes(),  values[i].getBytes());
+                        put.addColumn(family.getBytes(), column.getBytes(),  values[i].getBytes());
                         hTable.put(put);
                     }
                 }
@@ -296,7 +296,7 @@ public class OHTableSecondaryPartTTLTest {
                     for (String column : columns) {
                         for (int i = 0; i < values.length; i++) {
                             Put put = new Put(toBytes(key));
-                            put.add(family.getBytes(), column.getBytes(), values[i].getBytes());
+                            put.addColumn(family.getBytes(), column.getBytes(), values[i].getBytes());
                             hTable.put(put);
                         }
                     }

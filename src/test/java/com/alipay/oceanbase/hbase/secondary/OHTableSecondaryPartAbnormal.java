@@ -68,7 +68,7 @@ public class OHTableSecondaryPartAbnormal {
         hTable.init();
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY, QUALIFIER, VALUE_2);
         hTable.put(put2);
         Get get = new Get(ROW);
         get.addFamily(FAMILY);
@@ -89,16 +89,6 @@ public class OHTableSecondaryPartAbnormal {
         } catch (IOException e) {
             assertTrue(e.getCause().getMessage()
                 .contains("timeseries hbase table with check existence only query not supported"));
-        }
-        get = new Get(ROW);
-        get.addFamily(FAMILY);
-        get.setClosestRowBefore(true);
-        try {
-            hTable.get(get);
-            fail("unexpected, should failed before");
-        } catch (IOException e) {
-            assertTrue(e.getCause().getMessage()
-                .contains("timeseries hbase table with reverse query not supported"));
         }
         Scan scan = new Scan(ROW);
         scan.addFamily(FAMILY);
@@ -175,7 +165,7 @@ public class OHTableSecondaryPartAbnormal {
         hTable.init();
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY, QUALIFIER, VALUE_2);
         try {
             hTable.put(put2);
             fail("unexpected, should failed before");
@@ -191,7 +181,7 @@ public class OHTableSecondaryPartAbnormal {
         hTable.init();
         byte[] FAMILY = getColumnFamilyName(tableName).getBytes();
         Put put2 = new Put(ROW);
-        put2.add(FAMILY, QUALIFIER, VALUE_2);
+        put2.addColumn(FAMILY, QUALIFIER, VALUE_2);
         hTable.put(put2);
         Scan scan = new Scan(ROW);
         scan.addFamily(FAMILY);

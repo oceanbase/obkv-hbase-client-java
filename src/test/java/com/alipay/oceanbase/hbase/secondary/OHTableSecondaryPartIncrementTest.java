@@ -21,6 +21,7 @@ import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.AfterClass;
@@ -70,7 +71,7 @@ public class OHTableSecondaryPartIncrementTest {
         byte[] qualifier2 = Bytes.toBytes("qual2");
         byte[] val = Bytes.toBytes(0L);
         Put p = new Put(row);
-        p.add(cf, qualifier, val);
+        p.addColumn(cf, qualifier, val);
         hTable.put(p);
 
         for (int count = 0; count < 13; count++) {
@@ -82,7 +83,7 @@ public class OHTableSecondaryPartIncrementTest {
         get.setMaxVersions(1);
         get.addFamily(cf);
         Result result = hTable.get(get);
-        assertEquals(1300L, Bytes.toLong(result.raw()[0].getValue()));
+        assertEquals(1300L, Bytes.toLong(CellUtil.cloneValue(result.rawCells()[0])));
         get.setMaxVersions(100);
         result = hTable.get(get);
         assertEquals(14, result.size());
@@ -93,8 +94,10 @@ public class OHTableSecondaryPartIncrementTest {
         hTable.increment(inc);
         get.setMaxVersions(1);
         result = hTable.get(get);
-        assertEquals(1200L, Bytes.toLong(result.getColumnCells(cf, qualifier).get(0).getValue()));
-        assertEquals(-100L, Bytes.toLong(result.getColumnCells(cf, qualifier2).get(0).getValue()));
+        assertEquals(1200L,
+            Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(cf, qualifier).get(0))));
+        assertEquals(-100L,
+            Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(cf, qualifier2).get(0))));
         hTable.close();
     }
 
@@ -132,19 +135,19 @@ public class OHTableSecondaryPartIncrementTest {
             get.addFamily(FAMILY);
             result = hTable.get(get);
             assertEquals(1, result.size());
-            assertEquals(2L, Bytes.toLong(result.raw()[0].getValue()));
+            assertEquals(2L, Bytes.toLong(CellUtil.cloneValue(result.rawCells()[0])));
             inc.addColumn(FAMILY, QUALIFIERS[0], 2L);
             hTable.increment(inc);
             get.setMaxVersions(10);
             get.addFamily(FAMILY);
             result = hTable.get(get);
             assertEquals(3, result.size());
-            assertEquals(4L,
-                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(0).getValue()));
-            assertEquals(2L,
-                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[1]).get(1).getValue()));
-            assertEquals(2L,
-                Bytes.toLong(result.getColumnCells(FAMILY, QUALIFIERS[0]).get(0).getValue()));
+            assertEquals(4L, Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(FAMILY,
+                QUALIFIERS[1]).get(0))));
+            assertEquals(2L, Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(FAMILY,
+                QUALIFIERS[1]).get(1))));
+            assertEquals(2L, Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(FAMILY,
+                QUALIFIERS[0]).get(0))));
         } finally {
             hTable.close();
         }
@@ -185,7 +188,7 @@ public class OHTableSecondaryPartIncrementTest {
             get.setMaxVersions(1);
             get.addColumn(FAMILY, column.getBytes());
             Result result = hTable.get(get);
-            assertEquals(expect, Bytes.toLong(result.getColumnCells(FAMILY, column.getBytes()).get(0).getValue()));
+            assertEquals(expect, Bytes.toLong(CellUtil.cloneValue(result.getColumnCells(FAMILY, column.getBytes()).get(0))));
         } finally {
             hTable.close();
         }
