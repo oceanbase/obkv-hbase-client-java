@@ -2060,8 +2060,7 @@ public class OHTable implements Table {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
-                            CellUtil.cloneQualifier(kv));
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2091,11 +2090,11 @@ public class OHTable implements Table {
                         ObObj.getMax()));
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE);
                     } else {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 }
