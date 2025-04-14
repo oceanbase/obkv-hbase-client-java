@@ -2010,8 +2010,7 @@ public class OHTable implements HTableInterface {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
-                            kv.getQualifier());
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
@@ -2041,11 +2040,11 @@ public class OHTable implements HTableInterface {
                         ObObj.getMax()));
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE);
                     } else {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1),
+                            new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE, kv.getQualifier());
                     }
                 }
