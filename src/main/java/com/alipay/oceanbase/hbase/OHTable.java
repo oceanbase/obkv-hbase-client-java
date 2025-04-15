@@ -1835,7 +1835,7 @@ public class OHTable implements HTableInterface {
             obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), left_ts));
             obBorderFlag.setInclusiveStart();
         } else {
-            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), right_ts));
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), left_ts));
             obBorderFlag.unsetInclusiveStart();
         }
 
@@ -1845,7 +1845,7 @@ public class OHTable implements HTableInterface {
             obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), right_ts));
             obBorderFlag.setInclusiveEnd();
         } else {
-            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), left_ts));
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), right_ts));
             obBorderFlag.unsetInclusiveEnd();
         }
         ObTableQuery obTableQuery = new ObTableQuery();
