@@ -1001,6 +1001,14 @@ public class OHTable implements HTableInterface {
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                             getTargetTableName(tableNameString));
+                        /*
+                            Setting setAllowDistributeScan to false because the implementation of two-level partitioning does not support reverse scans.   
+                            This avoids entering the new processing logic new_try_process.   
+                            Additionally, the server has defenses in place to prevent the old logic from processing two-level partitioned tables.  
+                        */
+                        if (scan.isReversed()) {
+                            request.setAllowDistributeScan(false);
+                        }
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1028,6 +1036,14 @@ public class OHTable implements HTableInterface {
                                 obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration));
+                            /*
+                                Setting setAllowDistributeScan to false because the implementation of two-level partitioning does not support reverse scans.   
+                                This avoids entering the new processing logic new_try_process.   
+                                Additionally, the server has defenses in place to prevent the old logic from processing two-level partitioned tables.  
+                            */
+                            if (scan.isReversed()) {
+                                request.setAllowDistributeScan(false);
+                            }
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
