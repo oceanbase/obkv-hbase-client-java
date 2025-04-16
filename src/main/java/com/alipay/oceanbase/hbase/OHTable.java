@@ -1931,11 +1931,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false, scan.getStartRow(),
-                true, true, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
+                    scan.includeStartRow(), true, ts);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true, scan.getStopRow(),
-                false, false, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
+                    scan.includeStopRow(), false, ts);
         }
         obTableQuery.setBatchSize(scan.getBatch());
         obTableQuery.setLimit(scan.getLimit());
