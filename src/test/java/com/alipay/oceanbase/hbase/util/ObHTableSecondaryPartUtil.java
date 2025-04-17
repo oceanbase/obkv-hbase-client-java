@@ -31,14 +31,14 @@ import java.util.function.Supplier;
 
 public class ObHTableSecondaryPartUtil {
     public static void openDistributedExecute() throws Exception {
-        Connection conn = ObHTableTestUtil.getSysConnection();
-        String stmt = "ALTER SYSTEM SET _obkv_feature_mode = 'distributed_execute=on';";
+        Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM SET _obkv_enable_distributed_execution = true;";
         conn.createStatement().execute(stmt);
     }
 
     public static void closeDistributedExecute() throws Exception {
-        Connection conn = ObHTableTestUtil.getSysConnection();
-        String stmt = "ALTER SYSTEM SET _obkv_feature_mode = 'distributed_execute=off';";
+        Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM SET _obkv_enable_distributed_execution = false;";
         conn.createStatement().execute(stmt);
     }
 
