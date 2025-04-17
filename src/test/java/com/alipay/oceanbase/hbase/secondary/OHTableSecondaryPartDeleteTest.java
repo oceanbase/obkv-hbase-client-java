@@ -412,7 +412,7 @@ public class OHTableSecondaryPartDeleteTest {
         hTable.close();
     }
 
-    public static void testMultiCFDeleteFamilyVersionImpl(Map.Entry<String, List<String>> entry) throws Exception {
+    public static void testMultiCFDeleteFamilyWithVersionImpl(Map.Entry<String, List<String>> entry) throws Exception {
         String key = "putKey";
         String value = "value";
         String column = "putColumn";
@@ -433,6 +433,43 @@ public class OHTableSecondaryPartDeleteTest {
             put.addColumn(toBytes(family), toBytes(column + family), ts3, toBytes(value + ts3));
             put.addColumn(toBytes(family), toBytes(column + family), ts4, toBytes(value + ts4));
             delete.addFamily(toBytes(family), ts2);
+        }
+        hTable.put(put);
+        hTable.delete(delete);
+
+
+        Get get = new Get(toBytes(key));
+        get.setMaxVersions();
+        for (String tableName : entry.getValue()) {
+            String family = getColumnFamilyName(tableName);
+            get.addColumn(toBytes(family), toBytes(column + family));
+        }
+        Result result = hTable.get(get);
+        Assert(entry.getValue(), ()->Assert.assertEquals(6, result.size()));
+        hTable.close();
+    }
+
+    public static void testMultiCFDeleteFamilyVersionImpl(Map.Entry<String, List<String>> entry) throws Exception {
+        String key = "putKey";
+        String value = "value";
+        String column = "putColumn";
+
+        long ts1 = System.currentTimeMillis();
+        long ts2 = ts1 + 1000;
+        long ts3 = ts2 + 1000;
+        long ts4 = ts3 + 1000;
+        System.out.println("ts1:" + ts1 + ", ts2:" + ts2 + ", ts3:" + ts3 + ", ts4:" + ts4);
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(entry.getKey());
+        hTable.init();
+        Put put = new Put(toBytes(key));
+        Delete delete = new Delete(toBytes(key));
+        for (String tableName : entry.getValue()) {
+            String family = getColumnFamilyName(tableName);
+            put.addColumn(toBytes(family), toBytes(column + family), ts1, toBytes(value + ts1));
+            put.addColumn(toBytes(family), toBytes(column + family), ts2, toBytes(value + ts2));
+            put.addColumn(toBytes(family), toBytes(column + family), ts3, toBytes(value + ts3));
+            put.addColumn(toBytes(family), toBytes(column + family), ts4, toBytes(value + ts4));
+            delete.addFamilyVersion(toBytes(family), ts2);
         }
         hTable.put(put);
         hTable.delete(delete);
@@ -530,6 +567,11 @@ public class OHTableSecondaryPartDeleteTest {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyImpl);
     }
 
+    @Test
+    public void testMultiCFDeleteFamilyWithVersion() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyWithVersionImpl);
+    }
+    
     @Test
     public void testMultiCFDeleteFamilyVersion() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyVersionImpl);
