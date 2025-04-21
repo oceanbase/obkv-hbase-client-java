@@ -197,7 +197,7 @@ public class OHTableSecondaryPartAbnormal {
         scan.addFamily(FAMILY);
         scan.setReversed(true);
         try {
-            hTable.getScanners(scan);
+            hTable.getScanner(scan);
             fail("unexpected, should failed before");
         } catch (IOException e) {
             assertTrue(e.getCause().getMessage()
