@@ -66,16 +66,16 @@ public class OHConnectionConfiguration {
         this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
         this.operationTimeout = conf.getInt("hbase.client.operation.timeout", 1200000);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
-            HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+                3000);
         int rpcConnectTimeout = -1;
         if (conf.get(SOCKET_TIMEOUT_CONNECT) != null) {
-            rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
+            rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, 1000);
         } else {
             if (conf.get(SOCKET_TIMEOUT) != null) {
-                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, DEFAULT_SOCKET_TIMEOUT);
+                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, 1000);
             } else {
                 rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT,
-                    DEFAULT_SOCKET_TIMEOUT_CONNECT);
+                    1000);
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
