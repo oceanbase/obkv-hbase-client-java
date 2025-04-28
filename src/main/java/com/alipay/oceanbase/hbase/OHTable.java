@@ -2176,11 +2176,14 @@ public class OHTable implements HTableInterface {
                     for (KeyValue kv : keyValueList) {
                         singleOpResultNum++;
                         if (isTableGroup) {
-                            KeyValue new_kv = modifyQualifier(kv,
-                                (Bytes.toString(family) + "." + Bytes.toString(kv.getQualifier()))
-                                    .getBytes());
+                            byte[] oldQualifier = kv.getQualifier();
+                            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+                            System.arraycopy(family, 0, newQualifier, 0, family.length);
+                            newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                            System.arraycopy(oldQualifier, 0, newQualifier, family.length +1, oldQualifier.length );
+                            KeyValue newKV = modifyQualifier(kv, newQualifier);
                             batch
-                                .addOperation(buildMutation(new_kv, INSERT_OR_UPDATE, true, put.getTTL()));
+                                .addOperation(buildMutation(newKV, INSERT_OR_UPDATE, true, put.getTTL()));
                         } else {
                             batch.addOperation(buildMutation(kv, INSERT_OR_UPDATE, false, put.getTTL()));
                         }
