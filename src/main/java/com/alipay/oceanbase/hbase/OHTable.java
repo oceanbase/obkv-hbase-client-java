@@ -2111,46 +2111,50 @@ public class OHTable implements Table {
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup,
                                                                      byte[] family, Long TTL) {
-        Cell new_cell = kv;
+        Cell newCell = kv;
         if (isTableGroup && family != null) {
-            new_cell = modifyQualifier(kv, (Bytes.toString(family) + "." + Bytes.toString(CellUtil
-                .cloneQualifier(kv))).getBytes());
+            byte[] oldQualifier = CellUtil.cloneQualifier(kv);
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            System.arraycopy(family, 0, newQualifier, 0, family.length);
+            newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+            System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
+            newCell = modifyQualifier(kv, newQualifier);
         }
         Cell.Type kvType = kv.getType();
         switch (kvType) {
             case Put:
-                String[] property_columns = V_COLUMNS;
-                Object[] property = new Object[] { CellUtil.cloneValue(new_cell) };
+                String[] propertyColumns = V_COLUMNS;
+                Object[] property = new Object[] { CellUtil.cloneValue(newCell) };
                 if (TTL != Long.MAX_VALUE) {
-                    property_columns = PROPERTY_COLUMNS;
-                    property = new Object[] { CellUtil.cloneValue(new_cell), TTL };
+                    propertyColumns = PROPERTY_COLUMNS;
+                    property = new Object[] { CellUtil.cloneValue(newCell), TTL };
                 }
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(new_cell), CellUtil.cloneQualifier(new_cell),
-                            new_cell.getTimestamp() }, property_columns, property);
+                    new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
+                            newCell.getTimestamp() }, propertyColumns, property);
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(new_cell), CellUtil.cloneQualifier(new_cell),
-                            new_cell.getTimestamp() }, null, null);
+                    new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
+                            newCell.getTimestamp() }, null, null);
             case DeleteColumn:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(new_cell), CellUtil.cloneQualifier(new_cell),
-                            -new_cell.getTimestamp() }, null, null);
+                    new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
+                            -newCell.getTimestamp() }, null, null);
             case DeleteFamily:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
                     DEL,
                     ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(new_cell),
-                            isTableGroup ? CellUtil.cloneQualifier(new_cell) : null,
-                            -new_cell.getTimestamp() }, null, null);
+                    new Object[] { CellUtil.cloneRow(newCell),
+                            isTableGroup ? CellUtil.cloneQualifier(newCell) : null,
+                            -newCell.getTimestamp() }, null, null);
             case DeleteFamilyVersion:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(
                     DEL,
                     ROW_KEY_COLUMNS,
-                    new Object[] { CellUtil.cloneRow(new_cell),
-                            isTableGroup ? CellUtil.cloneQualifier(new_cell) : null,
-                            new_cell.getTimestamp() }, null, null);
+                    new Object[] { CellUtil.cloneRow(newCell),
+                            isTableGroup ? CellUtil.cloneQualifier(newCell) : null,
+                            newCell.getTimestamp() }, null, null);
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
@@ -2292,10 +2296,10 @@ public class OHTable implements Table {
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
         Cell.Type kvType = kv.getType();
-        String[] property_columns = V_COLUMNS;
+        String[] propertyColumns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
         if (TTL != Long.MAX_VALUE) {
-            property_columns = PROPERTY_COLUMNS;
+            propertyColumns = PROPERTY_COLUMNS;
             property = new Object[] { CellUtil.cloneValue(kv), TTL };
         }
         switch (kvType) {
@@ -2303,7 +2307,7 @@ public class OHTable implements Table {
                 return getInstance(
                     operationType,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            kv.getTimestamp() }, property_columns, property);
+                            kv.getTimestamp() }, propertyColumns, property);
             case Delete:
                 return getInstance(
                     DEL,
