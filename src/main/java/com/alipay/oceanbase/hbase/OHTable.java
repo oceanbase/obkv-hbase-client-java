@@ -908,15 +908,20 @@ public class OHTable implements Table {
     private void processColumnFilters(NavigableSet<byte[]> columnFilters,
                                       Map<byte[], NavigableSet<byte[]>> familyMap) {
         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : familyMap.entrySet()) {
+            byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    String columnNameStr = Bytes.toString(columnName);
-                    columnNameStr = Bytes.toString(entry.getKey()) + "." + columnNameStr;
-                    columnFilters.add(columnNameStr.getBytes());
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    System.arraycopy(family, 0, newQualifier, 0, family.length);
+                    newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    columnFilters.add(newQualifier);
                 }
             } else {
-                String columnNameStr = Bytes.toString(entry.getKey()) + ".";
-                columnFilters.add(columnNameStr.getBytes());
+                byte[] newQualifier = new byte[family.length + 1/* length of "."*/];
+                System.arraycopy(family, 0, newQualifier, 0, family.length);
+                newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                columnFilters.add(newQualifier);
             }
         }
     }
@@ -1874,7 +1879,7 @@ public class OHTable implements Table {
                 if (columnQualifier == null) {
                     obHTableFilter.addSelectColumnQualifier(new byte[0]);
                 } else {
-                    obHTableFilter.addSelectColumnQualifier(columnQualifier);
+                   obHTableFilter.addSelectColumnQualifier(columnQualifier);
                 }
             }
         }
@@ -2012,6 +2017,14 @@ public class OHTable implements Table {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
+        // construct new_kv otherwise filter will fail to match targeted columns
+        byte[] oldQualifier = CellUtil.cloneQualifier(kv);
+        byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+        System.arraycopy(family, 0, newQualifier, 0, family.length);
+        newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+        System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
+        kv = modifyQualifier(kv, newQualifier);
+
         ObNewRange range = new ObNewRange();
         ObTableQuery tableQuery = new ObTableQuery();
         tableQuery.setObKVParams(buildOBKVParams((Scan) null));
@@ -2274,8 +2287,9 @@ public class OHTable implements Table {
                         List<Cell> keyValueList = entry.getValue();
                         for (Cell kv : keyValueList) {
                             singleOpResultNum++;
+
                             if (disExec) {
-                                batch.addOperation(buildDeleteQueryAndMutate((KeyValue) kv, DEL, false, family, Long.MAX_VALUE));
+                                batch.addOperation(buildDeleteQueryAndMutate((KeyValue) kv, DEL, isTableGroup, family, Long.MAX_VALUE));
                             } else {
                                 batch.addOperation(buildMutation(kv, DEL, isTableGroup, family, Long.MAX_VALUE));
                             }
