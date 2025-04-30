@@ -2017,14 +2017,15 @@ public class OHTable implements Table {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
-        // construct new_kv otherwise filter will fail to match targeted columns
-        byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-        byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
-        System.arraycopy(family, 0, newQualifier, 0, family.length);
-        newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-        System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
-        kv = modifyQualifier(kv, newQualifier);
-
+        if(isTableGroup) {
+            // construct new_kv otherwise filter will fail to match targeted columns
+            byte[] oldQualifier = CellUtil.cloneQualifier(kv);
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            System.arraycopy(family, 0, newQualifier, 0, family.length);
+            newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+            System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
+            kv = modifyQualifier(kv, newQualifier);
+        }
         ObNewRange range = new ObNewRange();
         ObTableQuery tableQuery = new ObTableQuery();
         tableQuery.setObKVParams(buildOBKVParams((Scan) null));
