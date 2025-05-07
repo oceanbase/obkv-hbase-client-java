@@ -1,0 +1,26 @@
+<configuration>
+    <property>
+        <name>hbase.client.connection.impl</name>
+        <value>com.alipay.oceanbase.hbase.util.OHConnectionImpl</value>
+    </property>
+    <property>
+        <name>hbase.oceanbase.fullUserName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>hbase.oceanbase.password</name>
+        <value></value>
+    </property>
+    <property>
+        <name>hbase.oceanbase.paramURL</name>
+        <value></value>
+    </property>
+    <property>
+        <name>hbase.oceanbase.sysUserName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>hbase.oceanbase.sysPassword</name>
+        <value></value>
+    </property>
+</configuration>

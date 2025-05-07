@@ -17,32 +17,20 @@
 
 package com.oceanbase.example;
 
-import com.alipay.oceanbase.hbase.OHTableClient;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.*;
+
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class SimpleHBaseClientDemo {
-    public static String PARAM_URL      = "";
-    public static String FULL_USER_NAME = "";
-    public static String PASSWORD       = "";
-    public static String SYS_USER_NAME  = "";
-    public static String SYS_PASSWORD   = "";
-
     public static void simpleTest() throws Exception {
-        // 1. initial client for table test1
-        Configuration conf = new Configuration();
-        conf.set(HBASE_OCEANBASE_PARAM_URL, PARAM_URL);
-        conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
-        conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
-        conf.set(HBASE_OCEANBASE_SYS_USER_NAME, SYS_USER_NAME);
-        conf.set(HBASE_OCEANBASE_SYS_PASSWORD, SYS_PASSWORD);
-        OHTableClient hTable = new OHTableClient("test1", conf);
-        hTable.init();
+        // 1. initial connection for table test1
+        HBaseConfiguration conf = new HBaseConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        TableName tableName = TableName.valueOf("test1");
+        Table hTable = connection.getTable(tableName);
 
         // 2. put data like hbase
         byte[] family = toBytes("family1");
@@ -56,10 +44,11 @@ public class SimpleHBaseClientDemo {
         Get get = new Get(rowKey);
         get.addColumn(family, column);
         Result r = hTable.get(get);
-        System.out.printf("column1: " + r.getColumn(family, column));
+        System.out.println("column1: " + r.getColumn(family, column));
 
         // 4. close
         hTable.close();
+        connection.close();
     }
 
     public static void main(String[] args) throws Exception {
