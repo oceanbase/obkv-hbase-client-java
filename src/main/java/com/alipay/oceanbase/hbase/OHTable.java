@@ -849,13 +849,19 @@ public class OHTable implements HTableInterface {
         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : familyMap.entrySet()) {
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    String columnNameStr = Bytes.toString(columnName);
-                    columnNameStr = Bytes.toString(entry.getKey()) + "." + columnNameStr;
-                    columnFilters.add(columnNameStr.getBytes());
+                    byte[] family = entry.getKey();
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    System.arraycopy(family, 0, newQualifier, 0, family.length);
+                    newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    columnFilters.add(newQualifier);
                 }
             } else {
-                String columnNameStr = Bytes.toString(entry.getKey()) + ".";
-                columnFilters.add(columnNameStr.getBytes());
+                byte[] family = entry.getKey();
+                byte[] newQualifier = new byte[family.length + 1/* length of "."*/];
+                System.arraycopy(family, 0, newQualifier, 0, family.length);
+                newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                columnFilters.add(newQualifier);
             }
         }
     }
@@ -2180,7 +2186,7 @@ public class OHTable implements HTableInterface {
                             byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
                             System.arraycopy(family, 0, newQualifier, 0, family.length);
                             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                            System.arraycopy(oldQualifier, 0, newQualifier, family.length +1, oldQualifier.length );
+                            System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
                             KeyValue newKV = modifyQualifier(kv, newQualifier);
                             batch
                                 .addOperation(buildMutation(newKV, INSERT_OR_UPDATE, true, put.getTTL()));
@@ -2226,13 +2232,16 @@ public class OHTable implements HTableInterface {
                         for (KeyValue kv : keyValueList) {
                             singleOpResultNum++;
                             if (isTableGroup) {
-                                KeyValue new_kv = modifyQualifier(kv,
-                                        (Bytes.toString(family) + "." + Bytes.toString(kv
-                                                .getQualifier())).getBytes());
+                                byte[] oldQualifier = kv.getQualifier();
+                                byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+                                System.arraycopy(family, 0, newQualifier, 0, family.length);
+                                newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
+                                System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
+                                KeyValue newKV = modifyQualifier(kv, newQualifier);
                                 if (disExec) {
-                                    batch.addOperation(buildDeleteQueryAndMutate(new_kv, DEL, true, Long.MAX_VALUE));
+                                    batch.addOperation(buildDeleteQueryAndMutate(newKV, DEL, true, Long.MAX_VALUE));
                                 } else {
-                                    batch.addOperation(buildMutation(new_kv, DEL, true, Long.MAX_VALUE));
+                                    batch.addOperation(buildMutation(newKV, DEL, true, Long.MAX_VALUE));
                                 }
                             } else {
                                 if (disExec) {
