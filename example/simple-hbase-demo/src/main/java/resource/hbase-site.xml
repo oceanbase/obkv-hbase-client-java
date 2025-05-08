@@ -4,6 +4,10 @@
         <value>com.alipay.oceanbase.hbase.util.OHConnectionImpl</value>
     </property>
     <property>
+        <name>hbase.oceanbase.odpMode</name>
+        <value>false</value>
+    </property>
+    <property>
         <name>hbase.oceanbase.fullUserName</name>
         <value></value>
     </property>
@@ -12,15 +16,33 @@
         <value></value>
     </property>
     <property>
+        <!-- only for direct-connect mode-->
         <name>hbase.oceanbase.paramURL</name>
         <value></value>
     </property>
     <property>
+        <!-- only for direct-connect mode-->
         <name>hbase.oceanbase.sysUserName</name>
         <value></value>
     </property>
     <property>
+        <!-- only for direct-connect mode-->
         <name>hbase.oceanbase.sysPassword</name>
+        <value></value>
+    </property>
+    <property>
+        <!-- only for odp mode-->
+        <name>hbase.oceanbase.odpAddr</name>
+        <value></value>
+    </property>
+        <!-- only for odp mode-->
+    <property>
+        <name>hbase.oceanbase.odpPort</name>
+        <value>3307</value>
+    </property>
+    <property>
+        <!-- only for odp mode-->
+        <name>hbase.oceanbase.database</name>
         <value></value>
     </property>
 </configuration>
