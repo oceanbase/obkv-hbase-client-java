@@ -155,4 +155,5 @@ public final class OHConstants {
 
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
 
+    public static final int      DEFAULT_SOCKET_TIMEOUT_CONNECT              = 1000;
 }
