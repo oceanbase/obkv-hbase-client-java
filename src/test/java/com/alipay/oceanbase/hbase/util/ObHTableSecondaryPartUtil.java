@@ -56,6 +56,20 @@ public class ObHTableSecondaryPartUtil {
         }
     }
 
+    public static void alterTables(TableTemplateManager.TableType type, List<String> tableNames,
+                                   Map<String, List<String>> group2tableNames, boolean printSql)
+            throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        // single cf table
+        if (tableNames != null) {
+            alterTables(conn, type, tableNames, printSql);
+        }
+        // multi cf table
+        if (group2tableNames != null) {
+            alterTables(conn, type, group2tableNames, printSql);
+        }
+    }
+
     public static void createTables(Connection conn, TableTemplateManager.TableType type,
                                     List<String> tableNames, boolean printSql) throws Exception {
         // create single cf table
@@ -81,6 +95,31 @@ public class ObHTableSecondaryPartUtil {
                 }
             }
             tableNames.add(tableName);
+        }
+    }
+
+    public static void alterTables(Connection conn, TableTemplateManager.TableType type,
+                                   List<String> tableNames, boolean printSql) throws Exception {
+        // create single cf table
+        if (tableNames != null) {
+            String tableGroup = TableTemplateManager.getTableGroupName(type, false);
+            String tableName = TableTemplateManager.generateTableName(tableGroup, false, 1);
+            String sql = TableTemplateManager.getAlterTableSQL(type, tableName);
+            try {
+                System.out.println(sql);
+                conn.createStatement().execute(sql);
+                System.out.println("============= alter table: " + tableName + "  table_group: "
+                        + getTableName(tableName) + " =============\n"
+                        + (printSql ? sql : "")
+                        + " \n============= done =============\n");
+            } catch (SQLSyntaxErrorException e) {
+                if (!e.getMessage().contains("already exists")) {
+                    throw e;
+                } else {
+                    System.out.println("============= table: " + tableName + "  table_group: "
+                            + getTableName(tableName) + " alter failed =============");
+                }
+            }
         }
     }
 
@@ -116,6 +155,30 @@ public class ObHTableSecondaryPartUtil {
                     }
                 }
                 group2tableNames.get(tableGroup).add(tableName);
+            }
+        }
+    }
+
+    public static void alterTables(Connection conn, TableTemplateManager.TableType type, Map<String,
+                                   List<String>> group2tableNames, boolean printSql) throws Exception {
+        if (group2tableNames != null) {
+            String tableGroup = TableTemplateManager.getTableGroupName(type, true);
+            group2tableNames.put(tableGroup, new LinkedList<>());
+            for (int i = 1; i <= 3; ++i) {
+                String tableName = TableTemplateManager.generateTableName(tableGroup, true, i);
+                String sql = TableTemplateManager.getAlterTableSQL(type, tableName);
+                try {
+                    conn.createStatement().execute(sql);
+                    System.out.println("============= alter table: " + tableName
+                            + "  table_group: " + getTableName(tableName) + " =============\n"
+                            + (printSql ? sql : "") + " \n============= done =============\n");
+                } catch (SQLSyntaxErrorException e) {
+                    if (!e.getMessage().contains("already exists")) {
+                        throw e;
+                    } else {
+                        System.out.println("============= table: " + tableName + "  table_group: " + getTableName(tableName) + " alter failed =============");
+                    }
+                }
             }
         }
     }
