@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.ObTableClient;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
@@ -140,7 +141,9 @@ public class OHConnectionImpl implements Connection {
 
     @Override
     public RegionLocator getRegionLocator(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(null/*args*/);
+        OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(obTableClient);
+        return executor.getRegionLocator(String.valueOf(tableName));
     }
 
     @Override
