@@ -141,14 +141,15 @@ public class OHConnectionImpl implements Connection {
 
     @Override
     public RegionLocator getRegionLocator(TableName tableName) throws IOException {
-        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(null/*args*/);
+        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
         OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(obTableClient);
         return executor.getRegionLocator(String.valueOf(tableName));
     }
 
     @Override
     public Admin getAdmin() throws IOException {
-        throw new FeatureNotSupportedException("not supported yet'");
+        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
+        return new OHAdmin(obTableClient);
     }
 
     private void shutdownBatchPool(ExecutorService pool) {
