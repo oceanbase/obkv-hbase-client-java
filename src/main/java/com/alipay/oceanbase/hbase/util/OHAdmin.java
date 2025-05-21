@@ -2,21 +2,22 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
+import com.alipay.oceanbase.rpc.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
-import org.apache.hadoop.hbase.client.Admin;
-import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.client.replication.TableCFs;
 import org.apache.hadoop.hbase.client.security.SecurityCapability;
 import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
-import org.apache.hadoop.hbase.protobuf.generated.AdminProtos;
-import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
-import org.apache.hadoop.hbase.protobuf.generated.MasterProtos;
 import org.apache.hadoop.hbase.quotas.QuotaFilter;
 import org.apache.hadoop.hbase.quotas.QuotaRetriever;
 import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
+import org.apache.hadoop.hbase.replication.ReplicationException;
+import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
+import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
 import org.apache.hadoop.hbase.snapshot.HBaseSnapshotException;
 import org.apache.hadoop.hbase.snapshot.RestoreSnapshotException;
 import org.apache.hadoop.hbase.snapshot.SnapshotCreationException;
@@ -24,9 +25,7 @@ import org.apache.hadoop.hbase.snapshot.UnknownSnapshotException;
 import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
@@ -68,8 +67,18 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public List<TableDescriptor> listTableDescriptors() throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public HTableDescriptor[] listTables(Pattern pattern) throws IOException {
         return new HTableDescriptor[0];
+    }
+
+    @Override
+    public List<TableDescriptor> listTableDescriptors(Pattern pattern) throws IOException {
+        return Collections.emptyList();
     }
 
     @Override
@@ -80,6 +89,11 @@ public class OHAdmin implements Admin {
     @Override
     public HTableDescriptor[] listTables(Pattern pattern, boolean b) throws IOException {
         return new HTableDescriptor[0];
+    }
+
+    @Override
+    public List<TableDescriptor> listTableDescriptors(Pattern pattern, boolean b) throws IOException {
+        return Collections.emptyList();
     }
 
     @Override
@@ -118,23 +132,28 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void createTable(HTableDescriptor hTableDescriptor) throws IOException {
+    public TableDescriptor getDescriptor(TableName tableName) throws TableNotFoundException, IOException {
+        return null;
+    }
+
+    @Override
+    public void createTable(TableDescriptor tableDescriptor) throws IOException {
 
     }
 
     @Override
-    public void createTable(HTableDescriptor hTableDescriptor, byte[] bytes, byte[] bytes1, int i) throws IOException {
+    public void createTable(TableDescriptor tableDescriptor, byte[] bytes, byte[] bytes1, int i) throws IOException {
 
     }
 
     @Override
-    public void createTable(HTableDescriptor hTableDescriptor, byte[][] bytes) throws IOException {
+    public void createTable(TableDescriptor tableDescriptor, byte[][] bytes) throws IOException {
 
     }
 
     @Override
-    public void createTableAsync(HTableDescriptor hTableDescriptor, byte[][] bytes) throws IOException {
-
+    public Future<Void> createTableAsync(TableDescriptor tableDescriptor, byte[][] bytes) throws IOException {
+        return null;
     }
 
     @Override
@@ -144,12 +163,17 @@ public class OHAdmin implements Admin {
             executor.deleteTable(tableName.getNameAsString());
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else {
                 throw e;
             }
         }
+    }
+
+    @Override
+    public Future<Void> deleteTableAsync(TableName tableName) throws IOException {
+        return null;
     }
 
     @Override
@@ -168,13 +192,18 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public Future<Void> truncateTableAsync(TableName tableName, boolean b) throws IOException {
+        return null;
+    }
+
+    @Override
     public void enableTable(TableName tableName) throws IOException {
 
     }
 
     @Override
-    public void enableTableAsync(TableName tableName) throws IOException {
-
+    public Future<Void> enableTableAsync(TableName tableName) throws IOException {
+        return null;
     }
 
     @Override
@@ -188,8 +217,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void disableTableAsync(TableName tableName) throws IOException {
-
+    public Future<Void> disableTableAsync(TableName tableName) throws IOException {
+        return null;
     }
 
     @Override
@@ -238,8 +267,13 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void addColumn(TableName tableName, HColumnDescriptor hColumnDescriptor) throws IOException {
+    public void addColumnFamily(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
 
+    }
+
+    @Override
+    public Future<Void> addColumnFamilyAsync(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+        return null;
     }
 
     @Override
@@ -248,8 +282,23 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void modifyColumn(TableName tableName, HColumnDescriptor hColumnDescriptor) throws IOException {
+    public void deleteColumnFamily(TableName tableName, byte[] bytes) throws IOException {
 
+    }
+
+    @Override
+    public Future<Void> deleteColumnFamilyAsync(TableName tableName, byte[] bytes) throws IOException {
+        return null;
+    }
+
+    @Override
+    public void modifyColumnFamily(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+
+    }
+
+    @Override
+    public Future<Void> modifyColumnFamilyAsync(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+        return null;
     }
 
     @Override
@@ -278,12 +327,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public List<RegionInfo> getRegions(ServerName serverName) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public void flush(TableName tableName) throws IOException {
 
     }
 
     @Override
     public void flushRegion(byte[] bytes) throws IOException {
+
+    }
+
+    @Override
+    public void flushRegionServer(ServerName serverName) throws IOException {
 
     }
 
@@ -308,6 +367,16 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public void compact(TableName tableName, CompactType compactType) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public void compact(TableName tableName, byte[] bytes, CompactType compactType) throws IOException, InterruptedException {
+
+    }
+
+    @Override
     public void majorCompact(TableName tableName) throws IOException {
 
     }
@@ -328,7 +397,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void compactRegionServer(ServerName serverName, boolean b) throws IOException, InterruptedException {
+    public void majorCompact(TableName tableName, CompactType compactType) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public void majorCompact(TableName tableName, byte[] bytes, CompactType compactType) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public void compactRegionServer(ServerName serverName) throws IOException {
+
+    }
+
+    @Override
+    public void majorCompactRegionServer(ServerName serverName) throws IOException {
 
     }
 
@@ -353,23 +437,28 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public boolean setBalancerRunning(boolean b, boolean b1) throws IOException {
+    public boolean balancerSwitch(boolean b, boolean b1) throws IOException {
         return false;
     }
 
     @Override
-    public boolean balancer() throws IOException {
+    public boolean balance() throws IOException {
         return false;
     }
 
     @Override
-    public boolean balancer(boolean b) throws IOException {
+    public boolean balance(boolean b) throws IOException {
         return false;
     }
 
     @Override
     public boolean isBalancerEnabled() throws IOException {
         return false;
+    }
+
+    @Override
+    public CacheEvictionStats clearBlockCache(TableName tableName) throws IOException {
+        return null;
     }
 
     @Override
@@ -383,17 +472,17 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public boolean setNormalizerRunning(boolean b) throws IOException {
+    public boolean normalizerSwitch(boolean b) throws IOException {
         return false;
     }
 
     @Override
-    public boolean enableCatalogJanitor(boolean b) throws IOException {
+    public boolean catalogJanitorSwitch(boolean b) throws IOException {
         return false;
     }
 
     @Override
-    public int runCatalogScan() throws IOException {
+    public int runCatalogJanitor() throws IOException {
         return 0;
     }
 
@@ -403,8 +492,33 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public boolean cleanerChoreSwitch(boolean b) throws IOException {
+        return false;
+    }
+
+    @Override
+    public boolean runCleanerChore() throws IOException {
+        return false;
+    }
+
+    @Override
+    public boolean isCleanerChoreEnabled() throws IOException {
+        return false;
+    }
+
+    @Override
     public void mergeRegions(byte[] bytes, byte[] bytes1, boolean b) throws IOException {
 
+    }
+
+    @Override
+    public Future<Void> mergeRegionsAsync(byte[] bytes, byte[] bytes1, boolean b) throws IOException {
+        return null;
+    }
+
+    @Override
+    public Future<Void> mergeRegionsAsync(byte[][] bytes, boolean b) throws IOException {
+        return null;
     }
 
     @Override
@@ -428,8 +542,28 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void modifyTable(TableName tableName, HTableDescriptor hTableDescriptor) throws IOException {
+    public Future<Void> splitRegionAsync(byte[] bytes, byte[] bytes1) throws IOException {
+        return null;
+    }
 
+    @Override
+    public void modifyTable(TableName tableName, TableDescriptor tableDescriptor) throws IOException {
+
+    }
+
+    @Override
+    public void modifyTable(TableDescriptor tableDescriptor) throws IOException {
+
+    }
+
+    @Override
+    public Future<Void> modifyTableAsync(TableName tableName, TableDescriptor tableDescriptor) throws IOException {
+        return null;
+    }
+
+    @Override
+    public Future<Void> modifyTableAsync(TableDescriptor tableDescriptor) throws IOException {
+        return null;
     }
 
     @Override
@@ -443,13 +577,32 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public boolean isMasterInMaintenanceMode() throws IOException {
+        return false;
+    }
+
+    @Override
     public void stopRegionServer(String s) throws IOException {
 
     }
 
     @Override
-    public ClusterStatus getClusterStatus() throws IOException {
+    public ClusterMetrics getClusterMetrics(EnumSet<ClusterMetrics.Option> enumSet) throws IOException {
         return null;
+    }
+
+    @Override
+    public List<RegionMetrics> getRegionMetrics(ServerName serverName) throws IOException {
+        throw new FeatureNotSupportedException("does not support yet");
+    }
+
+    @Override
+    public List<RegionMetrics> getRegionMetrics(ServerName serverName, TableName tableName) throws IOException {
+        OHRegionMetricsExecutor executor = new OHRegionMetricsExecutor(tableClient);
+        if (tableName == null) {
+            throw new FeatureNotSupportedException("does not support tableName is null");
+        }
+        return executor.getRegionMetrics(tableName.getNameAsString());
     }
 
     @Override
@@ -463,13 +616,28 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public Future<Void> createNamespaceAsync(NamespaceDescriptor namespaceDescriptor) throws IOException {
+        return null;
+    }
+
+    @Override
     public void modifyNamespace(NamespaceDescriptor namespaceDescriptor) throws IOException {
 
     }
 
     @Override
+    public Future<Void> modifyNamespaceAsync(NamespaceDescriptor namespaceDescriptor) throws IOException {
+        return null;
+    }
+
+    @Override
     public void deleteNamespace(String s) throws IOException {
 
+    }
+
+    @Override
+    public Future<Void> deleteNamespaceAsync(String s) throws IOException {
+        return null;
     }
 
     @Override
@@ -488,12 +656,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public List<TableDescriptor> listTableDescriptorsByNamespace(byte[] bytes) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public TableName[] listTableNamesByNamespace(String s) throws IOException {
         return new TableName[0];
     }
 
     @Override
     public List<HRegionInfo> getTableRegions(TableName tableName) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<RegionInfo> getRegions(TableName tableName) throws IOException {
         return Collections.emptyList();
     }
 
@@ -508,6 +686,11 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public List<TableDescriptor> listTableDescriptors(List<TableName> list) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public HTableDescriptor[] getTableDescriptors(List<String> list) throws IOException {
         return new HTableDescriptor[0];
     }
@@ -518,13 +701,18 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public ProcedureInfo[] listProcedures() throws IOException {
-        return new ProcedureInfo[0];
+    public Future<Boolean> abortProcedureAsync(long l, boolean b) throws IOException {
+        return null;
     }
 
     @Override
-    public Future<Boolean> abortProcedureAsync(long l, boolean b) throws IOException {
-        return null;
+    public String getProcedures() throws IOException {
+        return "";
+    }
+
+    @Override
+    public String getLocks() throws IOException {
+        return "";
     }
 
     @Override
@@ -533,17 +721,17 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public String[] getMasterCoprocessors() throws IOException {
-        return new String[0];
-    }
-
-    @Override
-    public AdminProtos.GetRegionInfoResponse.CompactionState getCompactionState(TableName tableName) throws IOException {
+    public CompactionState getCompactionState(TableName tableName) throws IOException {
         return null;
     }
 
     @Override
-    public AdminProtos.GetRegionInfoResponse.CompactionState getCompactionStateForRegion(byte[] bytes) throws IOException {
+    public CompactionState getCompactionState(TableName tableName, CompactType compactType) throws IOException {
+        return null;
+    }
+
+    @Override
+    public CompactionState getCompactionStateForRegion(byte[] bytes) throws IOException {
         return null;
     }
 
@@ -568,22 +756,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void snapshot(String s, TableName tableName, HBaseProtos.SnapshotDescription.Type type) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(String s, TableName tableName, SnapshotType snapshotType) throws IOException, SnapshotCreationException, IllegalArgumentException {
 
     }
 
     @Override
-    public void snapshot(HBaseProtos.SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException, IllegalArgumentException {
 
     }
 
     @Override
-    public MasterProtos.SnapshotResponse takeSnapshotAsync(HBaseProtos.SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException {
-        return null;
+    public void snapshotAsync(SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException {
+
     }
 
     @Override
-    public boolean isSnapshotFinished(HBaseProtos.SnapshotDescription snapshotDescription) throws IOException, HBaseSnapshotException, UnknownSnapshotException {
+    public boolean isSnapshotFinished(SnapshotDescription snapshotDescription) throws IOException, HBaseSnapshotException, UnknownSnapshotException {
         return false;
     }
 
@@ -598,6 +786,11 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public Future<Void> restoreSnapshotAsync(String s) throws IOException, RestoreSnapshotException {
+        return null;
+    }
+
+    @Override
     public void restoreSnapshot(byte[] bytes, boolean b) throws IOException, RestoreSnapshotException {
 
     }
@@ -608,7 +801,17 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public void restoreSnapshot(String s, boolean b, boolean b1) throws IOException, RestoreSnapshotException {
+
+    }
+
+    @Override
     public void cloneSnapshot(byte[] bytes, TableName tableName) throws IOException, TableExistsException, RestoreSnapshotException {
+
+    }
+
+    @Override
+    public void cloneSnapshot(String s, TableName tableName, boolean b) throws IOException, TableExistsException, RestoreSnapshotException {
 
     }
 
@@ -618,12 +821,17 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public Future<Void> cloneSnapshotAsync(String s, TableName tableName) throws IOException, TableExistsException {
+        return null;
+    }
+
+    @Override
     public void execProcedure(String s, String s1, Map<String, String> map) throws IOException {
 
     }
 
     @Override
-    public byte[] execProcedureWithRet(String s, String s1, Map<String, String> map) throws IOException {
+    public byte[] execProcedureWithReturn(String s, String s1, Map<String, String> map) throws IOException {
         return new byte[0];
     }
 
@@ -633,27 +841,27 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public List<HBaseProtos.SnapshotDescription> listSnapshots() throws IOException {
+    public List<SnapshotDescription> listSnapshots() throws IOException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<HBaseProtos.SnapshotDescription> listSnapshots(String s) throws IOException {
+    public List<SnapshotDescription> listSnapshots(String s) throws IOException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<HBaseProtos.SnapshotDescription> listSnapshots(Pattern pattern) throws IOException {
+    public List<SnapshotDescription> listSnapshots(Pattern pattern) throws IOException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<HBaseProtos.SnapshotDescription> listTableSnapshots(String s, String s1) throws IOException {
+    public List<SnapshotDescription> listTableSnapshots(String s, String s1) throws IOException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<HBaseProtos.SnapshotDescription> listTableSnapshots(Pattern pattern, Pattern pattern1) throws IOException {
+    public List<SnapshotDescription> listTableSnapshots(Pattern pattern, Pattern pattern1) throws IOException {
         return Collections.emptyList();
     }
 
@@ -698,6 +906,11 @@ public class OHAdmin implements Admin {
     }
 
     @Override
+    public List<QuotaSettings> getQuota(QuotaFilter quotaFilter) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public CoprocessorRpcChannel coprocessorService() {
         return null;
     }
@@ -718,22 +931,117 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public int getMasterInfoPort() throws IOException {
-        return 0;
-    }
-
-    @Override
     public List<SecurityCapability> getSecurityCapabilities() throws IOException {
         return Collections.emptyList();
     }
 
     @Override
-    public boolean[] setSplitOrMergeEnabled(boolean b, boolean b1, MasterSwitchType... masterSwitchTypes) throws IOException {
-        return new boolean[0];
+    public boolean splitSwitch(boolean b, boolean b1) throws IOException {
+        return false;
     }
 
     @Override
-    public boolean isSplitOrMergeEnabled(MasterSwitchType masterSwitchType) throws IOException {
+    public boolean mergeSwitch(boolean b, boolean b1) throws IOException {
         return false;
+    }
+
+    @Override
+    public boolean isSplitEnabled() throws IOException {
+        return false;
+    }
+
+    @Override
+    public boolean isMergeEnabled() throws IOException {
+        return false;
+    }
+
+    @Override
+    public void addReplicationPeer(String s, ReplicationPeerConfig replicationPeerConfig, boolean b) throws IOException {
+
+    }
+
+    @Override
+    public void removeReplicationPeer(String s) throws IOException {
+
+    }
+
+    @Override
+    public void enableReplicationPeer(String s) throws IOException {
+
+    }
+
+    @Override
+    public void disableReplicationPeer(String s) throws IOException {
+
+    }
+
+    @Override
+    public ReplicationPeerConfig getReplicationPeerConfig(String s) throws IOException {
+        return null;
+    }
+
+    @Override
+    public void updateReplicationPeerConfig(String s, ReplicationPeerConfig replicationPeerConfig) throws IOException {
+
+    }
+
+    @Override
+    public void appendReplicationPeerTableCFs(String s, Map<TableName, List<String>> map) throws ReplicationException, IOException {
+
+    }
+
+    @Override
+    public void removeReplicationPeerTableCFs(String s, Map<TableName, List<String>> map) throws ReplicationException, IOException {
+
+    }
+
+    @Override
+    public List<ReplicationPeerDescription> listReplicationPeers() throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<ReplicationPeerDescription> listReplicationPeers(Pattern pattern) throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void decommissionRegionServers(List<ServerName> list, boolean b) throws IOException {
+
+    }
+
+    @Override
+    public List<ServerName> listDecommissionedRegionServers() throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void recommissionRegionServer(ServerName serverName, List<byte[]> list) throws IOException {
+
+    }
+
+    @Override
+    public List<TableCFs> listReplicatedTableCFs() throws IOException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void enableTableReplication(TableName tableName) throws IOException {
+
+    }
+
+    @Override
+    public void disableTableReplication(TableName tableName) throws IOException {
+
+    }
+
+    @Override
+    public void clearCompactionQueues(ServerName serverName, Set<String> set) throws IOException, InterruptedException {
+
+    }
+
+    @Override
+    public List<ServerName> clearDeadServers(List<ServerName> list) throws IOException {
+        return Collections.emptyList();
     }
 }
