@@ -427,8 +427,9 @@ public class OHTable implements HTableInterface {
     }
 
     @Override
-    public HTableDescriptor getTableDescriptor() {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public HTableDescriptor getTableDescriptor() throws IOException {
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        return executor.getTableDescriptor();
     }
 
     /**
