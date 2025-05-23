@@ -149,8 +149,9 @@ public class OHConnectionImpl implements Connection {
 
     @Override
     public RegionLocator getRegionLocator(TableName tableName) throws IOException {
-        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(null/*args*/);
-        OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(obTableClient);
+        OHConnectionConfiguration connectionConfig = getOHConnectionConfiguration();
+        ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
+        OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(), obTableClient);
         return executor.getRegionLocator(String.valueOf(tableName));
     }
 

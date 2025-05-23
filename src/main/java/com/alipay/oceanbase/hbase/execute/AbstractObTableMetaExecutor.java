@@ -15,7 +15,7 @@ public abstract class AbstractObTableMetaExecutor<T> implements ObTableMetaExecu
         if (request.getMetaType() != getMetaType()) {
             throw new IOException("Invalid meta type, expected " + getMetaType());
         }
-        ObTable table = client.randomTable();
+        ObTable table = client.getRandomTable();
         ObTableMetaResponse response;
         try {
             response = (ObTableMetaResponse) client.executeWithRetry(
