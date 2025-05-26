@@ -48,6 +48,7 @@ public class OHConnectionConfiguration {
     private final int        maxKeyValueSize;
     private final int        rpcTimeout;
     private final int        rpcConnectTimeout;
+    private final int        numRetries;
 
     public OHConnectionConfiguration(Configuration conf) {
         this.paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
@@ -79,6 +80,8 @@ public class OHConnectionConfiguration {
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
+        this.numRetries = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.scannerCaching = conf.getInt("hbase.client.scanner.caching", Integer.MAX_VALUE);
         this.scannerMaxResultSize = conf.getLong("hbase.client.scanner.max.result.size",
             WRITE_BUFFER_SIZE_DEFAULT);
@@ -166,5 +169,9 @@ public class OHConnectionConfiguration {
 
     public String getDatabase() {
         return this.database;
+    }
+
+    public int getNumRetries() {
+        return this.numRetries;
     }
 }

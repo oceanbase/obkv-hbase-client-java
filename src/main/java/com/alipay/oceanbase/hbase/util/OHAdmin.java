@@ -1,5 +1,6 @@
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
@@ -31,9 +32,11 @@ import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 public class OHAdmin implements Admin {
-    private final ObTableClient tableClient;
-    OHAdmin(ObTableClient tableClient) {
-        this.tableClient = tableClient;
+    private final OHConnectionImpl connection;
+    private final Configuration conf;
+    OHAdmin(OHConnectionImpl connection) {
+        this.connection = connection;
+        this.conf = connection.getConfiguration();
     }
 
     @Override
@@ -58,6 +61,8 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean tableExists(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
         return executor.tableExists(tableName.getNameAsString());
     }
@@ -139,6 +144,8 @@ public class OHAdmin implements Admin {
 
     @Override
     public void deleteTable(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHDeleteTableExecutor executor = new OHDeleteTableExecutor(tableClient);
         try {
             executor.deleteTable(tableName.getNameAsString());
