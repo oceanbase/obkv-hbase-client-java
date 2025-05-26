@@ -35,7 +35,7 @@ public class OHDeleteTableExecutor extends AbstractObTableMetaExecutor<Void> {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestDataMap = new HashMap<>();
-        requestDataMap.put("name", tableName);
+        requestDataMap.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestDataMap);
         request.setData(jsonData);
         return execute(tableClient, request);
