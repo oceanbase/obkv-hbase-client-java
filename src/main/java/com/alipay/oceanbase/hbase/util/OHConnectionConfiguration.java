@@ -57,6 +57,7 @@ public class OHConnectionConfiguration {
     private final int        rpcConnectTimeout;
     private final long       writeBufferPeriodicFlushTimeoutMs;
     private final long       writeBufferPeriodicFlushTimerTickMs;
+    private final int        numRetries;
 
     public OHConnectionConfiguration(Configuration conf) {
         this.paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
@@ -100,6 +101,8 @@ public class OHConnectionConfiguration {
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
+        this.numRetries = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
         this.scannerCaching = conf.getInt(HConstants.HBASE_CLIENT_SCANNER_CACHING,
             Integer.MAX_VALUE);
         this.scannerMaxResultSize = conf.getLong(
@@ -208,5 +211,9 @@ public class OHConnectionConfiguration {
 
     public long getWriteBufferPeriodicFlushTimerTickMs() {
         return this.writeBufferPeriodicFlushTimerTickMs;
+    }
+
+    public int getNumRetries() {
+        return this.numRetries;
     }
 }

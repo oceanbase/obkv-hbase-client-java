@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase;
 
+import com.alipay.oceanbase.hbase.util.OHRegionMetrics;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
@@ -32,6 +33,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,7 +43,8 @@ import java.util.concurrent.Executors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertFalse;
 
 public class OHTableAdminInterfaceTest {
     public OHTablePool setUpLoadPool() throws IOException {
@@ -265,8 +268,36 @@ public class OHTableAdminInterfaceTest {
         Assert.assertEquals(0, startEndKeys.getSecond()[0].length);
     }
 
+    /*
+    *
+    CREATE DATABASE IF NOT EXISTS `n1`;
+    CREATE TABLEGROUP `n1:test_multi_cf` SHARDING = 'ADAPTIVE';
+    CREATE TABLE `n1:test_multi_cf$family_with_group1` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
+    CREATE TABLE `n1:test_multi_cf$family_with_group2` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
+    CREATE TABLE `n1:test_multi_cf$family_with_group3` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
+    * */
     @Test
     public void testAdminGetRegionMetrics() throws Exception {
+        String tablegroup1 = "test_multi_cf";
+        String tablegroup2 = "n1:test_multi_cf";
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
@@ -281,8 +312,8 @@ public class OHTableAdminInterfaceTest {
                     admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
                 });
         // insert 300 thousand of rows in each table under tablegroup test_multi_cf
-        batchInsert(100000);
-        List<RegionMetrics> metrics = admin.getRegionMetrics(null, TableName.valueOf("test_multi_cf"));
+        batchInsert(100000, tablegroup1);
+        List<RegionMetrics> metrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
         for (RegionMetrics regionMetrics : metrics) {
             System.out.println("region name: " + regionMetrics.getNameAsString()
                     + ", storeFileSize: " + regionMetrics.getStoreFileSize()
@@ -297,14 +328,25 @@ public class OHTableAdminInterfaceTest {
             executorService.submit(() -> {
                 try {
                     if (taskId % 2 == 1) {
-                        List<RegionMetrics> regionMetrics = admin.getRegionMetrics(null, TableName.valueOf("test_multi_cf"));
+                        List<RegionMetrics> regionMetrics = null;
+                        // test get regionMetrics from different namespaces
+                        if (taskId % 3 != 0) {
+                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
+                        } else {
+                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
+                        }
                         for (RegionMetrics m : regionMetrics) {
-                            System.out.println("task: " + taskId + ", region name: " + m.getNameAsString()
+                            System.out.println("task: " + taskId + ", tablegroup: " + ((OHRegionMetrics) m).getTablegroup()
+                                    + ", region name: " + m.getNameAsString()
                                     + ", storeFileSize: " + m.getStoreFileSize()
                                     + ", memFileSize: " + m.getMemStoreSize());
                         }
                     } else {
-                        batchInsert(1000);
+                        if (taskId % 8 == 0) {
+                            batchInsert(1000, tablegroup2);
+                        } else {
+                            batchInsert(1000, tablegroup1);
+                        }
                         System.out.println("task: " + taskId + ", batchInsert");
                     }
                 } catch (Exception e) {
@@ -325,7 +367,82 @@ public class OHTableAdminInterfaceTest {
         Assert.assertTrue(exceptionCatcher.isEmpty());
     }
 
-    private void batchInsert(int rows) throws Exception {
+    @Test
+    public void testAdminDeleteTable() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
+                "use `n1`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `n1:test` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family_group` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family1` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;");
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
+        assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        IOException thrown = assertThrows(IOException.class,
+                () -> {
+                    admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
+                });
+        Assert.assertTrue(thrown.getCause() instanceof ObTableException);
+        Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        admin.deleteTable(TableName.valueOf("n1", "test"));
+        admin.deleteTable(TableName.valueOf("test_multi_cf"));
+        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
+        assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+    }
+
+    @Test
+    public void testAdminTableExists() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
+        Assert.assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        Assert.assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
+    }
+
+    private void batchInsert(int rows, String tablegroup) throws Exception {
         byte[] family1 = Bytes.toBytes("family_with_group1");
         byte[] family2 = Bytes.toBytes("family_with_group2");
         byte[] family3 = Bytes.toBytes("family_with_group3");
@@ -349,7 +466,7 @@ public class OHTableAdminInterfaceTest {
         byte[] family3_value3 = Bytes.toBytes("family3_value3");
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
-        Table table = connection.getTable(TableName.valueOf("test_multi_cf"));
+        Table table = connection.getTable(TableName.valueOf(tablegroup));
         List<Row> batchLsit = new LinkedList<>();
         for (int i = 0; i < rows; ++i) {
             Put put = new Put(toBytes("Key" + i));

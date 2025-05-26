@@ -30,17 +30,17 @@ import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 public class OHAdmin implements Admin {
-    private final ObTableClient tableClient;
+    private boolean                aborted = false;
     private final OHConnectionImpl connection;
-    private boolean aborted = false;
-    OHAdmin(ObTableClient tableClient, OHConnectionImpl connection) {
-        this.tableClient = tableClient;
+    private final Configuration    conf;
+    OHAdmin(OHConnectionImpl connection) {
         this.connection = connection;
+        this.conf = connection.getConfiguration();
     }
 
     @Override
     public int getOperationTimeout() {
-        return (int) tableClient.getRuntimeMaxWait();
+        return connection.getOHConnectionConfiguration().getOperationTimeout();
     }
 
     @Override
@@ -62,6 +62,8 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean tableExists(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
         return executor.tableExists(tableName.getNameAsString());
     }
@@ -163,6 +165,8 @@ public class OHAdmin implements Admin {
 
     @Override
     public void deleteTable(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHDeleteTableExecutor executor = new OHDeleteTableExecutor(tableClient);
         try {
             executor.deleteTable(tableName.getNameAsString());
@@ -603,10 +607,12 @@ public class OHAdmin implements Admin {
 
     @Override
     public List<RegionMetrics> getRegionMetrics(ServerName serverName, TableName tableName) throws IOException {
-        OHRegionMetricsExecutor executor = new OHRegionMetricsExecutor(tableClient);
         if (tableName == null) {
             throw new FeatureNotSupportedException("does not support tableName is null");
         }
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHRegionMetricsExecutor executor = new OHRegionMetricsExecutor(tableClient);
         return executor.getRegionMetrics(tableName.getNameAsString());
     }
 
