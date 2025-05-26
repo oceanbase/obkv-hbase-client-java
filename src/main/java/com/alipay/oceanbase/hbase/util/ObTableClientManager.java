@@ -126,6 +126,13 @@ public class ObTableClientManager {
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
     }
 
+    public static void initTimeoutAndRetryTimes(ObTableClient obTableClient, OHConnectionConfiguration ohConnectionConf, int numRetries) {
+        obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        obTableClient.setRuntimeRetryTimes(numRetries);
+        obTableClient.setRuntimeMaxWait(ohConnectionConf.getOperationTimeout());
+        obTableClient.setRuntimeBatchMaxWait(ohConnectionConf.getOperationTimeout());
+    }
+
     public static class ObTableClientKey {
         private String     paramUrl;
         private String     fullUserName;

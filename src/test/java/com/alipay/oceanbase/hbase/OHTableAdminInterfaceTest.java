@@ -18,7 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
-import com.alipay.oceanbase.rpc.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.conf.Configuration;
@@ -28,7 +28,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
-import org.codehaus.jackson.annotate.JsonTypeInfo;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -281,7 +280,7 @@ public class OHTableAdminInterfaceTest {
                 () -> {
                     admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
                 });
-        // insert 300 thousand of rows in each table under tablegorup test_multi_cf
+        // insert 300 thousand of rows in each table under tablegroup test_multi_cf
         batchInsert(100000);
         List<RegionMetrics> metrics = admin.getRegionMetrics(null, TableName.valueOf("test_multi_cf"));
         for (RegionMetrics regionMetrics : metrics) {
@@ -289,7 +288,7 @@ public class OHTableAdminInterfaceTest {
                     + ", storeFileSize: " + regionMetrics.getStoreFileSize()
                     + ", memFileSize: " + regionMetrics.getMemStoreSize());
         }
-        // concurrent read write
+        // concurrently read while writing 150 thousand of rows to each table
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         CountDownLatch latch = new CountDownLatch(100);
         List<Exception> exceptionCatcher = new ArrayList<>();

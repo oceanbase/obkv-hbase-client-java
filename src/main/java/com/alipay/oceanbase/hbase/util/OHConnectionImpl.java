@@ -142,6 +142,9 @@ public class OHConnectionImpl implements Connection {
     @Override
     public RegionLocator getRegionLocator(TableName tableName) throws IOException {
         ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
+        int numRetries = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        ObTableClientManager.initTimeoutAndRetryTimes(obTableClient, connectionConfig, numRetries);
         OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(obTableClient);
         return executor.getRegionLocator(String.valueOf(tableName));
     }
@@ -149,7 +152,10 @@ public class OHConnectionImpl implements Connection {
     @Override
     public Admin getAdmin() throws IOException {
         ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClient(connectionConfig);
-        return new OHAdmin(obTableClient);
+        int numRetries = conf.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        ObTableClientManager.initTimeoutAndRetryTimes(obTableClient, connectionConfig, numRetries);
+        return new OHAdmin(obTableClient, this);
     }
 
     private void shutdownBatchPool(ExecutorService pool) {

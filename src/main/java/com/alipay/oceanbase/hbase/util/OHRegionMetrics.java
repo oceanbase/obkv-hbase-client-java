@@ -1,5 +1,6 @@
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import org.apache.hadoop.hbase.RegionMetrics;
 import org.apache.hadoop.hbase.Size;
 
@@ -30,12 +31,12 @@ public class OHRegionMetrics implements RegionMetrics {
 
     @Override
     public int getStoreCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public int getStoreFileCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
@@ -50,71 +51,71 @@ public class OHRegionMetrics implements RegionMetrics {
 
     @Override
     public long getReadRequestCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getWriteRequestCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getFilteredReadRequestCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Size getStoreFileIndexSize() {
-        return null;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Size getStoreFileRootLevelIndexSize() {
-        return null;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Size getStoreFileUncompressedDataIndexSize() {
-        return null;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Size getBloomFilterSize() {
-        return null;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getCompactingCellCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getCompactedCellCount() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getCompletedSequenceId() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Map<byte[], Long> getStoreSequenceId() {
-        return Collections.emptyMap();
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public Size getUncompressedStoreFileSize() {
-        return null;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public float getDataLocality() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public long getLastMajorCompactionTimestamp() {
-        return 0;
+        throw new FeatureNotSupportedException("does not support yet");
     }
 }
