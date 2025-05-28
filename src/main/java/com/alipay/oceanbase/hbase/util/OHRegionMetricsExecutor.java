@@ -63,7 +63,7 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
-        requestData.put("name", tableName);
+        requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
         return execute(tableClient, request);

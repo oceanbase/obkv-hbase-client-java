@@ -268,34 +268,62 @@ public class OHTableAdminInterfaceTest {
         Assert.assertEquals(0, startEndKeys.getSecond()[0].length);
     }
 
-    /*
-    *
-    CREATE DATABASE IF NOT EXISTS `n1`;
-    CREATE TABLEGROUP `n1:test_multi_cf` SHARDING = 'ADAPTIVE';
-    CREATE TABLE `n1:test_multi_cf$family_with_group1` (
-        `K` varbinary(1024) NOT NULL,
-        `Q` varbinary(256) NOT NULL,
-        `T` bigint(20) NOT NULL,
-        `V` varbinary(1024) DEFAULT NULL,
-        PRIMARY KEY (`K`, `Q`, `T`)
-    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
-    CREATE TABLE `n1:test_multi_cf$family_with_group2` (
-        `K` varbinary(1024) NOT NULL,
-        `Q` varbinary(256) NOT NULL,
-        `T` bigint(20) NOT NULL,
-        `V` varbinary(1024) DEFAULT NULL,
-        PRIMARY KEY (`K`, `Q`, `T`)
-    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
-    CREATE TABLE `n1:test_multi_cf$family_with_group3` (
-        `K` varbinary(1024) NOT NULL,
-        `Q` varbinary(256) NOT NULL,
-        `T` bigint(20) NOT NULL,
-        `V` varbinary(1024) DEFAULT NULL,
-        PRIMARY KEY (`K`, `Q`, `T`)
-    ) TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;
-    * */
     @Test
     public void testAdminGetRegionMetrics() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
+                "use `n1`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `n1:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
+        st.close();
+        conn.close();
         String tablegroup1 = "test_multi_cf";
         String tablegroup2 = "n1:test_multi_cf";
         Configuration conf = ObHTableTestUtil.newConfiguration();
@@ -319,7 +347,7 @@ public class OHTableAdminInterfaceTest {
                     + ", storeFileSize: " + regionMetrics.getStoreFileSize()
                     + ", memFileSize: " + regionMetrics.getMemStoreSize());
         }
-        // concurrently read while writing 150 thousand of rows to each table
+        // concurrently read while writing 150 thousand of rows to 2 tablegroups
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         CountDownLatch latch = new CountDownLatch(100);
         List<Exception> exceptionCatcher = new ArrayList<>();
@@ -415,6 +443,8 @@ public class OHTableAdminInterfaceTest {
                 "      `V` varbinary(1024) DEFAULT NULL,\n" +
                 "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = `n1:test`;");
+        st.close();
+        conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
@@ -434,9 +464,62 @@ public class OHTableAdminInterfaceTest {
 
     @Test
     public void testAdminTableExists() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
+                "use `n1`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `n1:test` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family_group` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family1` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;");
+        st.close();
+        conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
+        // TableName cannot contain $ symbol
+        Assert.assertThrows(IllegalArgumentException.class,
+                () -> {
+                    TableName.valueOf("random_string$");
+                });
         Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
         Assert.assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
         Assert.assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
