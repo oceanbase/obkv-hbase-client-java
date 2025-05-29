@@ -18,15 +18,30 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.RegionMetrics;
+import org.apache.hadoop.hbase.ServerName;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+
 import org.junit.Assert;
+import org.junit.Assert.*;
 import org.junit.Test;
 
+
 import java.io.IOException;
+import java.sql.Statement;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Executors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
+import static org.apache.hadoop.hbase.util.Bytes.toBytes;
+import static org.junit.Assert.*;
 
 public class OHTableAdminInterfaceTest {
     public OHTablePool setUpLoadPool() throws IOException {
@@ -248,5 +263,120 @@ public class OHTableAdminInterfaceTest {
         Assert.assertEquals(1, startEndKeys.getSecond().length);
         Assert.assertEquals(0, startEndKeys.getFirst()[0].length);
         Assert.assertEquals(0, startEndKeys.getSecond()[0].length);
+    }
+
+    @Test
+    public void testAdminEnDisableTable() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
+                "use `n1`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `n1:test` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family_group` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family1` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;");
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        admin.disableTable(TableName.valueOf("test_multi_cf"));
+        assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
+        assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        // disable a non-existed table
+        IOException thrown = assertThrows(IOException.class,
+                () -> {
+                    admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
+                });
+        assertTrue(thrown.getCause() instanceof ObTableException);
+        Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+
+        // write an enabled table, should succeed
+        batchInsert(10, "test_multi_ch");
+        // disable a disabled table
+        thrown = assertThrows(IOException.class,
+                () -> {
+                    admin.disableTable(TableName.valueOf("test_multi_cf"));
+                });
+        assertTrue(thrown.getCause() instanceof ObTableException);
+        Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+
+        // write an enabled table, should fail
+        batchInsert(10, "test_multi_ch");
+        enDisableRead(10, "test_multi_ch");
+
+        // enable a disabled table
+        admin.enableTable(TableName.valueOf("test_multi_cf"));
+
+        // write an enabled table, should succeed
+        batchInsert(10, "test_multi_ch");
+        enDisableRead(10, "test_multi_ch");
+
+        // enable an enabled table
+        thrown = assertThrows(IOException.class,
+                () -> {
+                    admin.disableTable(TableName.valueOf("n1", "test");
+                });
+        assertTrue(thrown.getCause() instanceof ObTableException);
+        Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+
+        admin.deleteTable(TableName.valueOf("n1", "test"));
+        admin.deleteTable(TableName.valueOf("test_multi_cf"));
+        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
+        assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+    }
+
+    private void enDisableRead(int rows, String tablegroup) throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Table table = connection.getTable(TableName.valueOf(tablegroup));
+        List<Row> batchLsit = new LinkedList<>();
+        for (int i = 0; i < rows; ++i) {
+            Get get = new Get(toBytes("Key" + i));
+            batchLsit.add(get);
+            if (i % 100 == 0) { // 100 rows one batch to avoid OB_TIMEOUT
+                Object[] results = new Object[batchLsit.size()];
+                table.batch(batchLsit, results);
+                batchLsit.clear();
+            }
+        }
+        Object[] results = new Object[batchLsit.size()];
+        table.batch(batchLsit, results);
     }
 }
