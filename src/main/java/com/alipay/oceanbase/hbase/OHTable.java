@@ -200,8 +200,7 @@ public class OHTable implements HTableInterface {
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
-        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        int numRetries = ohConnectionConf.getNumRetries();
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -253,8 +252,7 @@ public class OHTable implements HTableInterface {
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
         OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
-        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        int numRetries = ohConnectionConf.getNumRetries();
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
@@ -322,8 +320,7 @@ public class OHTable implements HTableInterface {
         this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
         this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
-        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+        int numRetries = connectionConfig.getNumRetries();
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
@@ -385,7 +382,7 @@ public class OHTable implements HTableInterface {
             WRITE_BUFFER_SIZE_DEFAULT);
     }
 
-    private OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
+    public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
                                                               OHConnectionConfiguration ohConnectionConf) {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
