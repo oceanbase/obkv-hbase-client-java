@@ -499,13 +499,15 @@ public class OHTable implements Table {
     }
 
     @Override
-    public HTableDescriptor getTableDescriptor() {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public HTableDescriptor getTableDescriptor() throws IOException {
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        return executor.getTableDescriptor();
     }
 
     @Override
     public TableDescriptor getDescriptor() throws IOException {
-        throw new FeatureNotSupportedException("not supported yet.");
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        return executor.getTableDescriptor();
     }
 
     /**
