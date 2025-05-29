@@ -326,12 +326,61 @@ public class OHTableAdminInterfaceTest {
 
     @Test
     public void testAdminTableExists() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
+                "use `n1`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `n1:test` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family_group` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `n1:test$family1` (\n" +
+                "      `K` varbinary(1024) NOT NULL,\n" +
+                "      `Q` varbinary(256) NOT NULL,\n" +
+                "      `T` bigint(20) NOT NULL,\n" +
+                "      `V` varbinary(1024) DEFAULT NULL,\n" +
+                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = `n1:test`;");
+        st.close();
+        conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
+        // TableName cannot contain $ symbol
         Assert.assertThrows(IllegalArgumentException.class,
                 () -> {
-                    admin.tableExists(TableName.valueOf(""));
+                    TableName.valueOf("random_string$");
                 });
         Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
         Assert.assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
