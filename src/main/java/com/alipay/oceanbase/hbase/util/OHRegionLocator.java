@@ -11,23 +11,44 @@ import java.util.Collections;
 import java.util.List;
 
 public class OHRegionLocator implements RegionLocator {
-    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys) {
-        
+    private byte[][] startKeys;
+    private byte[][] endKeys;
+    private TableName tableName;
+
+    private List<HRegionLocation> regionLocations;
+
+    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys, List<HRegionLocation> regionLocations) {
+        this.startKeys = startKeys;
+        this.endKeys = endKeys;
+        this.regionLocations = regionLocations;
     }
 
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes) throws IOException {
+        // check if bytes is in the range of startKeys and endKeys
+        for (HRegionLocation regionLocation : regionLocations) {
+            if (regionLocation.getRegionInfo().containsRow(bytes)) {
+                return regionLocation;
+            }
+        }
         return null;
     }
 
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes, boolean b) throws IOException {
-        return null;
+        if (b) {
+            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(), tableClient);
+            RegionLocator location = executor.getRegionLocator(tableName.toString());
+            this.startKeys = location.getStartKeys();
+            this.endKeys = location.getEndKeys();
+            this.regionLocations = location.getAllRegionLocations();
+        }
+        return getRegionLocation(bytes);
     }
 
     @Override
     public List<HRegionLocation> getAllRegionLocations() throws IOException {
-        return Collections.emptyList();
+        return regionLocations;
     }
 
     /**
@@ -40,7 +61,7 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public byte[][] getStartKeys() throws IOException {
-        return null;
+        return startKeys;
     }
 
     /**
@@ -53,7 +74,7 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public byte[][] getEndKeys() throws IOException {
-        return null;
+        return endKeys;
     }
 
     /**
@@ -67,18 +88,18 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
-        return null;
+        return Pair.newPair(startKeys, endKeys);
     }
 
     @Override
     public TableName getName() {
-        return null;
+        return tableName;
     }
 
     private ObTableClient tableClient;
 
     @Override
     public void close() throws IOException {
-
+        return;
     }
 }

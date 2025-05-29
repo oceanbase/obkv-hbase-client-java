@@ -286,3 +286,62 @@ CREATE TABLE `n1:test$partitionFamily1` (
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
 
+CREATE TABLEGROUP test_region_locator SHARDING = 'ADAPTIVE';
+CREATE TABLE `test_region_locator$family_region_locator` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_region_locator PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE TABLEGROUP test_desc SHARDING = 'ADAPTIVE';
+
+CREATE TABLE `test_desc$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE TABLE `test_desc$family2` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
