@@ -356,7 +356,7 @@ public class OHTableAdminInterfaceTest {
         // enable an enabled table
         thrown = assertThrows(IOException.class,
                 () -> {
-                    admin.disableTable(TableName.valueOf("n1", "test");
+                    admin.disableTable(TableName.valueOf("n1", "test"));
                 });
         assertTrue(thrown.getCause() instanceof ObTableException);
         Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
