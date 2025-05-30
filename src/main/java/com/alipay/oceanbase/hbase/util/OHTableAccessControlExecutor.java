@@ -33,23 +33,23 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         return null;
     }
 
-    public void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {
+    public Void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        execute(tableClient, request);
+        return execute(tableClient, request);
     }
 
-    public void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
+    public Void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        execute(tableClient, request);
+        return execute(tableClient, request);
     }
 }
