@@ -20,12 +20,11 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.hbase.util.OHRegionMetrics;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.util.ResultSetPrinter;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.RegionMetrics;
-import org.apache.hadoop.hbase.ServerName;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
@@ -39,14 +38,13 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
+import static  com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 
 public class OHTableAdminInterfaceTest {
     public OHTablePool setUpLoadPool() throws IOException {
@@ -688,5 +686,291 @@ public class OHTableAdminInterfaceTest {
         }
         Object[] results = new Object[batchLsit.size()];
         table.batch(batchLsit, results);
+    }
+
+    @Test
+    public void testCreateDeleteTable() throws Exception {
+        TableName tableName = TableName.valueOf("testCreateTable");
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        byte[] cf3 = Bytes.toBytes("cf3");
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        // 1. construct htable desc and column family desc
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        hcd1.setMaxVersions(2);
+        hcd1.setTimeToLive(172800);
+
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        hcd2.setMaxVersions(1);
+        hcd2.setTimeToLive(86400);
+
+        HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+
+        // 2. execute create table and check exists
+        HTableDescriptor htd = new HTableDescriptor(tableName);
+        htd.addFamily(hcd1);
+        htd.addFamily(hcd2);
+        htd.addFamily(hcd3);
+        admin.createTable(htd);
+
+        // 3. check table creation success and correctness
+        assertTrue(admin.tableExists(tableName));
+        // TODO: show create table, need to be replace by getDescriptor
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        String selectSql = "show create table " + tableName.getNameAsString() + "$" + cf1;
+        System.out.println("execute sql: " + selectSql);
+        java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
+        ResultSetPrinter.print(resultSet);
+
+        selectSql = "show create table " + tableName.getNameAsString() + "$" + cf2;
+        System.out.println("execute sql: " + selectSql);
+        resultSet = conn.createStatement().executeQuery(selectSql);
+        ResultSetPrinter.print(resultSet);
+
+        selectSql = "show create table " + tableName.getNameAsString() + "$" + cf3;
+        System.out.println("execute sql: " + selectSql);
+        resultSet = conn.createStatement().executeQuery(selectSql);
+        ResultSetPrinter.print(resultSet);
+
+
+        // 4. test put/get some data
+        Table table = connection.getTable(tableName);
+        Put put = new Put(toBytes("Key" + 1));
+        put.addColumn(cf1, "c1".getBytes(), "hello world".getBytes());
+        put.addColumn(cf2, "c2".getBytes(), "hello world".getBytes());
+        put.addColumn(cf3, "c3".getBytes(), "hello world".getBytes());
+        table.put(put);
+
+        Scan scan = new Scan();
+        ResultScanner resultScanner = table.getScanner(scan);
+        List<Cell> cells = getCellsFromScanner(resultScanner);
+        Assert.assertEquals(3, cells.size());
+
+        // 5. disable and delete table
+        admin.disableTable(tableName);
+        admin.deleteTable(tableName);
+
+        // 5. test table exists after delete
+        admin.tableExists(tableName);
+
+        // 6. recreate and delete table
+        admin.createTable(htd);
+        admin.disableTable(tableName);
+        admin.deleteTable(tableName);
+    }
+
+    void testConcurCreateDelTablesHelper(List<TableName> tableNames, Boolean ignoreException) throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        int tableNums = tableNames.size();
+
+        // use some column family desc
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        byte[] cf3 = Bytes.toBytes("cf3");
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        hcd1.setMaxVersions(2);
+        hcd1.setTimeToLive(172800);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        hcd1.setMaxVersions(1);
+        hcd1.setTimeToLive(86400);
+        HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+
+        // 1. generate create table task, one task per table
+        List<Callable<Void>> tasks = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+            int finalI = i;
+            tasks.add(()->{
+                HTableDescriptor htd = new HTableDescriptor(tableNames.get(finalI));
+                htd.addFamily(hcd1);
+                htd.addFamily(hcd2);
+                htd.addFamily(hcd3);
+                try {
+                    admin.createTable(htd);
+                } catch (Exception e) {
+                    System.out.println(e);
+                    if (!ignoreException) {
+                        throw e;
+                    }
+                }
+                return null;
+            });
+        }
+
+        // 2. execute concurrent create table tasks
+        ExecutorService executorService = Executors.newFixedThreadPool(tableNums);
+        executorService.invokeAll(tasks);
+        executorService.shutdown();
+        executorService.awaitTermination(1, TimeUnit.MINUTES);
+
+        // 3. check table create success
+        for (int i = 0; i < tableNames.size(); i++) {
+            TableName tableName = tableNames.get(i);
+            assertTrue(admin.tableExists(tableName));
+        }
+
+        // 4. test put/get/delete some data
+        for (int i = 0; i < tableNames.size(); i++) {
+            Table table = connection.getTable(tableNames.get(i));
+            Put put = new Put(toBytes("Key" + 1));
+            put.addColumn(cf1, "c1".getBytes(), "hello world".getBytes());
+            put.addColumn(cf2, "c2".getBytes(), "hello world".getBytes());
+            put.addColumn(cf3, "c3".getBytes(), "hello world".getBytes());
+            table.put(put);
+
+            Scan scan = new Scan();
+            ResultScanner resultScanner = table.getScanner(scan);
+            List<Cell> cells = getCellsFromScanner(resultScanner);
+            Assert.assertEquals(3, cells.size());
+
+            table.delete(new Delete(toBytes("Key" + 1)));
+        }
+
+        // 4. disable all tables;
+        for (int i = 0; i < tableNames.size(); i++) {
+            TableName tableName = tableNames.get(i);
+            admin.disableTable(tableName);
+        }
+
+        // 5. generate delete table task
+        List<Callable<Void>> delTasks = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+            int finalI = i;
+            delTasks.add(()->{
+                try {
+                    admin.deleteTable(tableNames.get(finalI));
+                } catch (Exception e) {
+                    System.out.println(e);
+                    if (!ignoreException) {
+                        throw e;
+                    }
+                }
+                return null;
+            });
+        }
+
+        // 6. execute concurrent delete table tasks
+        ExecutorService delExecutorService = Executors.newFixedThreadPool(tableNums);
+        delExecutorService.invokeAll(delTasks);
+        delExecutorService.shutdown();
+        delExecutorService.awaitTermination(1, TimeUnit.MINUTES);
+
+        // 7. check table deletion success
+        for (int i = 0; i < tableNames.size(); i++) {
+            TableName tableName = tableNames.get(i);
+            assertFalse(admin.tableExists(tableName));
+        }
+    }
+
+    // 2. test concurrent create or delete different table
+    // step1: create different tables concurrently, it must succeed
+    // step2: execute put/read/delete on created table
+    // step3: delete different tables concurrently, it must succeed
+    @Test
+    public void testConcurCreateDelTables() throws Exception {
+        final int tableNums = 20;
+        List<TableName> tableNames = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+           tableNames.add(TableName.valueOf("testConcurCreateTable" + i));
+        }
+        testConcurCreateDelTablesHelper(tableNames, false);
+    }
+
+    // 3. test concurrent create or delete same table
+    // step1: create one table concurrently, only one table was successfully created
+    // step2: execute put/read/delete on created table
+    // step3: delete one table concurrently, the table will be deleted successfully
+    @Test
+    public void testConcurCreateOneTable() throws Exception {
+        final int taskNum = 20;
+        TableName tableName = TableName.valueOf("testConcurCreateOneTable");
+        List<TableName> tableNames = new ArrayList<>();
+        for (int i = 0; i < taskNum; i++) {
+            tableNames.add(tableName);
+        }
+        testConcurCreateDelTablesHelper(tableNames, true);
+    }
+
+    // 4. test the performance of concurrent create/delete table
+    @Test
+    public void testConcurCreateDelPerf() throws Exception {
+        final int tableNums = 100;
+        List<TableName> tableNames = new ArrayList<>();
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        byte[] cf3 = Bytes.toBytes("cf3");
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        hcd1.setMaxVersions(2);
+        hcd1.setTimeToLive(172800);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        hcd1.setMaxVersions(1);
+        hcd1.setTimeToLive(86400);
+        HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+
+        for (int i = 0; i < tableNums; i++) {
+            tableNames.add(TableName.valueOf("testConcurCreateDelPerf" + i));
+        }
+
+        List<Callable<Void>> tasks = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+            int finalI = i;
+            tasks.add(()->{
+                HTableDescriptor htd = new HTableDescriptor(tableNames.get(finalI));
+                htd.addFamily(hcd1);
+                htd.addFamily(hcd2);
+                htd.addFamily(hcd3);
+                try {
+                    admin.createTable(htd);
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+                return null;
+            });
+        }
+
+        // 2. execute concurrent create table tasks
+        long start = System.currentTimeMillis();
+        ExecutorService executorService = Executors.newFixedThreadPool(tableNums);
+        executorService.invokeAll(tasks);
+        executorService.shutdown();
+        executorService.awaitTermination(2, TimeUnit.MINUTES);
+        long duration = System.currentTimeMillis() - start;
+        System.out.println("create " + tableNums + " tables cost " + duration + " ms.");
+
+        // 3. disable all tables;
+        for (int i = 0; i < tableNames.size(); i++) {
+            TableName tableName = tableNames.get(i);
+            admin.disableTable(tableName);
+        }
+
+        // 4. generate delete table task
+        List<Callable<Void>> delTasks = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+            int finalI = i;
+            delTasks.add(()->{
+                try {
+                    admin.deleteTable(tableNames.get(finalI));
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+                return null;
+            });
+        }
+
+        // 6. execute concurrent delete table tasks
+        start = System.currentTimeMillis();
+        ExecutorService delExecutorService = Executors.newFixedThreadPool(tableNums);
+        delExecutorService.invokeAll(delTasks);
+        delExecutorService.shutdown();
+        delExecutorService.awaitTermination(1, TimeUnit.MINUTES);
+        duration = System.currentTimeMillis() - start;
+        System.out.println("delete " + tableNums + " tables cost " + duration + " ms.");
     }
 }
