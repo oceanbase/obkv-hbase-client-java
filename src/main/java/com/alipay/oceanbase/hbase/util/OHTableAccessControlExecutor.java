@@ -30,7 +30,8 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
     }
 
     @Override
-    public Boolean parse(ObTableMetaResponse response) throws IOException {
+    public Void parse(ObTableMetaResponse response) throws IOException {
+        return null;
     }
 
     public void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {

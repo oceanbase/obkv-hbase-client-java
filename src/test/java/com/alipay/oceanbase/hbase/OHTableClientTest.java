@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import org.apache.hadoop.hbase.HTableDescriptor;
 import org.junit.*;
 
 import java.util.LinkedList;
@@ -65,6 +66,64 @@ public class OHTableClientTest extends HTableTestBase {
         //        assertEquals("n1:test", new String(hTable2.getTableName()));
         hTable2.close();
         assertTrue(true);
+    }
+
+
+    /*
+    CREATE TABLEGROUP test_desc SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test_desc$family1` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+        PARTITION p1 VALUES LESS THAN ('c'),
+        PARTITION p2 VALUES LESS THAN ('e'),
+        PARTITION p3 VALUES LESS THAN ('g'),
+        PARTITION p4 VALUES LESS THAN ('i'),
+        PARTITION p5 VALUES LESS THAN ('l'),
+        PARTITION p6 VALUES LESS THAN ('n'),
+        PARTITION p7 VALUES LESS THAN ('p'),
+        PARTITION p8 VALUES LESS THAN ('s'),
+        PARTITION p9 VALUES LESS THAN ('v'),
+        PARTITION p10 VALUES LESS THAN (MAXVALUE)
+    );
+    
+    CREATE TABLE `test_desc$family2` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+        PARTITION p1 VALUES LESS THAN ('c'),
+        PARTITION p2 VALUES LESS THAN ('e'),
+        PARTITION p3 VALUES LESS THAN ('g'),
+        PARTITION p4 VALUES LESS THAN ('i'),
+        PARTITION p5 VALUES LESS THAN ('l'),
+        PARTITION p6 VALUES LESS THAN ('n'),
+        PARTITION p7 VALUES LESS THAN ('p'),
+        PARTITION p8 VALUES LESS THAN ('s'),
+        PARTITION p9 VALUES LESS THAN ('v'),
+        PARTITION p10 VALUES LESS THAN (MAXVALUE)
+    );
+    */
+    @Test
+    public void testGetTableDescriptor() throws Exception {
+        final String tableNameStr = "test_desc";
+
+        OHTableClient hTable2 = ObHTableTestUtil.newOHTableClient(tableNameStr);
+        hTable2.init();
+        try {
+            HTableDescriptor descriptor = hTable2.getTableDescriptor();
+            Assert.assertNotNull(descriptor);
+            Assert.assertTrue(descriptor.hasFamily("family1".getBytes()));
+            Assert.assertTrue(descriptor.hasFamily("family2".getBytes()));
+            Assert.assertFalse(descriptor.hasFamily("family".getBytes()));
+        } finally {
+            hTable2.close();
+        }
     }
 
     @AfterClass

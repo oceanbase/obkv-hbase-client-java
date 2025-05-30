@@ -135,17 +135,53 @@ public class OHAdmin implements Admin {
 
     @Override
     public HTableDescriptor getTableDescriptor(TableName tableName) throws TableNotFoundException, IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        try {
+            return executor.getTableDescriptor();
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
     public TableDescriptor getDescriptor(TableName tableName) throws TableNotFoundException, IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        try {
+            return executor.getTableDescriptor();
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
     public void createTable(TableDescriptor tableDescriptor) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableDescriptor.getTableName(), connectionConf);
+        OHCreateTableExecutor executor = new OHCreateTableExecutor(tableClient);
+        try {
+            executor.createTable(tableDescriptor, null);
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override

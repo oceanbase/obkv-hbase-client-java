@@ -1,9 +1,12 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
+import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
 import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.RegionLocator;
+import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
@@ -11,23 +14,53 @@ import java.util.Collections;
 import java.util.List;
 
 public class OHRegionLocator implements RegionLocator {
-    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys) {
-        
+    private byte[][] startKeys;
+    private byte[][] endKeys;
+    private TableName tableName;
+
+    private List<HRegionLocation> regionLocations;
+
+    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys, List<HRegionLocation> regionLocations) {
+        this.startKeys = startKeys;
+        this.endKeys = endKeys;
+        this.regionLocations = regionLocations;
     }
 
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes) throws IOException {
+        // check if bytes is in the range of startKeys and endKeys
+        for (HRegionLocation regionLocation : regionLocations) {
+            if (regionLocation.getRegionInfo().containsRow(bytes)) {
+                return regionLocation;
+            }
+        }
         return null;
     }
 
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes, boolean b) throws IOException {
-        return null;
+        if (b) {
+            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(), tableClient);
+            try {
+                RegionLocator location = executor.getRegionLocator(tableName.toString());
+                this.startKeys = location.getStartKeys();
+                this.endKeys = location.getEndKeys();
+                this.regionLocations = location.getAllRegionLocations();
+            } catch (IOException e) {
+                if (e.getCause() instanceof ObTableTransportException
+                        && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                    throw new TimeoutIOException(e.getCause());
+                } else {
+                    throw e;
+                }
+            }
+        }
+        return getRegionLocation(bytes);
     }
 
     @Override
     public List<HRegionLocation> getAllRegionLocations() throws IOException {
-        return Collections.emptyList();
+        return regionLocations;
     }
 
     /**
@@ -40,7 +73,7 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public byte[][] getStartKeys() throws IOException {
-        return null;
+        return startKeys;
     }
 
     /**
@@ -53,7 +86,7 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public byte[][] getEndKeys() throws IOException {
-        return null;
+        return endKeys;
     }
 
     /**
@@ -67,18 +100,18 @@ public class OHRegionLocator implements RegionLocator {
      */
     @Override
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
-        return null;
+        return Pair.newPair(startKeys, endKeys);
     }
 
     @Override
     public TableName getName() {
-        return null;
+        return tableName;
     }
 
     private ObTableClient tableClient;
 
     @Override
     public void close() throws IOException {
-
+        return;
     }
 }
