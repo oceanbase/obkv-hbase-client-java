@@ -105,6 +105,8 @@ public class ObHTableTestUtil {
         Configuration conf = HBaseConfiguration.create();
         conf.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
         conf.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
+        conf.set("rpc.execute.timeout", "20000");
+        conf.set("rpc.operation.timeout", "18000");
         if (ODP_MODE) {
             // ODP mode
             conf.set(HBASE_OCEANBASE_ODP_ADDR, ODP_ADDR);
