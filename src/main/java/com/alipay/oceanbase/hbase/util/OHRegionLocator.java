@@ -10,20 +10,24 @@ import org.apache.hadoop.hbase.exceptions.TimeoutIOException;
 import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 
 public class OHRegionLocator implements RegionLocator {
     private byte[][] startKeys;
     private byte[][] endKeys;
+    private ObTableClient tableClient;
     private TableName tableName;
 
     private List<HRegionLocation> regionLocations;
 
-    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys, List<HRegionLocation> regionLocations) {
+    public OHRegionLocator(byte[][] startKeys, byte[][] endKeys,
+                           List<HRegionLocation> regionLocations,
+                           TableName tableName, ObTableClient tableClient) {
         this.startKeys = startKeys;
         this.endKeys = endKeys;
         this.regionLocations = regionLocations;
+        this.tableName = tableName;
+        this.tableClient = tableClient;
     }
 
     @Override
@@ -39,7 +43,7 @@ public class OHRegionLocator implements RegionLocator {
 
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes, boolean b) throws IOException {
-        if (b) {
+        if (b || regionLocations.isEmpty()) {
             OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(), tableClient);
             try {
                 RegionLocator location = executor.getRegionLocator(tableName.toString());
@@ -107,8 +111,6 @@ public class OHRegionLocator implements RegionLocator {
     public TableName getName() {
         return tableName;
     }
-
-    private ObTableClient tableClient;
 
     @Override
     public void close() throws IOException {
