@@ -6,6 +6,7 @@ import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.location.model.TableEntry;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
@@ -116,28 +117,37 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
             final List<Object> tableIdDict,
             final List<Object> replicaDict,
             final List<Object> partitions) {
-        final int partitionCount = partitions.size();
-        final int regionCount = partitionCount + 1;
-        final byte[][] startKeys = new byte[regionCount][];
-        final byte[][] endKeys = new byte[regionCount][];
+        if ((partitions.size() % tableIdDict.size()) != 0) {
+            throw new ObTableUnexpectedException(
+                    "The number of partitions should be an integer multiple of the number of tables");
+        }
+        // the size of partitions the multiple of the number of zones, the number of tablets and the number of tables
+        final int regionCount = partitions.size() / tableIdDict.size(); // get tablet boundaries of leaders and followers
+        final List<byte[]> startKeysList = new ArrayList<>();
+        final List<byte[]> endKeysList = new ArrayList<>();
 
-        for (int i = 0; i < regionCount; i++) {
+        for (int i = 0; i < regionCount; ++i) {
+            boolean isLeader = ((int) ((List<Object>) partitions.get(i)).get(4) == 1);
+            if (!isLeader) { // only record leader's boundary
+                continue;
+            }
             if (i == 0) {
-                startKeys[i] = HConstants.EMPTY_BYTE_ARRAY;
-                endKeys[i] = ((List<Object>) partitions.get(i)).get(2).toString().getBytes();
+                startKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
+                endKeysList.add(((List<Object>) partitions.get(i)).get(2).toString().getBytes());
             } else if (i == regionCount - 1) {
-                startKeys[i] = ((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes();
-                endKeys[i] = HConstants.EMPTY_BYTE_ARRAY;
+                startKeysList.add(((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes());
+                endKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
             } else {
-                startKeys[i] = ((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes();
-                endKeys[i] = ((List<Object>) partitions.get(i)).get(2).toString().getBytes();
+                startKeysList.add(((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes());
+                endKeysList.add(((List<Object>) partitions.get(i)).get(2).toString().getBytes());
             }
         }
-
+        final byte[][] startKeys = startKeysList.toArray(new byte[0][]);
+        final byte[][] endKeys = endKeysList.toArray(new byte[0][]);
         // Create region locations for all regions
         final List<HRegionLocation> regionLocations = IntStream.range(0, regionCount)
                 .mapToObj(i -> {
-                    final List<Object> partition = (List<Object>) partitions.get(Math.min(i, partitionCount - 1));
+                    final List<Object> partition = (List<Object>) partitions.get(Math.min(i, regionCount - 1));
                     final int replicationIdx = (int) partition.get(3);
                     final List<Object> hostInfo = (List<Object>) replicaDict.get(replicationIdx);
 
@@ -155,7 +165,7 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                 })
                 .collect(Collectors.toList());
 
-        return new OHRegionLocator(startKeys, endKeys, regionLocations);
+        return new OHRegionLocator(startKeys, endKeys, regionLocations, TableName.valueOf(tableName), client);
     }
 
     /**
@@ -195,7 +205,7 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                 })
                 .collect(Collectors.toList());
 
-        return new OHRegionLocator(startKeys, endKeys, regionLocations);
+        return new OHRegionLocator(startKeys, endKeys, regionLocations, TableName.valueOf(tableName), client);
     }
 
     public OHRegionLocator getRegionLocator(final String tableName) throws IOException {
