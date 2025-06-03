@@ -22,6 +22,7 @@ import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -30,6 +31,7 @@ import org.junit.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.*;
@@ -989,6 +991,21 @@ public class OHConnectionTest {
                 }
             });
         }
+    }
+    @Test
+    public void testKeyPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_multi_cf";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
     }
 
     @Test
