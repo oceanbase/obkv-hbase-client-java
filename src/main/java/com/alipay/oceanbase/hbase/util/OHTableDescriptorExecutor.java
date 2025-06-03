@@ -10,7 +10,6 @@ import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
-import sun.font.SunFontManager;
 
 import java.io.IOException;
 import java.util.HashMap;
