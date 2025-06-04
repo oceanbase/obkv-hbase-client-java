@@ -19,6 +19,8 @@ package com.oceanbase.example;
 
 import com.alipay.oceanbase.hbase.OHTableClient;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -49,7 +51,7 @@ public class SimpleHBaseClientDemo {
         byte[] rowKey = toBytes("rowKey1");
         byte[] column = toBytes("column1");
         Put put = new Put(rowKey);
-        put.add(family, column, System.currentTimeMillis(), toBytes("value1"));
+        put.addColumn(family, column, System.currentTimeMillis(), toBytes("value1"));
         hTable.put(put);
 
         // 3. get data like hbase
@@ -58,7 +60,7 @@ public class SimpleHBaseClientDemo {
         Result r = hTable.get(get);
         if (!r.isEmpty()) {
             Cell cell = r.rawCells()[0];
-            System.out.printf("column1: " + CellUtil.cloneQualifier(r));
+            System.out.printf("column1: " + CellUtil.cloneQualifier(cell));
         }
 
         // 4. close
