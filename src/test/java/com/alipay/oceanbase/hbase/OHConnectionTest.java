@@ -20,10 +20,7 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Threads;
@@ -992,6 +989,52 @@ public class OHConnectionTest {
             });
         }
     }
+    
+    @Test
+    public void testHRegionLocation() throws IOException {
+        final String tableNameStr = "test_region_locator";
+
+        final byte[][] splitPoints = new byte[][] {
+                Bytes.toBytes("c"),  // p1: < 'c'
+                Bytes.toBytes("e"),  // p2: < 'e'
+                Bytes.toBytes("g"),  // p3: < 'g'
+                Bytes.toBytes("i"),  // p4: < 'i'
+                Bytes.toBytes("l"),  // p5: < 'l'
+                Bytes.toBytes("n"),  // p6: < 'n'
+                Bytes.toBytes("p"),  // p7: < 'p'
+                Bytes.toBytes("s"),  // p8: < 's'
+                Bytes.toBytes("v")   // p9: < 'v'
+        };
+
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        // (min, c), [c, e), [e, g), [g, i), [i, l), [l, n), [n, p), [p, s), [s, v), [v, max)
+        try (RegionLocator locator = connection.getRegionLocator(tableName)) {
+            Assert.assertEquals(locator.getStartKeys().length, locator.getEndKeys().length);
+            Assert.assertEquals(locator.getStartKeys().length, 10);
+            HRegionLocation loc = locator.getRegionLocation(HConstants.EMPTY_BYTE_ARRAY);
+            RegionInfo info = loc.getRegion();
+            Assert.assertEquals(Arrays.toString(locator.getStartKeys()[0]), Arrays.toString(info.getStartKey()));
+            Assert.assertEquals(Arrays.toString(locator.getEndKeys()[0]), Arrays.toString(info.getEndKey()));
+            for (int i = 1; i < locator.getStartKeys().length; i++) {
+                loc = locator.getRegionLocation(splitPoints[i - 1]);
+                info = loc.getRegion();
+                Assert.assertEquals(Arrays.toString(locator.getStartKeys()[i]), Arrays.toString(info.getStartKey()));
+                Assert.assertEquals(Arrays.toString(locator.getEndKeys()[i]), Arrays.toString(info.getEndKey()));
+            }
+        } finally {
+            Optional.ofNullable(hTable).ifPresent(table -> {
+                try {
+                    table.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+    
     @Test
     public void testKeyPartitionWithRegionLocator() throws IOException {
         final String tableNameStr = "test_multi_cf";
