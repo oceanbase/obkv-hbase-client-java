@@ -7,6 +7,7 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import com.alipay.oceanbase.rpc.table.ObTable;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
@@ -81,5 +82,52 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         request.setData(jsonData);
 
         return execute(client, request);
+    }
+
+    public boolean isDisable() throws IOException {
+        boolean isDisable = false;
+        final ObTableMetaRequest request = new ObTableMetaRequest();
+        request.setMetaType(getMetaType());
+        final Map<String, String> requestData = new HashMap<>();
+        requestData.put("table_name", tableName);
+
+        final String jsonData = JSON.toJSONString(requestData);
+        request.setData(jsonData);
+        try {
+            ObTableMetaResponse response = innerExecute(client, request);
+            final String responseData = response.getData();
+            final JSONObject jsonMap = Optional.<JSONObject>ofNullable(JSON.parseObject(responseData))
+                    .orElseThrow(() -> new IOException("jsonMap is null"));
+            JSONObject tbDesc = jsonMap.getJSONObject("tableDesc");
+            if (tbDesc != null) {
+                String state = tbDesc.getString("state");
+                if (state.compareToIgnoreCase("disable") == 0) {
+                    isDisable = true;
+                } else {
+                    isDisable = false;
+                }
+            }
+        } catch (IOException e) {
+            throw e;
+        }
+        return isDisable;
+    }
+
+    private ObTableMetaResponse innerExecute(ObTableClient client, ObTableMetaRequest request) throws IOException {
+        if (request.getMetaType() != getMetaType()) {
+            throw new IOException("Invalid meta type, expected " + getMetaType());
+        }
+        ObTable table = client.getRandomTable();
+        ObTableMetaResponse response;
+        try {
+            response = (ObTableMetaResponse) client.executeWithRetry(
+                    table,
+                    request,
+                    null /*tableName*/
+            );
+        } catch (Exception e) {
+            throw new IOException("Failed to execute request", e);
+        }
+        return response;
     }
 }

@@ -4,6 +4,7 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
+import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
@@ -243,7 +244,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public void enableTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
+        try {
+            executor.enableTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -268,7 +281,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public void disableTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_DISABLE_TABLE);
+        try {
+            executor.disableTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -283,12 +308,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean isTableEnabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        return isDisabled(tableName) == false;
     }
 
     @Override
     public boolean isTableDisabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        return isDisabled(tableName) == true;
+    }
+
+    private boolean isDisabled(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableDescriptorExecutor tableDescriptor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        return tableDescriptor.isDisable();
     }
 
     @Override

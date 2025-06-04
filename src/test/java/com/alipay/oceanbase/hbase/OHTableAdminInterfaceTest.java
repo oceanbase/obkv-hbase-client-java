@@ -319,53 +319,97 @@ public class OHTableAdminInterfaceTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        admin.disableTable(TableName.valueOf("test_multi_cf"));
         assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
         assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
-        // disable a non-existed table
-        IOException thrown = assertThrows(IOException.class,
-                () -> {
-                    admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
-                });
-        assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        // 1. disable a non-existed table
+        {
+            IOException thrown = assertThrows(IOException.class,
+                    () -> {
+                        admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
+                    });
+            assertTrue(thrown.getCause() instanceof ObTableException);
+            Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        }
+        // 2. write an enabled table, should succeed
+        {
+            if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
+                admin.enableTable(TableName.valueOf("test_multi_cf"));
+            }
+            batchInsert(10, "test_multi_cf");
+            batchGet(10, "test_multi_cf");
+        }
 
-        // write an enabled table, should succeed
-        batchInsert(10, "test_multi_ch");
-        // disable a disabled table
-        thrown = assertThrows(IOException.class,
-                () -> {
-                    admin.disableTable(TableName.valueOf("test_multi_cf"));
-                });
-        assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        // 3. disable a enable table
+        {
+            if (admin.isTableEnabled(TableName.valueOf("test_multi_cf"))) {
+                admin.disableTable(TableName.valueOf("test_multi_cf"));
+            }
+            // write and read disable table, should fail
+            try {
+                batchInsert(10, "test_multi_cf");
+                Assert.fail();
+            } catch (IOException ex) {
+                Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                System.out.println(ex.getCause().getMessage());
+            }
+            try {
+                batchGet(10, "test_multi_cf");
+                Assert.fail();
+            } catch (IOException ex) {
+                Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
+            }
 
-        // write an enabled table, should fail
-        batchInsert(10, "test_multi_ch");
-        enDisableRead(10, "test_multi_ch");
+        }
 
-        // enable a disabled table
-        admin.enableTable(TableName.valueOf("test_multi_cf"));
+        // 4. enable a disabled table
+        {
+            if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
+                admin.enableTable(TableName.valueOf("test_multi_cf"));
+            }
+            // write an enabled table, should succeed
+            batchInsert(10, "test_multi_cf");
+            batchGet(10, "test_multi_cf");
+        }
 
-        // write an enabled table, should succeed
-        batchInsert(10, "test_multi_ch");
-        enDisableRead(10, "test_multi_ch");
+        // 5. enable an enabled table
+        {
+            if (admin.isTableDisabled(TableName.valueOf("n1", "test"))) {
+                admin.enableTable(TableName.valueOf("n1", "test"));
+            }
+            try {
+                admin.enableTable(TableName.valueOf("n1", "test"));
+                Assert.fail();
+            } catch (IOException ex) {
+                Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
+            }
+        }
 
-        // enable an enabled table
-        thrown = assertThrows(IOException.class,
-                () -> {
-                    admin.disableTable(TableName.valueOf("n1", "test"));
-                });
-        assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        // 6. disable a disabled table
+        {
+            if (admin.isTableEnabled(TableName.valueOf("n1", "test"))) {
+                admin.disableTable(TableName.valueOf("n1", "test"));
+            }
+            try {
+                admin.disableTable(TableName.valueOf("n1", "test"));
+                Assert.fail();
+            } catch (IOException ex) {
+                Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
+            }
+        }
 
-        admin.deleteTable(TableName.valueOf("n1", "test"));
         admin.deleteTable(TableName.valueOf("test_multi_cf"));
-        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
         assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        admin.deleteTable(TableName.valueOf("n1", "test"));
+        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
     }
 
-    private void enDisableRead(int rows, String tablegroup) throws Exception {
+    private void batchGet(int rows, String tablegroup) throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Table table = connection.getTable(TableName.valueOf(tablegroup));
