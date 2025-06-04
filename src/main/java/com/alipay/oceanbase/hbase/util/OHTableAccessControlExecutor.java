@@ -1,7 +1,6 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -38,7 +37,7 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
-        requestData.put("name", tableName);
+        requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
         execute(tableClient, request);
@@ -48,7 +47,7 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
-        requestData.put("name", tableName);
+        requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
         execute(tableClient, request);
