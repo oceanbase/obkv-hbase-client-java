@@ -336,9 +336,6 @@ public class OHTableAdminInterfaceTest {
         {
             if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
                 admin.enableTable(TableName.valueOf("test_multi_cf"));
-                while (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
-                    Thread.sleep(1000); // sleep 1s
-                }
             }
             batchInsert(10, "test_multi_cf");
             batchGet(10, "test_multi_cf");
@@ -348,9 +345,6 @@ public class OHTableAdminInterfaceTest {
         {
             if (admin.isTableEnabled(TableName.valueOf("test_multi_cf"))) {
                 admin.disableTable(TableName.valueOf("test_multi_cf"));
-                while (admin.isTableEnabled(TableName.valueOf("test_multi_cf"))) {
-                    Thread.sleep(1000); // sleep 1s
-                }
             }
             // write and read disable table, should fail
             try {
@@ -365,7 +359,8 @@ public class OHTableAdminInterfaceTest {
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                System.out.println(ex.getCause().getMessage());
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
             }
 
         }
@@ -374,9 +369,6 @@ public class OHTableAdminInterfaceTest {
         {
             if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
                 admin.enableTable(TableName.valueOf("test_multi_cf"));
-                while (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
-                    Thread.sleep(1000); // sleep 1s
-                }
             }
             // write an enabled table, should succeed
             batchInsert(10, "test_multi_cf");
@@ -387,41 +379,36 @@ public class OHTableAdminInterfaceTest {
         {
             if (admin.isTableDisabled(TableName.valueOf("n1", "test"))) {
                 admin.enableTable(TableName.valueOf("n1", "test"));
-                while (admin.isTableDisabled(TableName.valueOf("n1", "test"))) {
-                    Thread.sleep(1000); // sleep 1s
-                }
             }
             try {
                 admin.enableTable(TableName.valueOf("n1", "test"));
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                System.out.println(ex.getCause().getMessage());
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
             }
         }
 
-        // 6. disable an disabled table
+        // 6. disable a disabled table
         {
             if (admin.isTableEnabled(TableName.valueOf("n1", "test"))) {
                 admin.disableTable(TableName.valueOf("n1", "test"));
-                while (admin.isTableEnabled(TableName.valueOf("n1", "test"))) {
-                    Thread.sleep(1000); // sleep 1s
-                }
             }
             try {
                 admin.disableTable(TableName.valueOf("n1", "test"));
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                System.out.println(ex.getCause().getMessage());
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
             }
         }
 
-        admin.deleteTable(TableName.valueOf("n1", "test"));
         admin.deleteTable(TableName.valueOf("test_multi_cf"));
-        // delete table is not ready
-        // assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
-        // assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        admin.deleteTable(TableName.valueOf("n1", "test"));
+        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
     }
 
     private void batchGet(int rows, String tablegroup) throws Exception {

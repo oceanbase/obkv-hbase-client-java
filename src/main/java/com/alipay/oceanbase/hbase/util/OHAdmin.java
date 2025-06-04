@@ -308,19 +308,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean isTableEnabled(TableName tableName) throws IOException {
-        return getIsDisabled(tableName) == false;
+        return isDisabled(tableName) == false;
     }
 
     @Override
     public boolean isTableDisabled(TableName tableName) throws IOException {
-        return getIsDisabled(tableName) == true;
+        return isDisabled(tableName) == true;
     }
 
-    private boolean getIsDisabled(TableName tableName) throws IOException {
+    private boolean isDisabled(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
         ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHTableDescriptorExecutor tableDescriptor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
-        return tableDescriptor.getTableIsDisable();
+        return tableDescriptor.isDisable();
     }
 
     @Override

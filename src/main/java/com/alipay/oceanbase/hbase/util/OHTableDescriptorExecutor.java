@@ -84,7 +84,7 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         return execute(client, request);
     }
 
-    public boolean getTableIsDisable() throws IOException {
+    public boolean isDisable() throws IOException {
         boolean isDisable = false;
         final ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
