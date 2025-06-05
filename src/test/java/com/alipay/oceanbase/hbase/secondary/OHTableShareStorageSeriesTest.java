@@ -75,7 +75,7 @@ public class OHTableShareStorageSeriesTest {
         long curTs = System.currentTimeMillis();
         for (int i = 0; i < recordCount; i++) {
             Put put = new Put(toBytes(key + i));
-            put.add(family.getBytes(), (column + i).getBytes(), curTs, toBytes(value + i));
+            put.addColumn(family.getBytes(), (column + i).getBytes(), curTs, toBytes(value + i));
             hTable.put(put);
         }
 
@@ -107,7 +107,7 @@ public class OHTableShareStorageSeriesTest {
         long curTs = System.currentTimeMillis();
         for (int i = 0; i < recordCount; i++) {
             Put put = new Put(toBytes(key + i));
-            put.add(family.getBytes(), (column).getBytes(), curTs, toBytes(value + i));
+            put.addColumn(family.getBytes(), (column).getBytes(), curTs, toBytes(value + i));
             hTable.put(put);
         }
 
