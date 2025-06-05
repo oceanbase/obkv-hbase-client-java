@@ -2,7 +2,9 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alibaba.fastjson.JSON;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
@@ -40,7 +42,21 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        return execute(tableClient, request);
+        try{
+            return execute(tableClient, request);
+        } catch (IOException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ObTableException) {
+                ObTableException obEx = (ObTableException) cause;
+                int errCode = obEx.getErrorCode();
+                if(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode == errCode) {
+                    throw new TableNotEnabledException("Table is not enabled: " + tableName + obEx);
+                } else if (ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode == errCode) {
+                    throw new TableNotFoundException("Table not found: " + tableName + obEx);
+                }
+            }
+            throw e;
+        }
     }
 
     public Void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
@@ -50,6 +66,20 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        return execute(tableClient, request);
+        try{
+            return execute(tableClient, request);
+        } catch (IOException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ObTableException) {
+                ObTableException obEx = (ObTableException) cause;
+                int errCode = obEx.getErrorCode();
+                if(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode == errCode) {
+                    throw new TableNotEnabledException("Table is not enabled: " + tableName + obEx);
+                } else if (ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode == errCode) {
+                    throw new TableNotFoundException("Table not found: " + tableName + obEx);
+                }
+            }
+            throw e;
+        }
     }
 }
