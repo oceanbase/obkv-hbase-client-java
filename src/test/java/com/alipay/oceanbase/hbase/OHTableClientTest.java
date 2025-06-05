@@ -19,6 +19,8 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.junit.*;
 
 import java.util.LinkedList;
@@ -77,7 +79,9 @@ public class OHTableClientTest extends HTableTestBase {
         `T` bigint(20) NOT NULL,
         `V` varbinary(1024) DEFAULT NULL,
         PRIMARY KEY (`K`, `Q`, `T`)
-    ) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+    ) TABLEGROUP = test_desc
+    KV_ATTRIBUTES ='{"Hbase": {"TimeToLive": 3600, "MaxVersions": 3}}' 
+    PARTITION BY RANGE COLUMNS(K) (
         PARTITION p1 VALUES LESS THAN ('c'),
         PARTITION p2 VALUES LESS THAN ('e'),
         PARTITION p3 VALUES LESS THAN ('g'),
@@ -96,7 +100,9 @@ public class OHTableClientTest extends HTableTestBase {
         `T` bigint(20) NOT NULL,
         `V` varbinary(1024) DEFAULT NULL,
         PRIMARY KEY (`K`, `Q`, `T`)
-    ) TABLEGROUP = test_desc PARTITION BY RANGE COLUMNS(K) (
+    ) TABLEGROUP = test_desc
+    KV_ATTRIBUTES ='{"Hbase": {"TimeToLive": 7200, "MaxVersions": 3}}'
+    PARTITION BY RANGE COLUMNS(K) (
         PARTITION p1 VALUES LESS THAN ('c'),
         PARTITION p2 VALUES LESS THAN ('e'),
         PARTITION p3 VALUES LESS THAN ('g'),
@@ -116,11 +122,30 @@ public class OHTableClientTest extends HTableTestBase {
         OHTableClient hTable2 = ObHTableTestUtil.newOHTableClient(tableNameStr);
         hTable2.init();
         try {
-            HTableDescriptor descriptor = hTable2.getTableDescriptor();
-            Assert.assertNotNull(descriptor);
-            Assert.assertTrue(descriptor.hasFamily("family1".getBytes()));
-            Assert.assertTrue(descriptor.hasFamily("family2".getBytes()));
-            Assert.assertFalse(descriptor.hasFamily("family".getBytes()));
+            {
+                HTableDescriptor descriptor1 = hTable2.getTableDescriptor();
+                Assert.assertNotNull(descriptor1);
+                Assert.assertEquals(2, descriptor1.getColumnFamilyCount());
+                Assert.assertTrue(descriptor1.hasFamily("family1".getBytes()));
+                Assert.assertTrue(descriptor1.hasFamily("family2".getBytes()));
+                Assert.assertFalse(descriptor1.hasFamily("family".getBytes()));
+                ColumnFamilyDescriptor family1 = descriptor1.getColumnFamily("family1".getBytes());
+                ColumnFamilyDescriptor family2 = descriptor1.getColumnFamily("family2".getBytes());
+                Assert.assertEquals(3600, family1.getTimeToLive());
+                Assert.assertEquals(7200, family2.getTimeToLive());
+            }
+            {
+                TableDescriptor descriptor2 = hTable2.getDescriptor();
+                Assert.assertNotNull(descriptor2);
+                Assert.assertEquals(2, descriptor2.getColumnFamilyCount());
+                Assert.assertTrue(descriptor2.hasColumnFamily("family1".getBytes()));
+                Assert.assertTrue(descriptor2.hasColumnFamily("family2".getBytes()));
+                Assert.assertFalse(descriptor2.hasColumnFamily("family".getBytes()));
+                ColumnFamilyDescriptor family1 = descriptor2.getColumnFamily("family1".getBytes());
+                ColumnFamilyDescriptor family2 = descriptor2.getColumnFamily("family2".getBytes());
+                Assert.assertEquals(3600, family1.getTimeToLive());
+                Assert.assertEquals(7200, family2.getTimeToLive());
+            }
         } finally {
             hTable2.close();
         }
