@@ -145,6 +145,8 @@ public class OHAdmin implements Admin {
             if (e.getCause() instanceof ObTableTransportException
                     && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
+                throw new TableNotFoundException(tableName);
             } else {
                 throw e;
             }
@@ -152,7 +154,7 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public TableDescriptor getDescriptor(TableName tableName) throws TableNotFoundException, IOException {
+    public TableDescriptor getDescriptor(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
         ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
         OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
@@ -162,6 +164,8 @@ public class OHAdmin implements Admin {
             if (e.getCause() instanceof ObTableTransportException
                     && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
+                throw new TableNotFoundException(tableName);
             } else {
                 throw e;
             }

@@ -223,7 +223,8 @@ public class OHTableClient implements Table, Lifecycle {
 
     @Override
     public TableDescriptor getDescriptor() throws IOException {
-        return null;
+        checkStatus();
+        return ohTable.getDescriptor();
     }
 
     @Override
