@@ -3,9 +3,11 @@ package com.alipay.oceanbase.hbase.util;
 import com.alibaba.fastjson.JSON;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.hbase.TableNotDisabledException;
 import org.apache.hadoop.hbase.TableNotEnabledException;
 import org.apache.hadoop.hbase.TableNotFoundException;
@@ -33,23 +35,51 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         return null;
     }
 
-    public void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {
+    public Void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        execute(tableClient, request);
+        try {
+            return execute(tableClient, request);
+        } catch (IOException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ObTableException) {
+                ObTableException obEx = (ObTableException) cause;
+                int errCode = obEx.getErrorCode();
+                if(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode == errCode) {
+                    throw new TableNotEnabledException("Table is not enabled: " + tableName + obEx);
+                } else if (ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode == errCode) {
+                    throw new TableNotFoundException("Table not found: " + tableName + obEx);
+                }
+            }
+            throw e;
+        }
     }
 
-    public void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
+    public Void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
         String jsonData = JSON.toJSONString(requestData);
         request.setData(jsonData);
-        execute(tableClient, request);
+        try {
+            return execute(tableClient, request);
+        } catch (IOException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof ObTableException) {
+                ObTableException obEx = (ObTableException) cause;
+                int errCode = obEx.getErrorCode();
+                if(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode == errCode) {
+                    throw new TableNotDisabledException("Table is not disabled: " + tableName + obEx);
+                } else if (ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode == errCode) {
+                    throw new TableNotFoundException("Table not found: " + tableName + obEx);
+                }
+            }
+            throw e;
+        }
     }
 }
