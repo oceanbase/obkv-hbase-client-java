@@ -605,7 +605,7 @@ public class OHTableAdminInterfaceTest {
                 });
         Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
         createTable(admin, TableName.valueOf("test_exist_tb"), "cf1", "cf2", "cf3");
-        createTable(admin, TableName.valueOf("exist_tb", "test"), "cf1", "cf2", "cf3");
+        createTable(admin, TableName.valueOf("exist_tb", "test"), "cf1", "cf2", "cf3");å
         Assert.assertTrue(admin.tableExists(TableName.valueOf("test_exist_tb")));
         Assert.assertTrue(admin.tableExists(TableName.valueOf("exist_tb", "test")));
     }
