@@ -25,10 +25,6 @@ import org.apache.hadoop.hbase.HConstants;
 import java.util.Properties;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
-import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS;
-import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT;
-import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS;
-import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.hadoop.hbase.ipc.RpcClient.DEFAULT_SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
@@ -55,8 +51,6 @@ public class OHConnectionConfiguration {
     private final int        readRpcTimeout;
     private final int        writeRpcTimeout;
     private final int        rpcConnectTimeout;
-    private final long       writeBufferPeriodicFlushTimeoutMs;
-    private final long       writeBufferPeriodicFlushTimerTickMs;
     private final int        numRetries;
 
     public OHConnectionConfiguration(Configuration conf) {
@@ -84,11 +78,6 @@ public class OHConnectionConfiguration {
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         this.writeRpcTimeout = conf.getInt(HConstants.HBASE_RPC_WRITE_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
-        this.writeBufferPeriodicFlushTimeoutMs = conf.getLong(
-            WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS, WRITE_BUFFER_PERIODIC_FLUSH_TIMEOUT_MS_DEFAULT);
-        this.writeBufferPeriodicFlushTimerTickMs = conf.getLong(
-            WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS,
-            WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT);
         int rpcConnectTimeout = -1;
         if (conf.get(SOCKET_TIMEOUT_CONNECT) != null) {
             rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
@@ -203,14 +192,6 @@ public class OHConnectionConfiguration {
 
     public String getDatabase() {
         return this.database;
-    }
-
-    public long getWriteBufferPeriodicFlushTimeoutMs() {
-        return this.writeBufferPeriodicFlushTimeoutMs;
-    }
-
-    public long getWriteBufferPeriodicFlushTimerTickMs() {
-        return this.writeBufferPeriodicFlushTimerTickMs;
     }
 
     public int getNumRetries() {

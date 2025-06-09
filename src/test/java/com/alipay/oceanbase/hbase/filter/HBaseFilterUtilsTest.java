@@ -209,15 +209,6 @@ public class HBaseFilterUtilsTest {
     }
 
     @Test
-    public void testColumnValueFilter() throws IOException {
-        ColumnValueFilter filter = new ColumnValueFilter(Bytes.toBytes("cf"), Bytes.toBytes("q"),
-            CompareOperator.EQUAL, Bytes.toBytes("v"));
-        System.out.println(Bytes.toString(HBaseFilterUtils.toParseableByteArray(filter)));
-        Assert.assertArrayEquals("ColumnValueFilter('cf','q',=,'binary:v')".getBytes(),
-            HBaseFilterUtils.toParseableByteArray(filter));
-    }
-
-    @Test
     public void testMultiRowRangeFilter() throws IOException {
         List<MultiRowRangeFilter.RowRange> ranges = new ArrayList<>();
         ranges.add(new MultiRowRangeFilter.RowRange(Bytes.toBytes("a"), true, Bytes.toBytes("b"), false));

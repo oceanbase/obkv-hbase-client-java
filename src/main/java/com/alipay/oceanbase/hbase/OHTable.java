@@ -620,8 +620,8 @@ public class OHTable implements Table {
         } else if (delete.getFamilyCellMap().size() > 1) {
             boolean has_delete_family = delete.getFamilyCellMap().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()).anyMatch(
-                            kv -> kv.getType().getCode() == KeyValue.Type.DeleteFamily.getCode() ||
-                                    kv.getType().getCode() == KeyValue.Type.DeleteFamilyVersion.getCode());
+                            kv -> kv.getTypeByte() == KeyValue.Type.DeleteFamily.getCode() ||
+                                    kv.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode());
             if (!has_delete_family) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
@@ -1402,8 +1402,8 @@ public class OHTable implements Table {
     }
 
     @Override
-    public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
-        return new ObCheckAndMutateBuilderImpl(row, family);
+    public long getRpcTimeout(TimeUnit unit) {
+        return getRpcTimeout();
     }
 
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier,
@@ -1723,6 +1723,11 @@ public class OHTable implements Table {
         return operationTimeout;
     }
 
+    @Override
+    public long getOperationTimeout(TimeUnit unit) {
+        return getOperationTimeout();
+    }
+
     //todo
     @Override
     public void setRpcTimeout(int rpcTimeout) {
@@ -1742,9 +1747,29 @@ public class OHTable implements Table {
     }
 
     @Override
+    public void setReadRpcTimeout(int readRpcTimeout) {
+        this.readRpcTimeout = readRpcTimeout;
+    }
+    @Override
+    public long getReadRpcTimeout(TimeUnit unit) {
+        return getReadRpcTimeout();
+    }
+
+    @Override
+    public long getWriteRpcTimeout(TimeUnit unit) {
+        return this.readRpcTimeout;
+    }
+
+    @Override
     public int getWriteRpcTimeout() {
         return this.writeRpcTimeout;
     }
+
+    @Override
+    public void setWriteRpcTimeout(int writeRpcTimeout) {
+        this.writeRpcTimeout = writeRpcTimeout;
+    }
+
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
         this.obTableClient.setRuntimeBatchExecutor(runtimeBatchExecutor);
@@ -2016,7 +2041,7 @@ public class OHTable implements Table {
     private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
                                                      ObTableOperationType operationType,
                                                      boolean isTableGroup, byte[] family, Long TTL) {
-        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
         if(isTableGroup) {
@@ -2136,7 +2161,7 @@ public class OHTable implements Table {
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
             newCell = modifyQualifier(kv, newQualifier);
         }
-        Cell.Type kvType = kv.getType();
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         switch (kvType) {
             case Put:
                 String[] propertyColumns = V_COLUMNS;
@@ -2182,7 +2207,7 @@ public class OHTable implements Table {
         byte[] family = CellUtil.cloneFamily(original);
         byte[] value = CellUtil.cloneValue(original);
         long timestamp = original.getTimestamp();
-        KeyValue.Type type = KeyValue.Type.codeToType(original.getType().getCode());
+        KeyValue.Type type = KeyValue.Type.codeToType(original.getTypeByte());
         // Create a new KeyValue with the modified qualifier
         return new KeyValue(row, family, newQualifier, timestamp, type, value);
     }
@@ -2312,7 +2337,7 @@ public class OHTable implements Table {
     public static ObTableOperation buildObTableOperation(Cell kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
-        Cell.Type kvType = kv.getType();
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         String[] propertyColumns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
         if (TTL != Long.MAX_VALUE) {
@@ -2449,7 +2474,7 @@ public class OHTable implements Table {
         return new Pair<>(getStartKeys(), getEndKeys());
     }
 
-    private CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
+    public static CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
         switch (cmpOp) {
             case LESS:
                 return CompareFilter.CompareOp.LESS;
@@ -2465,98 +2490,6 @@ public class OHTable implements Table {
                 return CompareFilter.CompareOp.GREATER;
             default:
                 return CompareFilter.CompareOp.NO_OP;
-        }
-    }
-
-    private class ObCheckAndMutateBuilderImpl implements CheckAndMutateBuilder {
-        private final byte[]    row;
-        private final byte[]    family;
-        private byte[]          qualifier;
-        private byte[]          value;
-        private TimeRange       timeRange;
-        private CompareOperator cmpOp;
-
-        ObCheckAndMutateBuilderImpl(byte[] row, byte[] family) {
-            this.row = checkNotNull(row, "The provided row is null.");
-            this.family = checkNotNull(family, "The provided family is null.");
-        }
-
-        @Override
-        public CheckAndMutateBuilder qualifier(byte[] qualifier) {
-            this.qualifier = checkNotNull(
-                qualifier,
-                "The provided qualifier is null. You could"
-                        + " use an empty byte array, or do not call this method if you want a null qualifier.");
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder timeRange(TimeRange timeRange) {
-            this.timeRange = timeRange;
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder ifNotExists() {
-            this.cmpOp = CompareOperator.EQUAL;
-            this.value = null;
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder ifMatches(CompareOperator cmpOp, byte[] value) {
-            this.cmpOp = checkNotNull(cmpOp, "The provided cmpOp is null.");
-            this.value = checkNotNull(value, "The provided value is null.");
-            return this;
-        }
-
-        @Override
-        public boolean thenPut(Put put) throws IOException {
-            checkCmpOp();
-            RowMutations rowMutations = new RowMutations(row);
-            rowMutations.add(put);
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, rowMutations);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        @Override
-        public boolean thenDelete(Delete delete) throws IOException {
-            checkCmpOp();
-            RowMutations rowMutations = new RowMutations(row);
-            rowMutations.add(delete);
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, rowMutations);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        @Override
-        public boolean thenMutate(RowMutations mutation) throws IOException {
-            checkCmpOp();
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, mutation);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        private void checkCmpOp() {
-            checkNotNull(this.cmpOp,
-                "The compare condition is null. Please use"
-                        + " ifNotExists/ifEquals/ifMatches before executing the request");
         }
     }
 }

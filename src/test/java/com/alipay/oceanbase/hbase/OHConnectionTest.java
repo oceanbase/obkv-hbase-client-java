@@ -1078,7 +1078,7 @@ public class OHConnectionTest {
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
             // set periodic flush timeout to enable Timer
-            params.setWriteBufferPeriodicFlushTimeoutMs(100);
+//            params.setWriteBufferPeriodicFlushTimeoutMs(100);
 
             // set thread pool
             long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);

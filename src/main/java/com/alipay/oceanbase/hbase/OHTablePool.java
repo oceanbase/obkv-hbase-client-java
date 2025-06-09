@@ -25,6 +25,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -42,7 +43,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import static com.alipay.oceanbase.hbase.OHTable.getCompareOp;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
 
@@ -802,6 +805,30 @@ public class OHTablePool implements Closeable {
             return table.checkAndPut(row, family, qualifier, compareOp, value, put);
         }
 
+        /**
+         * Atomically checks if a row/family/qualifier value matches the expected
+         * value. If it does, it adds the put.  If the passed value is null, the check
+         * is for the lack of column (ie: non-existence)
+         * <p>
+         * The expected value argument of this call is on the left and the current
+         * value of the cell is on the right side of the comparison operator.
+         * <p>
+         * Ie. eg. GREATER operator means expected value > existing <=> add the put.
+         *
+         * @param row       to check
+         * @param family    column family to check
+         * @param qualifier column qualifier to check
+         * @param op        comparison operator to use
+         * @param value     the expected value
+         * @param put       data to put if check succeeds
+         * @return true if the new put was executed, false otherwise
+         * @throws IOException e
+         */
+        @Override
+        public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Put put) throws IOException {
+            return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
+        }
+
         @Override
         public void delete(Delete delete) throws IOException {
             table.delete(delete);
@@ -825,9 +852,28 @@ public class OHTablePool implements Closeable {
             return table.checkAndDelete(row, family, qualifier, compareOp, value, delete);
         }
 
+        /**
+         * Atomically checks if a row/family/qualifier value matches the expected
+         * value. If it does, it adds the delete.  If the passed value is null, the
+         * check is for the lack of column (ie: non-existence)
+         * <p>
+         * The expected value argument of this call is on the left and the current
+         * value of the cell is on the right side of the comparison operator.
+         * <p>
+         * Ie. eg. GREATER operator means expected value > existing <=> add the delete.
+         *
+         * @param row       to check
+         * @param family    column family to check
+         * @param qualifier column qualifier to check
+         * @param op        comparison operator to use
+         * @param value     the expected value
+         * @param delete    data to delete if check succeeds
+         * @return true if the new delete was executed, false otherwise
+         * @throws IOException e
+         */
         @Override
-        public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
-            return table.checkAndMutate(row, family);
+        public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Delete delete) throws IOException {
+            return checkAndDelete(row, family, qualifier, getCompareOp(op), value, delete);
         }
 
         @Override
@@ -935,6 +981,44 @@ public class OHTablePool implements Closeable {
             return table.checkAndMutate(row, family, qualifier, compareOp, value, mutations);
         }
 
+        /**
+         * Atomically checks if a row/family/qualifier value matches the expected value.
+         * If it does, it performs the row mutations.  If the passed value is null, the check
+         * is for the lack of column (ie: non-existence)
+         * <p>
+         * The expected value argument of this call is on the left and the current
+         * value of the cell is on the right side of the comparison operator.
+         * <p>
+         * Ie. eg. GREATER operator means expected value > existing <=> perform row mutations.
+         *
+         * @param row       to check
+         * @param family    column family to check
+         * @param qualifier column qualifier to check
+         * @param op        the comparison operator
+         * @param value     the expected value
+         * @param mutation  mutations to perform if check succeeds
+         * @return true if the new put was executed, false otherwise
+         * @throws IOException e
+         */
+        @Override
+        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, RowMutations mutation) throws IOException {
+            return checkAndMutate(row, family, qualifier, getCompareOp(op), value, mutation);
+        }
+
+        /**
+         * Get timeout of each rpc request in this Table instance. It will be overridden by a more
+         * specific rpc timeout config such as readRpcTimeout or writeRpcTimeout.
+         *
+         * @param unit the unit of time the timeout to be represented in
+         * @return rpc timeout in the specified time unit
+         * @see #getReadRpcTimeout(TimeUnit)
+         * @see #getWriteRpcTimeout(TimeUnit)
+         */
+        @Override
+        public long getRpcTimeout(TimeUnit unit) {
+            return getRpcTimeout();
+        }
+
         @Override
         public void setOperationTimeout(int i) {
             table.setOperationTimeout(i);
@@ -948,6 +1032,89 @@ public class OHTablePool implements Closeable {
         @Override
         public void setRpcTimeout(int i) {
             table.setRpcTimeout(i);
+        }
+
+        /**
+         * Get timeout of each rpc read request in this Table instance.
+         *
+         * @param unit the unit of time the timeout to be represented in
+         * @return read rpc timeout in the specified time unit
+         */
+        @Override
+        public long getReadRpcTimeout(TimeUnit unit) {
+            return table.getReadRpcTimeout(unit);
+        }
+
+        /**
+         * Get timeout (millisecond) of each rpc read request in this Table instance.
+         *
+         * @deprecated since 2.0 and will be removed in 3.0 version
+         * use {@link #getReadRpcTimeout(TimeUnit)} instead
+         */
+        @Override
+        public int getReadRpcTimeout() {
+            return table.getReadRpcTimeout();
+        }
+
+        /**
+         * Set timeout (millisecond) of each rpc read request in operations of this Table instance, will
+         * override the value of hbase.rpc.read.timeout in configuration.
+         * If a rpc read request waiting too long, it will stop waiting and send a new request to retry
+         * until retries exhausted or operation timeout reached.
+         *
+         * @param readRpcTimeout the timeout for read rpc request in milliseconds
+         * @deprecated since 2.0.0, use {@link TableBuilder#setReadRpcTimeout} instead
+         */
+        @Override
+        public void setReadRpcTimeout(int readRpcTimeout) {
+            table.setReadRpcTimeout(readRpcTimeout);
+        }
+
+        /**
+         * Get timeout of each rpc write request in this Table instance.
+         *
+         * @param unit the unit of time the timeout to be represented in
+         * @return write rpc timeout in the specified time unit
+         */
+        @Override
+        public long getWriteRpcTimeout(TimeUnit unit) {
+            return table.getWriteRpcTimeout(unit);
+        }
+
+        /**
+         * Get timeout (millisecond) of each rpc write request in this Table instance.
+         *
+         * @deprecated since 2.0 and will be removed in 3.0 version
+         * use {@link #getWriteRpcTimeout(TimeUnit)} instead
+         */
+        @Override
+        public int getWriteRpcTimeout() {
+            return table.getWriteRpcTimeout();
+        }
+
+        /**
+         * Set timeout (millisecond) of each rpc write request in operations of this Table instance, will
+         * override the value of hbase.rpc.write.timeout in configuration.
+         * If a rpc write request waiting too long, it will stop waiting and send a new request to retry
+         * until retries exhausted or operation timeout reached.
+         *
+         * @param writeRpcTimeout the timeout for write rpc request in milliseconds
+         * @deprecated since 2.0.0, use {@link TableBuilder#setWriteRpcTimeout} instead
+         */
+        @Override
+        public void setWriteRpcTimeout(int writeRpcTimeout) {
+            table.setWriteRpcTimeout(writeRpcTimeout);
+        }
+
+        /**
+         * Get timeout of each operation in Table instance.
+         *
+         * @param unit the unit of time the timeout to be represented in
+         * @return operation rpc timeout in the specified time unit
+         */
+        @Override
+        public long getOperationTimeout(TimeUnit unit) {
+            return table.getOperationTimeout(unit);
         }
 
         @Override
