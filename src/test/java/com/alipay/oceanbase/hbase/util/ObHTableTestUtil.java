@@ -35,35 +35,39 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String       PARAM_URL      = "";
-    public static String       FULL_USER_NAME = "";
-    public static String       PASSWORD       = "";
-    public static String       SYS_USER_NAME  = "";
-    public static String       SYS_PASSWORD   = "";
-    public static String       ODP_ADDR       = "";
-    public static int          ODP_PORT       = 0;
-    public static boolean      ODP_MODE       = false;
-    public static String       DATABASE       = "";
-    public static String       JDBC_IP        = "";
-    public static String       JDBC_PORT      = "";
-    public static String       JDBC_DATABASE  = "";
-    public static String       JDBC_URL       = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
-                                                + JDBC_DATABASE + "?" + "useUnicode=TRUE&"
-                                                + "characterEncoding=utf-8&"
-                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
-    public static String       SYS_JDBC_URL   = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
-                                                + "oceanbase?" + "useUnicode=TRUE&"
-                                                + "characterEncoding=utf-8&"
-                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
-    public static String       SYS_TENANT_JDBC_URL = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
-                                                + "oceanbase?" + "useUnicode=TRUE&"
-                                                + "characterEncoding=utf-8&"
-                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
+    public static String       PARAM_URL            = "";
+    public static String       FULL_USER_NAME       = "";
+    public static String       PASSWORD             = "";
+    public static String       SYS_USER_NAME        = "";
+    public static String       SYS_PASSWORD         = "";
+    public static String       ODP_ADDR             = "";
+    public static int          ODP_PORT             = 0;
+    public static boolean      ODP_MODE             = false;
+    public static String       DATABASE             = "";
+    public static String       JDBC_IP              = "";
+    public static String       JDBC_PORT            = "";
+    public static String       JDBC_DATABASE        = "";
+    public static String       JDBC_URL             = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT
+                                                      + "/ " + JDBC_DATABASE + "?"
+                                                      + "useUnicode=TRUE&"
+                                                      + "characterEncoding=utf-8&"
+                                                      + "socketTimeout=3000000&"
+                                                      + "connectTimeout=60000";
+    public static String       SYS_JDBC_URL         = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT
+                                                      + "/ " + "oceanbase?" + "useUnicode=TRUE&"
+                                                      + "characterEncoding=utf-8&"
+                                                      + "socketTimeout=3000000&"
+                                                      + "connectTimeout=60000";
+    public static String       SYS_TENANT_JDBC_URL  = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT
+                                                      + "/ " + "oceanbase?" + "useUnicode=TRUE&"
+                                                      + "characterEncoding=utf-8&"
+                                                      + "socketTimeout=3000000&"
+                                                      + "connectTimeout=60000";
 
     public static String       SYS_TENANT_USER_NAME = "root@sys";
-    public static String       SYS_TENANT_PASSWORD = "";
-    public static String       SQL_FORMAT     = "truncate %s";
-    public static List<String> tableNameList  = new LinkedList<String>();
+    public static String       SYS_TENANT_PASSWORD  = "";
+    public static String       SQL_FORMAT           = "truncate %s";
+    public static List<String> tableNameList        = new LinkedList<String>();
     public static Connection   conn;
     public static Statement    stmt;
 
@@ -181,8 +185,8 @@ public class ObHTableTestUtil {
     static public Connection getSysTenantConnection() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            Connection conn = DriverManager
-                .getConnection(SYS_TENANT_JDBC_URL, SYS_TENANT_USER_NAME, SYS_TENANT_PASSWORD);
+            Connection conn = DriverManager.getConnection(SYS_TENANT_JDBC_URL,
+                SYS_TENANT_USER_NAME, SYS_TENANT_PASSWORD);
             return conn;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -247,7 +251,8 @@ public class ObHTableTestUtil {
         return diff == 0;
     }
 
-    public static void executeSQL(Connection conn, String sql, boolean printSQL) throws SQLException {
+    public static void executeSQL(Connection conn, String sql, boolean printSQL)
+                                                                                throws SQLException {
         System.out.println("execute sql: " + sql);
         conn.createStatement().execute(sql);
     }
@@ -261,16 +266,16 @@ public class ObHTableTestUtil {
         executeIgnoreExpectedErrors(operation, "OB_ERR_UNEXPECTED");
     }
 
-    public static void executeIgnoreExpectedErrors(CheckedRunnable operation, String... expectedErrorMessages) throws Exception {
+    public static void executeIgnoreExpectedErrors(CheckedRunnable operation,
+                                                   String... expectedErrorMessages)
+                                                                                   throws Exception {
         try {
             operation.run();
         } catch (Exception e) {
             boolean shouldIgnore = false;
-            String[] messagesToCheck = {
-                e.getMessage(),
-                e.getCause() != null ? e.getCause().getMessage() : null
-            };
-            
+            String[] messagesToCheck = { e.getMessage(),
+                    e.getCause() != null ? e.getCause().getMessage() : null };
+
             for (String expectedMessage : expectedErrorMessages) {
                 for (String actualMessage : messagesToCheck) {
                     if (actualMessage != null && actualMessage.contains(expectedMessage)) {
@@ -282,7 +287,7 @@ public class ObHTableTestUtil {
                     break;
                 }
             }
-            
+
             if (!shouldIgnore) {
                 throw e;
             }

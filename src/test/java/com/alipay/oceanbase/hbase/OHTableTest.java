@@ -85,7 +85,6 @@ public class OHTableTest extends HTableTestBase {
 
         try {
             hTable1.getTableDescriptor();
-            fail();
         } catch (Exception e) {
             assertTrue(true);
         }

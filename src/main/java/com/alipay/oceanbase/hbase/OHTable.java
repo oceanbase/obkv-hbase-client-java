@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put>  writeBuffer            = new ArrayList<Put>();
+    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -459,8 +459,8 @@ public class OHTable implements Table {
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
-                                                              OHConnectionConfiguration ohConnectionConf)
-                                                                                                         throws IllegalArgumentException {
+                                                                    OHConnectionConfiguration ohConnectionConf)
+                                                                                                               throws IllegalArgumentException {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
             if (params.length != 2) {
@@ -500,13 +500,15 @@ public class OHTable implements Table {
 
     @Override
     public HTableDescriptor getTableDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
     @Override
     public TableDescriptor getDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
@@ -620,8 +622,8 @@ public class OHTable implements Table {
         } else if (delete.getFamilyCellMap().size() > 1) {
             boolean has_delete_family = delete.getFamilyCellMap().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()).anyMatch(
-                            kv -> kv.getType().getCode() == KeyValue.Type.DeleteFamily.getCode() ||
-                                    kv.getType().getCode() == KeyValue.Type.DeleteFamilyVersion.getCode());
+                            kv -> kv.getTypeByte() == KeyValue.Type.DeleteFamily.getCode() ||
+                                    kv.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode());
             if (!has_delete_family) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
@@ -909,10 +911,12 @@ public class OHTable implements Table {
             byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                                   + columnName.length];
                     System.arraycopy(family, 0, newQualifier, 0, family.length);
                     newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1,
+                        columnName.length);
                     columnFilters.add(newQualifier);
                 }
             } else {
@@ -1402,8 +1406,8 @@ public class OHTable implements Table {
     }
 
     @Override
-    public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
-        return new ObCheckAndMutateBuilderImpl(row, family);
+    public long getRpcTimeout(TimeUnit unit) {
+        return getRpcTimeout();
     }
 
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier,
@@ -1723,6 +1727,11 @@ public class OHTable implements Table {
         return operationTimeout;
     }
 
+    @Override
+    public long getOperationTimeout(TimeUnit unit) {
+        return getOperationTimeout();
+    }
+
     //todo
     @Override
     public void setRpcTimeout(int rpcTimeout) {
@@ -1742,8 +1751,28 @@ public class OHTable implements Table {
     }
 
     @Override
+    public void setReadRpcTimeout(int readRpcTimeout) {
+        this.readRpcTimeout = readRpcTimeout;
+    }
+
+    @Override
+    public long getReadRpcTimeout(TimeUnit unit) {
+        return getReadRpcTimeout();
+    }
+
+    @Override
+    public long getWriteRpcTimeout(TimeUnit unit) {
+        return this.readRpcTimeout;
+    }
+
+    @Override
     public int getWriteRpcTimeout() {
         return this.writeRpcTimeout;
+    }
+
+    @Override
+    public void setWriteRpcTimeout(int writeRpcTimeout) {
+        this.writeRpcTimeout = writeRpcTimeout;
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
@@ -1877,7 +1906,7 @@ public class OHTable implements Table {
                 if (columnQualifier == null) {
                     obHTableFilter.addSelectColumnQualifier(new byte[0]);
                 } else {
-                   obHTableFilter.addSelectColumnQualifier(columnQualifier);
+                    obHTableFilter.addSelectColumnQualifier(columnQualifier);
                 }
             }
         }
@@ -1935,11 +1964,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
-                    scan.includeStartRow(), true, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(),
+                scan.getStartRow(), scan.includeStartRow(), true, ts);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
-                    scan.includeStopRow(), false, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(),
+                scan.getStopRow(), scan.includeStopRow(), false, ts);
         }
         obTableQuery.setBatchSize(scan.getBatch());
         obTableQuery.setLimit(scan.getLimit());
@@ -2016,13 +2045,14 @@ public class OHTable implements Table {
     private QueryAndMutate buildDeleteQueryAndMutate(KeyValue kv,
                                                      ObTableOperationType operationType,
                                                      boolean isTableGroup, byte[] family, Long TTL) {
-        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
-        if(isTableGroup) {
+        if (isTableGroup) {
             // construct new_kv otherwise filter will fail to match targeted columns
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2105,12 +2135,10 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 }
@@ -2130,13 +2158,14 @@ public class OHTable implements Table {
         Cell newCell = kv;
         if (isTableGroup && family != null) {
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
             newCell = modifyQualifier(kv, newQualifier);
         }
-        Cell.Type kvType = kv.getType();
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         switch (kvType) {
             case Put:
                 String[] propertyColumns = V_COLUMNS;
@@ -2182,7 +2211,7 @@ public class OHTable implements Table {
         byte[] family = CellUtil.cloneFamily(original);
         byte[] value = CellUtil.cloneValue(original);
         long timestamp = original.getTimestamp();
-        KeyValue.Type type = KeyValue.Type.codeToType(original.getType().getCode());
+        KeyValue.Type type = KeyValue.Type.codeToType(original.getTypeByte());
         // Create a new KeyValue with the modified qualifier
         return new KeyValue(row, family, newQualifier, timestamp, type, value);
     }
@@ -2312,7 +2341,7 @@ public class OHTable implements Table {
     public static ObTableOperation buildObTableOperation(Cell kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
-        Cell.Type kvType = kv.getType();
+        KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         String[] propertyColumns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
         if (TTL != Long.MAX_VALUE) {
@@ -2449,7 +2478,7 @@ public class OHTable implements Table {
         return new Pair<>(getStartKeys(), getEndKeys());
     }
 
-    private CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
+    public static CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
         switch (cmpOp) {
             case LESS:
                 return CompareFilter.CompareOp.LESS;
@@ -2465,98 +2494,6 @@ public class OHTable implements Table {
                 return CompareFilter.CompareOp.GREATER;
             default:
                 return CompareFilter.CompareOp.NO_OP;
-        }
-    }
-
-    private class ObCheckAndMutateBuilderImpl implements CheckAndMutateBuilder {
-        private final byte[]    row;
-        private final byte[]    family;
-        private byte[]          qualifier;
-        private byte[]          value;
-        private TimeRange       timeRange;
-        private CompareOperator cmpOp;
-
-        ObCheckAndMutateBuilderImpl(byte[] row, byte[] family) {
-            this.row = checkNotNull(row, "The provided row is null.");
-            this.family = checkNotNull(family, "The provided family is null.");
-        }
-
-        @Override
-        public CheckAndMutateBuilder qualifier(byte[] qualifier) {
-            this.qualifier = checkNotNull(
-                qualifier,
-                "The provided qualifier is null. You could"
-                        + " use an empty byte array, or do not call this method if you want a null qualifier.");
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder timeRange(TimeRange timeRange) {
-            this.timeRange = timeRange;
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder ifNotExists() {
-            this.cmpOp = CompareOperator.EQUAL;
-            this.value = null;
-            return this;
-        }
-
-        @Override
-        public CheckAndMutateBuilder ifMatches(CompareOperator cmpOp, byte[] value) {
-            this.cmpOp = checkNotNull(cmpOp, "The provided cmpOp is null.");
-            this.value = checkNotNull(value, "The provided value is null.");
-            return this;
-        }
-
-        @Override
-        public boolean thenPut(Put put) throws IOException {
-            checkCmpOp();
-            RowMutations rowMutations = new RowMutations(row);
-            rowMutations.add(put);
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, rowMutations);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        @Override
-        public boolean thenDelete(Delete delete) throws IOException {
-            checkCmpOp();
-            RowMutations rowMutations = new RowMutations(row);
-            rowMutations.add(delete);
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, rowMutations);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        @Override
-        public boolean thenMutate(RowMutations mutation) throws IOException {
-            checkCmpOp();
-            try {
-                return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                    timeRange, mutation);
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
-                throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
-                                      + e.getMessage() + " error.", e);
-            }
-        }
-
-        private void checkCmpOp() {
-            checkNotNull(this.cmpOp,
-                "The compare condition is null. Please use"
-                        + " ifNotExists/ifEquals/ifMatches before executing the request");
         }
     }
 }

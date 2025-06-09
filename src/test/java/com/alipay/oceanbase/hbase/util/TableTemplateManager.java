@@ -46,66 +46,66 @@ public class TableTemplateManager {
         NON_PARTITIONED_TIME_CELL_TTL, // 时序表带CELL TTL列
     }
 
-    public static List<TableType>               NORMAL_AND_SERIES_TABLES = Arrays
-                                                                             .asList(
-                                                                                 NON_PARTITIONED_REGULAR,
-                                                                                 NON_PARTITIONED_TIME_SERIES,
-                                                                                 SINGLE_PARTITIONED_REGULAR,
-                                                                                 SINGLE_PARTITIONED_TIME_SERIES,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY_GEN,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE_GEN,
-                                                                                 SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                                                                                 SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+    public static List<TableType>               NORMAL_AND_SERIES_TABLES         = Arrays
+                                                                                     .asList(
+                                                                                         NON_PARTITIONED_REGULAR,
+                                                                                         NON_PARTITIONED_TIME_SERIES,
+                                                                                         SINGLE_PARTITIONED_REGULAR,
+                                                                                         SINGLE_PARTITIONED_TIME_SERIES,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY_GEN,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE_GEN,
+                                                                                         SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_TIME_KEY_RANGE);
 
-    public static List<TableType>               NORMAL_PARTITIONED_TABLES = Arrays
-                                                                                .asList(
-                                                                                        SINGLE_PARTITIONED_REGULAR,
-                                                                                        SECONDARY_PARTITIONED_RANGE_KEY,
-                                                                                        SECONDARY_PARTITIONED_RANGE_KEY_GEN,
-                                                                                        SECONDARY_PARTITIONED_KEY_RANGE,
-                                                                                        SECONDARY_PARTITIONED_KEY_RANGE_GEN);
+    public static List<TableType>               NORMAL_PARTITIONED_TABLES        = Arrays
+                                                                                     .asList(
+                                                                                         SINGLE_PARTITIONED_REGULAR,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY_GEN,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE_GEN);
     public static List<TableType>               NORMAL_SERIES_PARTITIONED_TABLES = Arrays
-                                                                                    .asList(
-                                                                                            SINGLE_PARTITIONED_TIME_SERIES,
-                                                                                            SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                                                                                            SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+                                                                                     .asList(
+                                                                                         SINGLE_PARTITIONED_TIME_SERIES,
+                                                                                         SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_TIME_KEY_RANGE);
 
-    public static List<TableType>               SERIES_TABLES            = Arrays
-                                                                             .asList(
-                                                                                 NON_PARTITIONED_TIME_SERIES,
-                                                                                 SINGLE_PARTITIONED_TIME_SERIES,
-                                                                                 SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                                                                                 SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+    public static List<TableType>               SERIES_TABLES                    = Arrays
+                                                                                     .asList(
+                                                                                         NON_PARTITIONED_TIME_SERIES,
+                                                                                         SINGLE_PARTITIONED_TIME_SERIES,
+                                                                                         SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_TIME_KEY_RANGE);
 
-    public static List<TableType>               NORMAL_TABLES            = Arrays
-                                                                             .asList(
-                                                                                 NON_PARTITIONED_REGULAR,
-                                                                                 SINGLE_PARTITIONED_REGULAR,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY_GEN,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE_GEN);
+    public static List<TableType>               NORMAL_TABLES                    = Arrays
+                                                                                     .asList(
+                                                                                         NON_PARTITIONED_REGULAR,
+                                                                                         SINGLE_PARTITIONED_REGULAR,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY_GEN,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE_GEN);
 
-    public static List<TableType>               CELL_TTL_TABLES          = Arrays
-                                                                             .asList(
-                                                                                 NON_PARTITIONED_REGULAR_CELL_TTL,
-                                                                                 SINGLE_PARTITIONED_REGULAR_CELL_TTL,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,
-                                                                                 SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
-                                                                                 SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL);
+    public static List<TableType>               CELL_TTL_TABLES                  = Arrays
+                                                                                     .asList(
+                                                                                         NON_PARTITIONED_REGULAR_CELL_TTL,
+                                                                                         SINGLE_PARTITIONED_REGULAR_CELL_TTL,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,
+                                                                                         SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
+                                                                                         SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL);
 
-    public static List<TableType>               TIMESERIES_TABLES        = Arrays
-                                                                             .asList(
-                                                                                 NON_PARTITIONED_TIME_SERIES,
-                                                                                 SINGLE_PARTITIONED_TIME_SERIES,
-                                                                                 SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                                                                                 SECONDARY_PARTITIONED_TIME_KEY_RANGE);
+    public static List<TableType>               TIMESERIES_TABLES                = Arrays
+                                                                                     .asList(
+                                                                                         NON_PARTITIONED_TIME_SERIES,
+                                                                                         SINGLE_PARTITIONED_TIME_SERIES,
+                                                                                         SECONDARY_PARTITIONED_TIME_RANGE_KEY,
+                                                                                         SECONDARY_PARTITIONED_TIME_KEY_RANGE);
 
-    private static final Map<TableType, String> SQL_TEMPLATES            = new EnumMap<TableType, String>(
-                                                                             TableType.class);
+    private static final Map<TableType, String> SQL_TEMPLATES                    = new EnumMap<TableType, String>(
+                                                                                     TableType.class);
 
     static {
         // 普通表非分区表模版
@@ -297,55 +297,55 @@ public class TableTemplateManager {
                                                          + ") TABLEGROUP = %s");
     }
 
-    private static final Map<TableType, String> ALTER_SQL_TEMPLATES            = new EnumMap<TableType, String>(
-            TableType.class);
+    private static final Map<TableType, String> ALTER_SQL_TEMPLATES              = new EnumMap<TableType, String>(
+                                                                                     TableType.class);
 
     static {
         // 普通表一级分区模板
         ALTER_SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_REGULAR,
-                "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
         // 时序表一级分区模板
         ALTER_SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_TIME_SERIES,
-                "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
         // 普通表RANGE-KEY分区（使用K）
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         // 合并GEN类型的注释处理
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_GEN,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         // 普通表KEY-RANGE分区（使用K）
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         // 普通表KEY-RANGE分区（使用生成列）
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_GEN,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         // 时序表RANGE-KEY分区
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_TIME_RANGE_KEY,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         // 时序表KEY-RANGE分区
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_TIME_KEY_RANGE,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         /* ------------------ CELL TTL ----------------*/
         ALTER_SQL_TEMPLATES.put(TableType.SINGLE_PARTITIONED_REGULAR_CELL_TTL,
-                "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER PARTITION p0 STORAGE_CACHE_POLICY='hot';");
 
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_CELL_TTL,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_RANGE_KEY_GEN_CELL_TTL,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_CELL_TTL,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
 
         ALTER_SQL_TEMPLATES.put(TableType.SECONDARY_PARTITIONED_KEY_RANGE_GEN_CELL_TTL,
-                "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
+            "ALTER TABLE `%s` ALTER SUBPARTITION p1sp0 STORAGE_CACHE_POLICY='hot';");
     }
 
     public static String getCreateTableSQL(TableType type, String tableName,

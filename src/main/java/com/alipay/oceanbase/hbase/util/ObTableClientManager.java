@@ -128,16 +128,19 @@ public class ObTableClientManager {
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
     }
 
-    public static ObTableClient getOrCreateObTableClientByTableName(TableName tableName, OHConnectionConfiguration connectionConfig) throws IllegalArgumentException,
-            IOException {
+    public static ObTableClient getOrCreateObTableClientByTableName(TableName tableName,
+                                                                    OHConnectionConfiguration connectionConfig)
+                                                                                                               throws IllegalArgumentException,
+                                                                                                               IOException {
         String tableNameString = tableName.getNameAsString();
-        ObTableClient obTableClient = getOrCreateObTableClient(
-                OHTable.setUserDefinedNamespace(tableNameString, connectionConfig));
+        ObTableClient obTableClient = getOrCreateObTableClient(OHTable.setUserDefinedNamespace(
+            tableNameString, connectionConfig));
         ObTableClientManager.initTimeoutAndRetryTimes(obTableClient, connectionConfig);
         return obTableClient;
     }
 
-    private static void initTimeoutAndRetryTimes(ObTableClient obTableClient, OHConnectionConfiguration ohConnectionConf) {
+    private static void initTimeoutAndRetryTimes(ObTableClient obTableClient,
+                                                 OHConnectionConfiguration ohConnectionConf) {
         obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         obTableClient.setRuntimeRetryTimes(ohConnectionConf.getNumRetries());
         obTableClient.setRuntimeMaxWait(ohConnectionConf.getOperationTimeout());

@@ -127,7 +127,7 @@ public final class OHConstants {
     /**
      * use to specify whether to query only the data in hot storage when performing a query.
      */
-    public static final String   HBASE_HTABLE_QUERY_HOT_ONLY       = "hbase.htable.query.hot_only";
+    public static final String   HBASE_HTABLE_QUERY_HOT_ONLY                 = "hbase.htable.query.hot_only";
 
     /*-------------------------------------------------------------------------------------------------------------*/
 

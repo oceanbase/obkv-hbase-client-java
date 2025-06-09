@@ -25,6 +25,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -42,7 +43,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
+import static com.alipay.oceanbase.hbase.OHTable.getCompareOp;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
 
@@ -803,6 +806,12 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op,
+                                   byte[] value, Put put) throws IOException {
+            return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
+        }
+
+        @Override
         public void delete(Delete delete) throws IOException {
             table.delete(delete);
         }
@@ -826,8 +835,10 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
-        public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
-            return table.checkAndMutate(row, family);
+        public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier,
+                                      CompareOperator op, byte[] value, Delete delete)
+                                                                                      throws IOException {
+            return checkAndDelete(row, family, qualifier, getCompareOp(op), value, delete);
         }
 
         @Override
@@ -936,6 +947,18 @@ public class OHTablePool implements Closeable {
         }
 
         @Override
+        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
+                                      CompareOperator op, byte[] value, RowMutations mutation)
+                                                                                              throws IOException {
+            return checkAndMutate(row, family, qualifier, getCompareOp(op), value, mutation);
+        }
+
+        @Override
+        public long getRpcTimeout(TimeUnit unit) {
+            return getRpcTimeout();
+        }
+
+        @Override
         public void setOperationTimeout(int i) {
             table.setOperationTimeout(i);
         }
@@ -948,6 +971,41 @@ public class OHTablePool implements Closeable {
         @Override
         public void setRpcTimeout(int i) {
             table.setRpcTimeout(i);
+        }
+
+        @Override
+        public long getReadRpcTimeout(TimeUnit unit) {
+            return table.getReadRpcTimeout(unit);
+        }
+
+        @Override
+        public int getReadRpcTimeout() {
+            return table.getReadRpcTimeout();
+        }
+
+        @Override
+        public void setReadRpcTimeout(int readRpcTimeout) {
+            table.setReadRpcTimeout(readRpcTimeout);
+        }
+
+        @Override
+        public long getWriteRpcTimeout(TimeUnit unit) {
+            return table.getWriteRpcTimeout(unit);
+        }
+
+        @Override
+        public int getWriteRpcTimeout() {
+            return table.getWriteRpcTimeout();
+        }
+
+        @Override
+        public void setWriteRpcTimeout(int writeRpcTimeout) {
+            table.setWriteRpcTimeout(writeRpcTimeout);
+        }
+
+        @Override
+        public long getOperationTimeout(TimeUnit unit) {
+            return table.getOperationTimeout(unit);
         }
 
         @Override
