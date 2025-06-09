@@ -626,51 +626,6 @@ public abstract class HTableMultiCFTestBase {
         }
         Assert.assertEquals(0, count);
 
-        // test periodic flush
-        params.setWriteBufferPeriodicFlushTimeoutMs(100);
-        mutator = connection.getBufferedMutator(params);
-        while (true) {
-            for (int i = 0; i < rows; ++i) {
-                mutations.clear();
-                Put put = new Put(toBytes(keys.get(i)));
-                put.addColumn(family1, family1_column1, family1_value);
-                put.addColumn(family1, family1_column2, family1_value);
-                put.addColumn(family1, family1_column3, family1_value);
-                put.addColumn(family2, family2_column1, family2_value);
-                put.addColumn(family3, family3_column1, family2_value);
-                put.addColumn(family3, family3_column2, family3_value);
-                mutations.add(put);
-                if (i % 3 == 0) { // 0, 3, 6, 9
-                    Delete delete = new Delete(toBytes(keys.get(i)));
-                    delete.addFamily(family1);
-                    delete.addFamily(family2);
-                    mutations.add(delete);
-                }
-                mutator.mutate(mutations);
-            }
-
-            get = new Get(toBytes("Key0"));
-            result = multiCfHTable.get(get);
-            if (!result.isEmpty()) {
-                break;
-            }
-        }
-        get = new Get(toBytes("Key2"));
-        get.setMaxVersions();
-        result = multiCfHTable.get(get);
-        count = result.rawCells().length;
-        Assert.assertTrue(count > 0);
-        // test timer periodic flush
-        int lastUndealtCount = ((OHBufferedMutatorImpl) mutator).size();
-        Thread.sleep(1000);
-        int currentUndealtCount = ((OHBufferedMutatorImpl) mutator).size();
-        Assert.assertNotEquals(lastUndealtCount, currentUndealtCount);
-        // after periodic flush, all mutations will be committed
-        Assert.assertEquals(0, currentUndealtCount);
-        result = multiCfHTable.get(get);
-        int newCount = result.rawCells().length;
-        Assert.assertNotEquals(count, newCount);
-
         // clean data
         mutations.clear();
         for (String key : keys) {

@@ -35,18 +35,18 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 
 public class ObHTableTestUtil {
     // please consult your dba for the following configuration.
-    public static String       PARAM_URL      = "";
-    public static String       FULL_USER_NAME = "";
+    public static String       PARAM_URL      = "http://ocp-cfg.alibaba.net:8080/services?User_ID=alibaba&UID=test&Action=ObRootServiceInfo&ObCluster=ob124.maochongxin.mcx.11.158.97.239&database=test";
+    public static String       FULL_USER_NAME = "root@mysql_tenant#ob124.maochongxin.mcx.11.158.97.239";
     public static String       PASSWORD       = "";
-    public static String       SYS_USER_NAME  = "";
-    public static String       SYS_PASSWORD   = "";
+    public static String       SYS_USER_NAME  = "proxyro";
+    public static String       SYS_PASSWORD   = "3u^0kCdpE";
     public static String       ODP_ADDR       = "";
     public static int          ODP_PORT       = 0;
     public static boolean      ODP_MODE       = false;
-    public static String       DATABASE       = "";
-    public static String       JDBC_IP        = "";
-    public static String       JDBC_PORT      = "";
-    public static String       JDBC_DATABASE  = "";
+    public static String       DATABASE       = "test";
+    public static String       JDBC_IP        = "11.158.97.239";
+    public static String       JDBC_PORT      = "55605";
+    public static String       JDBC_DATABASE  = "test";
     public static String       JDBC_URL       = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
                                                 + JDBC_DATABASE + "?" + "useUnicode=TRUE&"
                                                 + "characterEncoding=utf-8&"

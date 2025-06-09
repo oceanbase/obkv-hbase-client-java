@@ -5,6 +5,7 @@ import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import org.apache.commons.cli.Option;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
@@ -16,7 +17,6 @@ import org.apache.hadoop.hbase.quotas.QuotaFilter;
 import org.apache.hadoop.hbase.quotas.QuotaRetriever;
 import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
-import org.apache.hadoop.hbase.replication.ReplicationException;
 import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.replication.ReplicationPeerDescription;
 import org.apache.hadoop.hbase.snapshot.HBaseSnapshotException;
@@ -428,11 +428,6 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void flushRegionServer(ServerName serverName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
     public void compact(TableName tableName) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
@@ -482,6 +477,21 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Compact all regions on the region server. Asynchronous operation in that this method requests
+     * that a Compaction run and then it returns. It does not wait on the completion of Compaction
+     * (it can take a while).
+     *
+     * @param sn    the region server name
+     * @param major if it's major compaction
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    @Override
+    public void compactRegionServer(ServerName sn, boolean major) throws IOException, InterruptedException {
+        throw new FeatureNotSupportedException("does not support yet");
+    }
+
     @Override
     public void majorCompact(TableName tableName, CompactType compactType) throws IOException, InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
@@ -489,16 +499,6 @@ public class OHAdmin implements Admin {
 
     @Override
     public void majorCompact(TableName tableName, byte[] bytes, CompactType compactType) throws IOException, InterruptedException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public void compactRegionServer(ServerName serverName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public void majorCompactRegionServer(ServerName serverName) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -539,11 +539,6 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean isBalancerEnabled() throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public CacheEvictionStats clearBlockCache(TableName tableName) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -672,25 +667,64 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Get whole cluster status, containing status about:
+     * <pre>
+     * hbase version
+     * cluster id
+     * primary/backup master(s)
+     * master's coprocessors
+     * live/dead regionservers
+     * balancer
+     * regions in transition
+     * </pre>
+     *
+     * @return cluster status
+     * @throws IOException if a remote or network exception occurs
+     */
     @Override
-    public ClusterMetrics getClusterMetrics(EnumSet<ClusterMetrics.Option> enumSet) throws IOException {
+    public ClusterStatus getClusterStatus() throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Get cluster status with a set of {@link Option} to get desired status.
+     *
+     * @param options
+     * @return cluster status
+     * @throws IOException if a remote or network exception occurs
+     */
     @Override
-    public List<RegionMetrics> getRegionMetrics(ServerName serverName) throws IOException {
+    public ClusterStatus getClusterStatus(EnumSet<ClusterStatus.Option> options) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Get {@link RegionLoad} of all regions hosted on a regionserver.
+     *
+     * @param serverName region server from which regionload is required.
+     * @return region load map of all regions hosted on a region server
+     * @throws IOException if a remote or network exception occurs
+     */
     @Override
-    public List<RegionMetrics> getRegionMetrics(ServerName serverName, TableName tableName) throws IOException {
-        if (tableName == null) {
-            throw new FeatureNotSupportedException("does not support tableName is null");
-        }
+    public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName) throws IOException {
+        throw new FeatureNotSupportedException("does not support yet");
+    }
+
+    /**
+     * Get {@link RegionLoad} of all regions hosted on a regionserver for a table.
+     *
+     * @param serverName region server from which regionload is required.
+     * @param tableName  get region load of regions belonging to the table
+     * @return region load map of all regions of a table hosted on a region server
+     * @throws IOException if a remote or network exception occurs
+     */
+    @Override
+    public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName, TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
         ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHRegionMetricsExecutor executor = new OHRegionMetricsExecutor(tableClient);
-        return executor.getRegionMetrics(tableName.getNameAsString());
+        OHRegionLoadExecutor executor = new OHRegionLoadExecutor(tableName.getNameAsString(), tableClient);
+        return executor.getRegionLoad();
     }
 
     @Override
@@ -804,6 +838,17 @@ public class OHAdmin implements Admin {
 
     @Override
     public void rollWALWriter(ServerName serverName) throws IOException, FailedLogCloseException {
+        throw new FeatureNotSupportedException("does not support yet");
+    }
+
+    /**
+     * Helper that delegates to getClusterStatus().getMasterCoprocessors().
+     *
+     * @return an array of master coprocessors
+     * @see ClusterStatus#getMasterCoprocessors()
+     */
+    @Override
+    public String[] getMasterCoprocessors() throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -993,11 +1038,6 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public List<QuotaSettings> getQuota(QuotaFilter quotaFilter) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
     public CoprocessorRpcChannel coprocessorService() {
         throw new FeatureNotSupportedException("does not support yet");
     }
@@ -1022,28 +1062,27 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Turn the Split or Merge switches on or off.
+     *
+     * @param enabled     enabled or not
+     * @param synchronous If <code>true</code>, it waits until current split() call, if outstanding, to return.
+     * @param switchTypes switchType list {@link MasterSwitchType}
+     * @return Previous switch value array
+     */
     @Override
-    public boolean splitSwitch(boolean b, boolean b1) throws IOException {
+    public boolean[] splitOrMergeEnabledSwitch(boolean enabled, boolean synchronous, MasterSwitchType... switchTypes) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
+    /**
+     * Query the current state of the switch.
+     *
+     * @param switchType
+     * @return <code>true</code> if the switch is enabled, <code>false</code> otherwise.
+     */
     @Override
-    public boolean mergeSwitch(boolean b, boolean b1) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public boolean isSplitEnabled() throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public boolean isMergeEnabled() throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public void addReplicationPeer(String s, ReplicationPeerConfig replicationPeerConfig, boolean b) throws IOException {
+    public boolean splitOrMergeEnabledSwitch(MasterSwitchType switchType) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1069,16 +1108,6 @@ public class OHAdmin implements Admin {
 
     @Override
     public void updateReplicationPeerConfig(String s, ReplicationPeerConfig replicationPeerConfig) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public void appendReplicationPeerTableCFs(String s, Map<TableName, List<String>> map) throws ReplicationException, IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-    }
-
-    @Override
-    public void removeReplicationPeerTableCFs(String s, Map<TableName, List<String>> map) throws ReplicationException, IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1124,6 +1153,16 @@ public class OHAdmin implements Admin {
 
     @Override
     public void clearCompactionQueues(ServerName serverName, Set<String> set) throws IOException, InterruptedException {
+        throw new FeatureNotSupportedException("does not support yet");
+    }
+
+    /**
+     * List dead region servers.
+     *
+     * @return List of dead region servers.
+     */
+    @Override
+    public List<ServerName> listDeadServers() throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
