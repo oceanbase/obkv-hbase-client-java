@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase;
 
-import com.alipay.oceanbase.hbase.util.OHRegionMetrics;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.ResultSetPrinter;
@@ -40,6 +39,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.Map;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
@@ -429,7 +429,7 @@ public class OHTableAdminInterfaceTest {
     }
 
     @Test
-    public void testAdminGetRegionMetrics() throws Exception {
+    public void testRegionLoad() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
         st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
@@ -510,27 +510,27 @@ public class OHTableAdminInterfaceTest {
         // test tablegroup not existed
         IOException thrown = assertThrows(IOException.class,
                 () -> {
-                    admin.getRegionMetrics(null, TableName.valueOf("tablegroup_not_exists"));
+                    admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf("tablegroup_not_exists"));
                 });
         Assert.assertTrue(thrown.getCause() instanceof ObTableException);
         Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
 
-        // test use serverName without tableName to get region metrics
+        // test use serverName without tableName to get region load
         assertThrows(FeatureNotSupportedException.class,
                 () -> {
-                    admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
+                    admin.getRegionLoad(ServerName.valueOf("localhost,1,1"));
                 });
 
-        // test single-thread getRegionMetrics after writing
+        // test single-thread getRegionLoad after writing
         batchInsert(100000, tablegroup1);
         // test ServerName is any string
         long start = System.currentTimeMillis();
-        List<RegionMetrics> metrics = admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
+        Map<byte[], RegionLoad> regionLoadMap = admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
         long cost = System.currentTimeMillis() - start;
-        System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + tablegroup1);
-        assertEquals(30, metrics.size());
+        System.out.println("get region load time usage: " + cost + "ms, tablegroup: " + tablegroup1);
+        assertEquals(30, regionLoadMap.size());
 
-        // test getRegionMetrics concurrently reading while writing
+        // test getRegionLoad concurrently reading while writing
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         CountDownLatch latch = new CountDownLatch(100);
         List<Exception> exceptionCatcher = new ArrayList<>();
@@ -539,25 +539,25 @@ public class OHTableAdminInterfaceTest {
             executorService.submit(() -> {
                 try {
                     if (taskId % 2 == 1) {
-                        List<RegionMetrics> regionMetrics = null;
-                        // test get regionMetrics from different namespaces
+                        Map<byte[], RegionLoad> regionLoad = null;
+                        // test get regionLoad from different namespaces
                         if (taskId % 3 != 0) {
                             long thrStart = System.currentTimeMillis();
-                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
+                            regionLoad = admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
                             long thrCost = System.currentTimeMillis() - thrStart;
-                            System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                            if (regionMetrics.size() != 30) {
+                            System.out.println("task: " + taskId + ", get region load time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
+                            if (regionLoad.size() != 30) {
                                 throw new ObTableGetException(
-                                        "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+                                        "the number of region load does not match the number of tablets, the number of region load: " + regionLoad.size());
                             }
                         } else {
                             long thrStart = System.currentTimeMillis();
-                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
+                            regionLoad = admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup2));
                             long thrCost = System.currentTimeMillis() - thrStart;
-                            System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                            if (regionMetrics.size() != 9) {
+                            System.out.println("task: " + taskId + ", get region load time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
+                            if (regionLoad.size() != 9) {
                                 throw new ObTableGetException(
-                                        "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+                                        "the number of region load does not match the number of tablets, the number of region load: " + regionLoad.size());
                             }
                         }
                     } else {
@@ -598,14 +598,14 @@ public class OHTableAdminInterfaceTest {
         executorService.shutdownNow();
         Assert.assertTrue(exceptionCatcher.isEmpty());
 
-        // test getRegionMetrics from non-partitioned table
+        // test getRegionLoad from non-partitioned table
         String non_part_tablegroup = "test_no_part";
         batchInsert(10000, non_part_tablegroup);
         start = System.currentTimeMillis();
-        metrics = admin.getRegionMetrics(null, TableName.valueOf(non_part_tablegroup));
+        regionLoadMap = admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf(non_part_tablegroup));
         cost = System.currentTimeMillis() - start;
-        System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + non_part_tablegroup);
-        assertEquals(3, metrics.size());
+        System.out.println("get region load time usage: " + cost + "ms, tablegroup: " + non_part_tablegroup);
+        assertEquals(3, regionLoadMap.size());
     }
 
     @Test

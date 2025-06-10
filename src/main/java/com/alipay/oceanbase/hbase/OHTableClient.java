@@ -23,6 +23,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.CompareOperator;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
@@ -35,7 +36,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static com.alipay.oceanbase.hbase.OHTable.getCompareOp;
 
 public class OHTableClient implements Table, Lifecycle {
     private byte[]              tableName;
@@ -174,9 +178,14 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
-    public CheckAndMutateBuilder checkAndMutate(byte[] row, byte[] family) {
+    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, RowMutations mutation) throws IOException {
+        return checkAndMutate(row, family, qualifier, getCompareOp(op), value, mutation);
+    }
+
+    @Override
+    public long getRpcTimeout(TimeUnit unit) {
         checkStatus();
-        return ohTable.checkAndMutate(row, family);
+        return ohTable.getRpcTimeout(unit);
     }
 
     @Override
@@ -195,6 +204,48 @@ public class OHTableClient implements Table, Lifecycle {
     public void setRpcTimeout(int i) {
         checkStatus();
         ohTable.setRpcTimeout(i);
+    }
+
+    @Override
+    public long getReadRpcTimeout(TimeUnit unit) {
+        checkStatus();
+        return ohTable.getReadRpcTimeout(unit);
+    }
+
+    @Override
+    public int getReadRpcTimeout() {
+        checkStatus();
+        return ohTable.getReadRpcTimeout();
+    }
+
+    @Override
+    public void setReadRpcTimeout(int readRpcTimeout) {
+        checkStatus();
+        ohTable.setReadRpcTimeout(readRpcTimeout);
+    }
+
+    @Override
+    public long getWriteRpcTimeout(TimeUnit unit) {
+        checkStatus();
+        return ohTable.getWriteRpcTimeout(unit);
+    }
+
+    @Override
+    public int getWriteRpcTimeout() {
+        checkStatus();
+        return ohTable.getWriteRpcTimeout();
+    }
+
+    @Override
+    public void setWriteRpcTimeout(int writeRpcTimeout) {
+        checkStatus();
+        ohTable.setWriteRpcTimeout(writeRpcTimeout);
+    }
+
+    @Override
+    public long getOperationTimeout(TimeUnit unit) {
+        checkStatus();
+        return ohTable.getOperationTimeout(unit);
     }
 
     @Override
@@ -324,6 +375,11 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
+    public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Put put) throws IOException {
+        return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
+    }
+
+    @Override
     public void delete(Delete delete) throws IOException {
         checkStatus();
         ohTable.delete(delete);
@@ -348,6 +404,11 @@ public class OHTableClient implements Table, Lifecycle {
                                                                                                  throws IOException {
         checkStatus();
         return ohTable.checkAndDelete(row, family, qualifier, compareOp, value, delete);
+    }
+
+    @Override
+    public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Delete delete) throws IOException {
+        return ohTable.checkAndDelete(row, family, qualifier, getCompareOp(op), value, delete);
     }
 
     // Not support.

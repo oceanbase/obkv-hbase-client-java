@@ -19,11 +19,11 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
-import org.apache.hbase.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -59,7 +59,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private final AtomicLong                      writeBufferPeriodicFlushTimeoutMs   = new AtomicLong(
                                                                                           0);
     private final AtomicLong                      writeBufferPeriodicFlushTimerTickMs = new AtomicLong(
-                                                                                          MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
+                                                                                          0);
     private Timer                                 writeBufferPeriodicFlushTimer       = null;
 
     private final long                            writeBufferSize;
@@ -95,14 +95,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.operationTimeout = new AtomicInteger(
             params.getOperationTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
                 .getOperationTimeout() : connectionConfig.getOperationTimeout());
-
-        long newPeriodicFlushTimeoutMs = params.getWriteBufferPeriodicFlushTimeoutMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
-            .getWriteBufferPeriodicFlushTimeoutMs() : connectionConfig
-            .getWriteBufferPeriodicFlushTimeoutMs();
-        long newPeriodicFlushTimeIntervalMs = params.getWriteBufferPeriodicFlushTimerTickMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
-            .getWriteBufferPeriodicFlushTimerTickMs() : connectionConfig
-            .getWriteBufferPeriodicFlushTimerTickMs();
-        this.setWriteBufferPeriodicFlush(newPeriodicFlushTimeoutMs, newPeriodicFlushTimeIntervalMs);
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
@@ -211,41 +203,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     /**
-     * set time for periodic flush timer
-     * @param timeoutMs control when to flush from collecting first mutation
-     * @param timerTickMs control time interval to trigger the timer
-     * */
-    @Override
-    public synchronized void setWriteBufferPeriodicFlush(long timeoutMs, long timerTickMs) {
-        long originalTimeoutMs = this.writeBufferPeriodicFlushTimeoutMs.get();
-        long originalTimeTickMs = this.writeBufferPeriodicFlushTimerTickMs.get();
-
-        writeBufferPeriodicFlushTimeoutMs.set(Math.max(0, timeoutMs));
-        writeBufferPeriodicFlushTimerTickMs.set(Math.max(
-            MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS, timerTickMs));
-
-        // if time parameters are updated, stop the old timer
-        if (writeBufferPeriodicFlushTimeoutMs.get() != originalTimeoutMs
-            || writeBufferPeriodicFlushTimerTickMs.get() != originalTimeTickMs) {
-            if (writeBufferPeriodicFlushTimer != null) {
-                writeBufferPeriodicFlushTimer.cancel();
-                writeBufferPeriodicFlushTimer = null;
-            }
-        }
-
-        if (writeBufferPeriodicFlushTimer == null && writeBufferPeriodicFlushTimeoutMs.get() > 0) {
-            writeBufferPeriodicFlushTimer = new Timer(true);
-            writeBufferPeriodicFlushTimer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    OHBufferedMutatorImpl.this.timeTriggerForWriteBufferPeriodicFlush();
-                }
-            }, this.writeBufferPeriodicFlushTimerTickMs.get(),
-                this.writeBufferPeriodicFlushTimerTickMs.get());
-        }
-    }
-
-    /**
      * Send the operations in the buffer to the servers. Does not wait for the server's answer. If
      * there is an error, either throw the error, or use the listener to deal with the error.
      *
@@ -303,21 +260,14 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
-    /**
-     * reset the time parameters and cancel the timer (if exists)
-     * */
-    @Override
-    public void disableWriteBufferPeriodicFlush() {
-        setWriteBufferPeriodicFlush(0, MIN_WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS);
-    }
-
+    
     @Override
     public void close() throws IOException {
         if (closed) {
             return;
         }
         // reset timeout, timeTick and Timer
-        disableWriteBufferPeriodicFlush();
+//        disableWriteBufferPeriodicFlush();
         try {
             execute(true);
         } finally {
@@ -345,16 +295,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     public void flush() throws IOException {
         checkClose();
         execute(true);
-    }
-
-    @Override
-    public long getWriteBufferPeriodicFlushTimeoutMs() {
-        return writeBufferPeriodicFlushTimeoutMs.get();
-    }
-
-    @Override
-    public long getWriteBufferPeriodicFlushTimerTickMs() {
-        return writeBufferPeriodicFlushTimerTickMs.get();
     }
 
     @Override
