@@ -55,7 +55,13 @@ public class ObHTableTestUtil {
                                                 + "oceanbase?" + "useUnicode=TRUE&"
                                                 + "characterEncoding=utf-8&"
                                                 + "socketTimeout=3000000&" + "connectTimeout=60000";
+    public static String       SYS_TENANT_JDBC_URL = "jdbc:mysql://" + JDBC_IP + ":" + JDBC_PORT + "/ "
+                                                + "oceanbase?" + "useUnicode=TRUE&"
+                                                + "characterEncoding=utf-8&"
+                                                + "socketTimeout=3000000&" + "connectTimeout=60000";
 
+    public static String       SYS_TENANT_USER_NAME = "root@sys";
+    public static String       SYS_TENANT_PASSWORD = "";
     public static String       SQL_FORMAT     = "truncate %s";
     public static List<String> tableNameList  = new LinkedList<String>();
     public static Connection   conn;
@@ -172,6 +178,17 @@ public class ObHTableTestUtil {
         }
     }
 
+    static public Connection getSysTenantConnection() {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection conn = DriverManager
+                .getConnection(SYS_TENANT_JDBC_URL, SYS_TENANT_USER_NAME, SYS_TENANT_PASSWORD);
+            return conn;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @FunctionalInterface
     public interface CheckedConsumer<T> {
         void accept(T t) throws Throwable;
@@ -233,5 +250,42 @@ public class ObHTableTestUtil {
     public static void executeSQL(Connection conn, String sql, boolean printSQL) throws SQLException {
         System.out.println("execute sql: " + sql);
         conn.createStatement().execute(sql);
+    }
+
+    @FunctionalInterface
+    public interface CheckedRunnable {
+        void run() throws Exception;
+    }
+
+    public static void executeIgnoreUnexpectedError(CheckedRunnable operation) throws Exception {
+        executeIgnoreExpectedErrors(operation, "OB_ERR_UNEXPECTED");
+    }
+
+    public static void executeIgnoreExpectedErrors(CheckedRunnable operation, String... expectedErrorMessages) throws Exception {
+        try {
+            operation.run();
+        } catch (Exception e) {
+            boolean shouldIgnore = false;
+            String[] messagesToCheck = {
+                e.getMessage(),
+                e.getCause() != null ? e.getCause().getMessage() : null
+            };
+            
+            for (String expectedMessage : expectedErrorMessages) {
+                for (String actualMessage : messagesToCheck) {
+                    if (actualMessage != null && actualMessage.contains(expectedMessage)) {
+                        shouldIgnore = true;
+                        break;
+                    }
+                }
+                if (shouldIgnore) {
+                    break;
+                }
+            }
+            
+            if (!shouldIgnore) {
+                throw e;
+            }
+        }
     }
 }

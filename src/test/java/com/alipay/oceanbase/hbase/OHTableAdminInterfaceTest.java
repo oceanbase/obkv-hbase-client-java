@@ -67,6 +67,58 @@ public class OHTableAdminInterfaceTest {
         return ohTablePool;
     }
 
+    enum ErrSimPoint {
+        EN_CREATE_HTABLE_TG_FINISH_ERR(2621),
+        EN_CREATE_HTABLE_CF_FINISH_ERR(2622),
+        EN_DISABLE_HTABLE_CF_FINISH_ERR(2623),
+        EN_DELETE_HTABLE_CF_FINISH_ERR(2624);
+        
+        private final int errCode;
+        
+        ErrSimPoint(int errCode) {
+            this.errCode = errCode;
+        }
+        
+        public int getErrCode() {
+            return errCode;
+        }
+    }
+
+    private void setErrSimPoint(ErrSimPoint errSimPoint, boolean enable) {
+        java.sql.Connection connection = null;
+        java.sql.Statement statement = null;
+        
+        try {
+            connection = ObHTableTestUtil.getSysTenantConnection();
+            statement = connection.createStatement();
+            
+            String sql = String.format(
+                "alter system set_tp tp_no = %d, error_code = 4016, frequency = %d",
+                errSimPoint.getErrCode(),
+                enable ? 1 : 0
+            );
+            
+            statement.execute(sql);            
+        } catch (Exception e) {
+            throw new RuntimeException("Error injection setup failed", e);
+        } finally {
+            if (statement != null) {
+                try {
+                    statement.close();
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        }
+    }
+
     @Test
     public void testGetStartEndKeysOHTableClientRange() throws Exception {
         // Init OHTableClient
@@ -1208,5 +1260,73 @@ public class OHTableAdminInterfaceTest {
         String value = resultSet.getString(1);
         Assert.assertEquals(kvAttributes, value);
         Assert.assertFalse(resultSet.next());
+    }
+    
+    // NOTE: observer should build with `-DOB_ERRSIM=ON` option, otherwise the test will fail
+    // This test verifies error injection scenarios for table operations
+    @Test
+    public void testCreateTableInjectError() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        byte[] tableName = Bytes.toBytes("test_create_table_inject_error");
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        byte[] cf3 = Bytes.toBytes("cf3");
+        
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+        
+        HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
+        htd.addFamily(hcd1);
+        htd.addFamily(hcd2);
+        htd.addFamily(hcd3);
+        
+        // 1. open err EN_CREATE_HTABLE_TG_FINISH_ERR
+        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, true);
+        ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
+        assertFalse("Table should not exist after TG error injection", 
+                   admin.tableExists(TableName.valueOf(tableName)));
+        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, false);
+        
+        // 2. open err EN_CREATE_HTABLE_CF_FINISH_ERR
+        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, true);
+        ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
+        assertFalse("Table should not exist after CF error injection", 
+                   admin.tableExists(TableName.valueOf(tableName)));
+        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, false);
+        
+        // 3. create table without error
+        admin.createTable(htd);
+        assertTrue("Table should exist after normal creation", 
+                  admin.tableExists(TableName.valueOf(tableName)));
+        assertEquals("Table should have 3 column families", 3, 
+                    admin.getTableDescriptor(TableName.valueOf(tableName)).getFamilies().size());
+        
+        // 4. open err EN_DISABLE_HTABLE_CF_FINISH_ERR
+        setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, true);
+        admin.disableTable(TableName.valueOf(tableName));
+        assertFalse("Table should not be disabled after disable error injection", 
+                   admin.isTableDisabled(TableName.valueOf(tableName)));
+        setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, false);
+        
+        // 5. disable table without error
+        admin.disableTable(TableName.valueOf(tableName));
+        assertTrue("Table should be disabled after normal disable", 
+                  admin.isTableDisabled(TableName.valueOf(tableName)));
+        
+        // 6. open err EN_DELETE_HTABLE_CF_FINISH_ERR
+        setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, true);
+        admin.deleteTable(TableName.valueOf(tableName));
+        assertTrue("Table should still exist after delete error injection", 
+                  admin.tableExists(TableName.valueOf(tableName)));
+        setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, false);
+        
+        // 7. delete table without error
+        admin.deleteTable(TableName.valueOf(tableName));
+        assertFalse("Table should not exist after normal delete", 
+                   admin.tableExists(TableName.valueOf(tableName)));
     }
 }
