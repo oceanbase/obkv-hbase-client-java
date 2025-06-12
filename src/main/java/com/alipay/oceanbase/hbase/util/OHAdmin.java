@@ -248,20 +248,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public void enableTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-//        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-//        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-//        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
-//        try {
-//            executor.enableTable(tableName.getNameAsString());
-//        } catch (IOException e) {
-//            if (e.getCause() instanceof ObTableTransportException
-//                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-//                throw new TimeoutIOException(e.getCause());
-//            } else {
-//                throw e;
-//            }
-//        }
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
+        try {
+            executor.enableTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -313,14 +312,12 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean isTableEnabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-//        return isDisabled(tableName) == false;
+        return isDisabled(tableName) == false;
     }
 
     @Override
     public boolean isTableDisabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-//        return isDisabled(tableName) == true;
+        return isDisabled(tableName) == true;
     }
 
     private boolean isDisabled(TableName tableName) throws IOException {
