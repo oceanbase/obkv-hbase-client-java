@@ -1,7 +1,25 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -11,16 +29,15 @@ import org.apache.hadoop.hbase.RegionMetrics;
 import org.apache.hadoop.hbase.Size;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<RegionMetrics>> {
     private final ObTableClient tableClient;
+
     OHRegionMetricsExecutor(ObTableClient tableClient) {
         this.tableClient = tableClient;
     }
+
     @Override
     public ObTableRpcMetaType getMetaType() throws IOException {
         return ObTableRpcMetaType.HTABLE_REGION_METRICS;
@@ -38,13 +55,21 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
     * */
     @Override
     public List<RegionMetrics> parse(ObTableMetaResponse response) throws IOException {
+        final ObjectMapper objectMapper = new ObjectMapper();
+        final JsonNode jsonMap = Optional.<JsonNode>ofNullable(objectMapper.readTree(response.getData()))
+                .orElseThrow(() -> new IOException("jsonMap is null"));
+        JsonNode tableGroupNameNode = Optional.<JsonNode>ofNullable(jsonMap.get("tableName"))
+                .orElseThrow(() -> new IOException("tableName is null"));
+        String tableGroupName = tableGroupNameNode.asText();
+        JsonNode regionListNode = Optional.<JsonNode>ofNullable(jsonMap.get("regionList"))
+                .orElseThrow(() -> new IOException("regionList is null"));
+        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("regions"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("regions is null"));
+        List<Integer> memTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("memTableSize"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("memTableSize is null"));
+        List<Integer> ssTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("ssTableSize"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("ssTableSize is null"));
         List<RegionMetrics> metricsList = new ArrayList<>();
-        JSONObject metrcisJSONObject = JSON.parseObject(response.getData());
-        String tableGroupName = metrcisJSONObject.getString("tableName");
-        JSONObject regionList = metrcisJSONObject.getJSONObject("regionList");
-        List<Integer> regions = regionList.getJSONArray("regions").toJavaList(Integer.class);
-        List<Integer> memTableSizeList = regionList.getJSONArray("memTableSize").toJavaList(Integer.class);
-        List<Integer> ssTableSizeList = regionList.getJSONArray("ssTableSize").toJavaList(Integer.class);
         if (regions.isEmpty() || regions.size() != memTableSizeList.size() || memTableSizeList.size() != ssTableSizeList.size()) {
             throw new IOException("size length has to be the same");
         }
@@ -64,7 +89,8 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-        String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
         return execute(tableClient, request);
     }

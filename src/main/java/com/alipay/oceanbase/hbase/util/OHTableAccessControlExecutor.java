@@ -1,6 +1,23 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -15,7 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Void> {
-    private final ObTableClient tableClient;
+    private final ObTableClient      tableClient;
     private final ObTableRpcMetaType type;
 
     OHTableAccessControlExecutor(ObTableClient tableClient, ObTableRpcMetaType type) {
@@ -38,7 +55,8 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-        String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
         execute(tableClient, request);
     }
@@ -48,7 +66,8 @@ public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Vo
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-        String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
         execute(tableClient, request);
     }

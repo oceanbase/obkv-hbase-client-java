@@ -1,7 +1,25 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -18,7 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTableDescriptor> {
-    private final String tableName;
+    private final String        tableName;
     private final ObTableClient client;
 
     public OHTableDescriptorExecutor(String tableName, ObTableClient client) {
@@ -30,35 +48,35 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
     public HTableDescriptor parse(ObTableMetaResponse response) throws IOException {
         try {
             final String jsonData = response.getData();
-            final JSONObject jsonMap = Optional.<JSONObject>ofNullable(JSON.parseObject(jsonData))
+            final ObjectMapper objectMapper = new ObjectMapper();
+            final JsonNode jsonMap = Optional.<JsonNode>ofNullable(objectMapper.readTree(jsonData))
                     .orElseThrow(() -> new IOException("jsonMap is null"));
             /*
             {
-              "cfDesc": {
+              "cfDescs": {
                 "cf1": {
-                  "TTL":604800 
+                  "TTL":604800
                 },
                 "cf2": {
-                  "TTL":259200 
+                  "TTL":259200
                 }
               },
               "tbDesc": {
-                "name":"test"
+                "name":"test",
+                "state":"disable" ("enable")
               }
             }
              */
             HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
-            JSONObject cfDesc = jsonMap.getJSONObject("cfDescs");
-            if (cfDesc != null) {
-                for (Map.Entry<String, Object> entry : cfDesc.entrySet()) {
-                    String cfName = entry.getKey();
-                    JSONObject attributes = (JSONObject) entry.getValue();
-                    HColumnDescriptor cf = new HColumnDescriptor(cfName);
-                    cf.setTimeToLive(attributes.getIntValue("TTL"));
-                    tableDescriptor.addFamily(cf);
-                }
-            } else {
-                throw new IOException("cfDesc is null");
+            JsonNode cfDescsNode = Optional.<JsonNode>ofNullable(jsonMap.get("cfDescs"))
+                    .orElseThrow(() -> new IOException("cfDesc is null"));
+            Map<String, Object> cfDescsMap = objectMapper.convertValue(cfDescsNode, new TypeReference<Map<String, Object>>(){});
+            for (Map.Entry<String, Object> entry : cfDescsMap.entrySet()) {
+                String cfName = entry.getKey();
+                JsonNode attributes = (JsonNode) entry.getValue();
+                HColumnDescriptor cf = new HColumnDescriptor(cfName);
+                cf.setTimeToLive(attributes.get("TTL").asInt());
+                tableDescriptor.addFamily(cf);
             }
             return tableDescriptor;
         } catch (IllegalArgumentException e) {
@@ -71,14 +89,13 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         return ObTableRpcMetaType.HTABLE_GET_DESC;
     }
 
-
     public HTableDescriptor getTableDescriptor() throws IOException {
         final ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         final Map<String, String> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-
-        final String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        final String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
 
         return execute(client, request);
@@ -90,22 +107,21 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         request.setMetaType(getMetaType());
         final Map<String, String> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-
-        final String jsonData = JSON.toJSONString(requestData);
+        final ObjectMapper objectMapper = new ObjectMapper();
+        final String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
         try {
             ObTableMetaResponse response = innerExecute(client, request);
             final String responseData = response.getData();
-            final JSONObject jsonMap = Optional.<JSONObject>ofNullable(JSON.parseObject(responseData))
+            final JsonNode jsonMap = Optional.<JsonNode>ofNullable(objectMapper.readTree(responseData))
                     .orElseThrow(() -> new IOException("jsonMap is null"));
-            JSONObject tbDesc = jsonMap.getJSONObject("tableDesc");
-            if (tbDesc != null) {
-                String state = tbDesc.getString("state");
-                if (state.compareToIgnoreCase("disable") == 0) {
-                    isDisable = true;
-                } else {
-                    isDisable = false;
-                }
+            JsonNode tbDesc = Optional.<JsonNode>ofNullable(jsonMap.get("tableDesc"))
+                    .orElseThrow(() -> new IOException("tableDesc is null"));
+            String state = tbDesc.get("state").asText();
+            if (state.compareToIgnoreCase("disable") == 0) {
+                isDisable = true;
+            } else {
+                isDisable = false;
             }
         } catch (IOException e) {
             throw e;
@@ -113,7 +129,8 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         return isDisable;
     }
 
-    private ObTableMetaResponse innerExecute(ObTableClient client, ObTableMetaRequest request) throws IOException {
+    private ObTableMetaResponse innerExecute(ObTableClient client, ObTableMetaRequest request)
+                                                                                              throws IOException {
         if (request.getMetaType() != getMetaType()) {
             throw new IOException("Invalid meta type, expected " + getMetaType());
         }
