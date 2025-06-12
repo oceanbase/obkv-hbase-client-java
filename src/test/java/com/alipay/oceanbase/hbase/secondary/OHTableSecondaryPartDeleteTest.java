@@ -571,7 +571,7 @@ public class OHTableSecondaryPartDeleteTest {
     public void testMultiCFDeleteFamilyWithVersion() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyWithVersionImpl);
     }
-    
+
     @Test
     public void testMultiCFDeleteFamilyVersion() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartDeleteTest::testMultiCFDeleteFamilyVersionImpl);

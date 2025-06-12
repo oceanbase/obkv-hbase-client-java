@@ -31,7 +31,6 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;

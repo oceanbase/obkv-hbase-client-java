@@ -18,7 +18,6 @@
 package com.alipay.oceanbase.hbase.util;
 
 import org.apache.hadoop.hbase.RegionLoad;
-import org.apache.hadoop.hbase.shaded.protobuf.generated.ClusterStatusProtos;
 
 public class OHRegionLoad extends RegionLoad {
     private final byte[] name;         // tablet_name, id in String

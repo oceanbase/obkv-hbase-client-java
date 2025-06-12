@@ -1,3 +1,20 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
@@ -477,16 +494,6 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Compact all regions on the region server. Asynchronous operation in that this method requests
-     * that a Compaction run and then it returns. It does not wait on the completion of Compaction
-     * (it can take a while).
-     *
-     * @param sn    the region server name
-     * @param major if it's major compaction
-     * @throws IOException
-     * @throws InterruptedException
-     */
     @Override
     public void compactRegionServer(ServerName sn, boolean major) throws IOException, InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
@@ -667,58 +674,21 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Get whole cluster status, containing status about:
-     * <pre>
-     * hbase version
-     * cluster id
-     * primary/backup master(s)
-     * master's coprocessors
-     * live/dead regionservers
-     * balancer
-     * regions in transition
-     * </pre>
-     *
-     * @return cluster status
-     * @throws IOException if a remote or network exception occurs
-     */
     @Override
     public ClusterStatus getClusterStatus() throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Get cluster status with a set of {@link Option} to get desired status.
-     *
-     * @param options
-     * @return cluster status
-     * @throws IOException if a remote or network exception occurs
-     */
     @Override
     public ClusterStatus getClusterStatus(EnumSet<ClusterStatus.Option> options) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Get {@link RegionLoad} of all regions hosted on a regionserver.
-     *
-     * @param serverName region server from which regionload is required.
-     * @return region load map of all regions hosted on a region server
-     * @throws IOException if a remote or network exception occurs
-     */
     @Override
     public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Get {@link RegionLoad} of all regions hosted on a regionserver for a table.
-     *
-     * @param serverName region server from which regionload is required.
-     * @param tableName  get region load of regions belonging to the table
-     * @return region load map of all regions of a table hosted on a region server
-     * @throws IOException if a remote or network exception occurs
-     */
     @Override
     public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName, TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
@@ -1062,25 +1032,11 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Turn the Split or Merge switches on or off.
-     *
-     * @param enabled     enabled or not
-     * @param synchronous If <code>true</code>, it waits until current split() call, if outstanding, to return.
-     * @param switchTypes switchType list {@link MasterSwitchType}
-     * @return Previous switch value array
-     */
     @Override
     public boolean[] splitOrMergeEnabledSwitch(boolean enabled, boolean synchronous, MasterSwitchType... switchTypes) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Query the current state of the switch.
-     *
-     * @param switchType
-     * @return <code>true</code> if the switch is enabled, <code>false</code> otherwise.
-     */
     @Override
     public boolean splitOrMergeEnabledSwitch(MasterSwitchType switchType) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");

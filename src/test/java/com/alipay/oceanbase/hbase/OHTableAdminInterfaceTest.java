@@ -32,7 +32,6 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.junit.Assert;
 import org.junit.Test;
 
-
 import java.io.IOException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -45,7 +44,7 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
-import static  com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
+import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 
 public class OHTableAdminInterfaceTest {
     public OHTablePool setUpLoadPool() throws IOException {
@@ -794,7 +793,6 @@ public class OHTableAdminInterfaceTest {
         System.out.println("execute sql: " + selectSql);
         resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
-
 
         // 4. test put/get some data
         Table table = connection.getTable(tableName);

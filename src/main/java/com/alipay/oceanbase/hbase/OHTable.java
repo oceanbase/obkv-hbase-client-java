@@ -618,11 +618,11 @@ public class OHTable implements Table {
                     Collections.singletonList(delete), true,
                     resultMapSingleOp);
         } else if (delete.getFamilyCellMap().size() > 1) {
-            boolean has_delete_family = delete.getFamilyCellMap().entrySet().stream()
+            boolean hasDeleteFamily = delete.getFamilyCellMap().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()).anyMatch(
                             kv -> kv.getTypeByte() == KeyValue.Type.DeleteFamily.getCode() ||
                                     kv.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode());
-            if (!has_delete_family) {
+            if (!hasDeleteFamily) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
                         resultMapSingleOp);

@@ -70,7 +70,6 @@ public class OHTableClientTest extends HTableTestBase {
         assertTrue(true);
     }
 
-
     /*
     CREATE TABLEGROUP test_desc SHARDING = 'ADAPTIVE';
     CREATE TABLE `test_desc$family1` (

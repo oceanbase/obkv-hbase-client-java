@@ -59,7 +59,7 @@ public class ObHTableSecondaryPartUtil {
 
     public static void alterTables(TableTemplateManager.TableType type, List<String> tableNames,
                                    Map<String, List<String>> group2tableNames, boolean printSql)
-            throws Exception {
+                                                                                                throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // single cf table
         if (tableNames != null) {
@@ -110,15 +110,15 @@ public class ObHTableSecondaryPartUtil {
                 System.out.println(sql);
                 conn.createStatement().execute(sql);
                 System.out.println("============= alter table: " + tableName + "  table_group: "
-                        + getTableName(tableName) + " =============\n"
-                        + (printSql ? sql : "")
-                        + " \n============= done =============\n");
+                                   + getTableName(tableName) + " =============\n"
+                                   + (printSql ? sql : "")
+                                   + " \n============= done =============\n");
             } catch (SQLSyntaxErrorException e) {
                 if (!e.getMessage().contains("already exists")) {
                     throw e;
                 } else {
                     System.out.println("============= table: " + tableName + "  table_group: "
-                            + getTableName(tableName) + " alter failed =============");
+                                       + getTableName(tableName) + " alter failed =============");
                 }
             }
         }
