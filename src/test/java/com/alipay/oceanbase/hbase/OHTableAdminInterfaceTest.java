@@ -35,6 +35,7 @@ import org.junit.Test;
 
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -780,17 +781,17 @@ public class OHTableAdminInterfaceTest {
         assertTrue(admin.tableExists(tableName));
         // TODO: show create table, need to be replace by getDescriptor
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
-        String selectSql = "show create table " + tableName.getNameAsString() + "$" + cf1;
+        String selectSql = "show create table " + tableName.getNameAsString() + "$" + Bytes.toString(cf1);
         System.out.println("execute sql: " + selectSql);
         java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
 
-        selectSql = "show create table " + tableName.getNameAsString() + "$" + cf2;
+        selectSql = "show create table " + tableName.getNameAsString() + "$" + Bytes.toString(cf2);
         System.out.println("execute sql: " + selectSql);
         resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
 
-        selectSql = "show create table " + tableName.getNameAsString() + "$" + cf3;
+        selectSql = "show create table " + tableName.getNameAsString() + "$" + Bytes.toString(cf3);
         System.out.println("execute sql: " + selectSql);
         resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
@@ -1032,5 +1033,199 @@ public class OHTableAdminInterfaceTest {
         delExecutorService.awaitTermination(1, TimeUnit.MINUTES);
         duration = System.currentTimeMillis() - start;
         System.out.println("delete " + tableNums + " tables cost " + duration + " ms.");
+    }
+
+    @Test
+    public void testHTableDDLDefense() throws Exception {
+        TableName tableName = TableName.valueOf("testHTableDefense");
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        // 1. construct htable desc and column family desc
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        hcd1.setMaxVersions(2);
+        hcd1.setTimeToLive(172800);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        hcd1.setMaxVersions(1);
+        hcd1.setTimeToLive(86400);
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+
+        // 2. execute create table and check exists
+        try {
+            HTableDescriptor htd = new HTableDescriptor(tableName);
+            htd.addFamily(hcd1);
+            htd.addFamily(hcd2);
+            admin.createTable(htd);
+            assertTrue(admin.tableExists(tableName));
+
+            /// execute the following ddl stmt in created by admin table, should be prohibited
+            // 4. alter table add constraint
+            try {
+                String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 5. alter table add index
+            try {
+                String sql = "alter table testHTableDefense$cf1 ADD INDEX idx_1(T)";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 5. alter table add fk
+            try {
+                String sql = "alter table testHTableDefense$cf1 MODIFY COLUMN V LONGTEXT";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 6. alter table modify column to lob
+            try {
+                String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 7. create trigger
+            try {
+                String sql = " CREATE TRIGGER hbase_trigger_1" +
+                             " AFTER INSERT ON testHTableDefense$cf1 FOR EACH ROW" +
+                             " BEGIN END";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 8. create view
+            try {
+                String sql = " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 9. alter view
+            try {
+                String sql = "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 10. create index
+            try {
+                String sql = " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+
+            // 11. explicit create table and specify created_by:admin, should be prohibited
+            try {
+                String sql = "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CREATED_BY\": \"ADMIN\"}}'";
+                System.out.println("execute sql: " + sql);
+                conn.createStatement().execute(sql);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+            }
+
+            // 12. alter table to created_by:admin, should be prohibited
+            try {
+                String sql1 = "CREATE TABLE testHTableDefense$cf3(a int primary key)";
+                System.out.println("execute sql: " + sql1);
+                conn.createStatement().execute(sql1);
+                String sql2 = "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CREATED_BY\": \"ADMIN\"}}'";
+                System.out.println("execute sql: " + sql2);
+                conn.createStatement().execute(sql2);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("alter table kv attributes to created by admin not supported", e.getMessage());
+                // clean table
+                String sql3 = "drop table if exists testHTableDefense$cf3";
+                System.out.println("execute sql: " + sql3);
+                conn.createStatement().execute(sql3);
+            }
+
+            // 13. disable a htable did not created by admin is not suppported
+            try {
+                String sql1 = "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2";
+                System.out.println("execute sql: " + sql1);
+                conn.createStatement().execute(sql1);
+                String sql2 = "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf4(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2";
+                System.out.println("execute sql: " + sql2);
+                conn.createStatement().execute(sql2);
+                admin.disableTable(TableName.valueOf("testHTableDefense2"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
+
+            }
+
+            // 14. delete a htable did not created by admin is not suppported
+            try {
+                String sql1 = "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2";
+                System.out.println("execute sql: " + sql1);
+                conn.createStatement().execute(sql1);
+                String sql2 = "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf5(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2";
+                System.out.println("execute sql: " + sql2);
+                conn.createStatement().execute(sql2);
+                admin.deleteTable(TableName.valueOf("testHTableDefense2"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
+            }
+
+        } catch (Exception e) {
+           e.printStackTrace();
+           assertTrue(false);
+        } finally {
+            admin.disableTable(tableName);
+            admin.deleteTable(tableName);
+            String sql1 = "DROP TABLE IF EXISTS testHTableDefense2$cf4";
+            System.out.println("execute sql: " + sql1);
+            conn.createStatement().execute(sql1);
+            String sql2 = "DROP TABLE IF EXISTS testHTableDefense2$cf5";
+            System.out.println("execute sql: " + sql2);
+            conn.createStatement().execute(sql2);
+            String sql3 = "DROP TABLEGROUP IF EXISTS testHTableDefense2";
+            System.out.println("execute sql: " + sql3);
+            conn.createStatement().execute(sql3);
+        }
     }
 }
