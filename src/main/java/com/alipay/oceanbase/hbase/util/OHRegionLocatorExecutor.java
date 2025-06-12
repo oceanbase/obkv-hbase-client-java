@@ -1,13 +1,29 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
-import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
-import com.alipay.oceanbase.rpc.location.model.TableEntry;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
@@ -19,7 +35,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegionLocator> {
-    private final String tableName;
+    private final String        tableName;
     private final ObTableClient client;
 
     OHRegionLocatorExecutor(String tableName, ObTableClient client) {
@@ -42,7 +58,8 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
     public OHRegionLocator parse(ObTableMetaResponse response) throws IOException {
         try {
             final String jsonData = response.getData();
-            final JSONObject jsonMap = Optional.<JSONObject>ofNullable(JSON.parseObject(jsonData))
+            final ObjectMapper objectMapper = new ObjectMapper();
+            final JsonNode jsonMap = Optional.ofNullable(objectMapper.readTree(jsonData))
                     .orElseThrow(() -> new IOException("jsonMap is null"));
             /*
                   {
@@ -77,14 +94,17 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                     ]
                   }
              */
-
-            final List<Object> partitions = Optional.<List<Object>>ofNullable(jsonMap.getJSONArray("partitions"))
+            JsonNode partitionsNode = Optional.<JsonNode>ofNullable(jsonMap.get("partitions"))
                     .orElseThrow(() -> new IOException("partitions is null"));
+            List<Object> partitions = objectMapper.convertValue(partitionsNode, new TypeReference<List<Object>>(){});
 
-            final List<Object> tableIdDict = Optional.<List<Object>>ofNullable(jsonMap.getJSONArray("table_id_dict"))
+            JsonNode tableIdDictNode = Optional.<JsonNode>ofNullable(jsonMap.get("table_id_dict"))
                     .orElseThrow(() -> new IOException("tableIdDict is null"));
-            final List<Object> replicaDict = Optional.<List<Object>>ofNullable(jsonMap.getJSONArray("replica_dict"))
+            List<Object> tableIdDict = objectMapper.convertValue(tableIdDictNode, new TypeReference<List<Object>>(){});
+
+            JsonNode replicaDictNode = Optional.<JsonNode>ofNullable(jsonMap.get("replica_dict"))
                     .orElseThrow(() -> new IOException("replicaDict is null"));
+            List<Object> replicaDict = objectMapper.convertValue(replicaDictNode, new TypeReference<List<Object>>(){});
 
             final boolean isHashLikePartition = partitions.stream()
                     .map(obj -> (List<Object>) obj)
@@ -213,8 +233,8 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
         request.setMetaType(getMetaType());
         final Map<String, String> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
-
-        final String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        final String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
 
         return execute(client, request);
