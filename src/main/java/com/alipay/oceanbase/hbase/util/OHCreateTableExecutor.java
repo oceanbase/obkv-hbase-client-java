@@ -53,7 +53,7 @@ public class OHCreateTableExecutor extends AbstractObTableMetaExecutor<Void> {
         final ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
-        requestData.put("htable_name", tableDescriptor.getTableName().getName());
+        requestData.put("htable_name", tableDescriptor.getTableName().getNameAsString());
         Map<String, Map<String, Integer>> columnFamilies = new HashMap<>();
         for (ColumnFamilyDescriptor columnDescriptor : tableDescriptor.getColumnFamilies()) {
             Map<String, Integer> columnFamily = new HashMap<>();
