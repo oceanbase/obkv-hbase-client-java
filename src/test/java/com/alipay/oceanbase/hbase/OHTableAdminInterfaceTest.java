@@ -1067,10 +1067,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 5. alter table add index
@@ -1078,10 +1078,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = "alter table testHTableDefense$cf1 ADD INDEX idx_1(T)";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 5. alter table add fk
@@ -1089,10 +1089,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = "alter table testHTableDefense$cf1 MODIFY COLUMN V LONGTEXT";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 6. alter table modify column to lob
@@ -1100,10 +1100,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 7. create trigger
@@ -1113,10 +1113,10 @@ public class OHTableAdminInterfaceTest {
                              " BEGIN END";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 8. create view
@@ -1124,10 +1124,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 9. alter view
@@ -1135,10 +1135,10 @@ public class OHTableAdminInterfaceTest {
                 String sql = "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 10. create index
@@ -1146,22 +1146,22 @@ public class OHTableAdminInterfaceTest {
                 String sql = " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
 
             // 11. explicit create table and specify created_by:admin, should be prohibited
             try {
-                String sql = "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CREATED_BY\": \"ADMIN\"}}'";
+                String sql = "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'";
                 System.out.println("execute sql: " + sql);
                 conn.createStatement().execute(sql);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("user ddl with created_by attribute not supported", e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 12. alter table to created_by:admin, should be prohibited
@@ -1169,11 +1169,11 @@ public class OHTableAdminInterfaceTest {
                 String sql1 = "CREATE TABLE testHTableDefense$cf3(a int primary key)";
                 System.out.println("execute sql: " + sql1);
                 conn.createStatement().execute(sql1);
-                String sql2 = "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CREATED_BY\": \"ADMIN\"}}'";
+                String sql2 = "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'";
                 System.out.println("execute sql: " + sql2);
                 conn.createStatement().execute(sql2);
+                fail();
             } catch (SQLException e) {
-                e.printStackTrace();
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("alter table kv attributes to created by admin not supported", e.getMessage());
                 // clean table
@@ -1191,8 +1191,8 @@ public class OHTableAdminInterfaceTest {
                 System.out.println("execute sql: " + sql2);
                 conn.createStatement().execute(sql2);
                 admin.disableTable(TableName.valueOf("testHTableDefense2"));
+                fail();
             } catch (Exception e) {
-                e.printStackTrace();
                 Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
 
             }
@@ -1206,8 +1206,8 @@ public class OHTableAdminInterfaceTest {
                 System.out.println("execute sql: " + sql2);
                 conn.createStatement().execute(sql2);
                 admin.deleteTable(TableName.valueOf("testHTableDefense2"));
+                fail();
             } catch (Exception e) {
-                e.printStackTrace();
                 Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
             }
 
