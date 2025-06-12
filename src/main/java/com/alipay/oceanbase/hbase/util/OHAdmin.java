@@ -174,20 +174,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public void createTable(TableDescriptor tableDescriptor) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-//        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-//        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableDescriptor.getTableName(), connectionConf);
-//        OHCreateTableExecutor executor = new OHCreateTableExecutor(tableClient);
-//        try {
-//            executor.createTable(tableDescriptor, null);
-//        } catch (IOException e) {
-//            if (e.getCause() instanceof ObTableTransportException
-//                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-//                throw new TimeoutIOException(e.getCause());
-//            } else {
-//                throw e;
-//            }
-//        }
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableDescriptor.getTableName(), connectionConf);
+        OHCreateTableExecutor executor = new OHCreateTableExecutor(tableClient);
+        try {
+            executor.createTable(tableDescriptor, null);
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -207,20 +206,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public void deleteTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
-//        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-//        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-//        OHDeleteTableExecutor executor = new OHDeleteTableExecutor(tableClient);
-//        try {
-//            executor.deleteTable(tableName.getNameAsString());
-//        } catch (IOException e) {
-//            if (e.getCause() instanceof ObTableTransportException
-//                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-//                throw new TimeoutIOException(e.getCause());
-//            } else {
-//                throw e;
-//            }
-//        }
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHDeleteTableExecutor executor = new OHDeleteTableExecutor(tableClient);
+        try {
+            executor.deleteTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
