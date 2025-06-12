@@ -37,10 +37,9 @@ import org.junit.Test;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
@@ -270,59 +269,31 @@ public class OHTableAdminInterfaceTest {
         Assert.assertEquals(0, startEndKeys.getSecond()[0].length);
     }
 
+    public static void createTable(Admin admin, TableName tableName, String... columnFamilies) throws IOException {
+        HTableDescriptor htd = new HTableDescriptor(tableName);
+        // Add column families
+        for (String cf : columnFamilies) {
+            HColumnDescriptor hcd = new HColumnDescriptor(Bytes.toBytes(cf));
+            htd.addFamily(hcd);
+        }
+        // Create the table
+        admin.createTable(htd);
+    }
+
     @Test
     public void testAdminEnDisableTable() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
-        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
-                "use `n1`;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS `n1:test` SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test$family_group` (\n" +
-                "      `K` varbinary(1024) NOT NULL,\n" +
-                "      `Q` varbinary(256) NOT NULL,\n" +
-                "      `T` bigint(20) NOT NULL,\n" +
-                "      `V` varbinary(1024) DEFAULT NULL,\n" +
-                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test`;" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test$family1` (\n" +
-                "      `K` varbinary(1024) NOT NULL,\n" +
-                "      `Q` varbinary(256) NOT NULL,\n" +
-                "      `T` bigint(20) NOT NULL,\n" +
-                "      `V` varbinary(1024) DEFAULT NULL,\n" +
-                "      PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test`;");
+        st.execute("CREATE DATABASE IF NOT EXISTS `en_dis`");
+        st.close();
+        conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        assertTrue(admin.tableExists(TableName.valueOf("n1", "test")));
-        assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        createTable(admin, TableName.valueOf("test_en_dis_tb"), "cf1", "cf2", "cf3");
+        createTable(admin, TableName.valueOf("en_dis", "test"), "cf1", "cf2", "cf3");
+        assertTrue(admin.tableExists(TableName.valueOf("en_dis", "test")));
+        assertTrue(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
         // 1. disable a non-existed table
         {
             IOException thrown = assertThrows(IOException.class,
@@ -334,28 +305,28 @@ public class OHTableAdminInterfaceTest {
         }
         // 2. write an enabled table, should succeed
         {
-            if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
-                admin.enableTable(TableName.valueOf("test_multi_cf"));
+            if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
+                admin.enableTable(TableName.valueOf("test_en_dis_tb"));
             }
-            batchInsert(10, "test_multi_cf");
-            batchGet(10, "test_multi_cf");
+            batchInsert(10, "test_en_dis_tb");
+            batchGet(10, "test_en_dis_tb");
         }
 
         // 3. disable a enable table
         {
-            if (admin.isTableEnabled(TableName.valueOf("test_multi_cf"))) {
-                admin.disableTable(TableName.valueOf("test_multi_cf"));
+            if (admin.isTableEnabled(TableName.valueOf("test_en_dis_tb"))) {
+                admin.disableTable(TableName.valueOf("test_en_dis_tb"));
             }
             // write and read disable table, should fail
             try {
-                batchInsert(10, "test_multi_cf");
+                batchInsert(10, "test_en_dis_tb");
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
                 System.out.println(ex.getCause().getMessage());
             }
             try {
-                batchGet(10, "test_multi_cf");
+                batchGet(10, "test_en_dis_tb");
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
@@ -367,36 +338,21 @@ public class OHTableAdminInterfaceTest {
 
         // 4. enable a disabled table
         {
-            if (admin.isTableDisabled(TableName.valueOf("test_multi_cf"))) {
-                admin.enableTable(TableName.valueOf("test_multi_cf"));
+            if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
+                admin.enableTable(TableName.valueOf("test_en_dis_tb"));
             }
             // write an enabled table, should succeed
-            batchInsert(10, "test_multi_cf");
-            batchGet(10, "test_multi_cf");
+            batchInsert(10, "test_en_dis_tb");
+            batchGet(10, "test_en_dis_tb");
         }
 
         // 5. enable an enabled table
         {
-            if (admin.isTableDisabled(TableName.valueOf("n1", "test"))) {
-                admin.enableTable(TableName.valueOf("n1", "test"));
+            if (admin.isTableDisabled(TableName.valueOf("en_dis", "test"))) {
+                admin.enableTable(TableName.valueOf("en_dis", "test"));
             }
             try {
-                admin.enableTable(TableName.valueOf("n1", "test"));
-                Assert.fail();
-            } catch (IOException ex) {
-                Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
-                        ((ObTableException) ex.getCause()).getErrorCode());
-            }
-        }
-
-        // 6. disable a disabled table
-        {
-            if (admin.isTableEnabled(TableName.valueOf("n1", "test"))) {
-                admin.disableTable(TableName.valueOf("n1", "test"));
-            }
-            try {
-                admin.disableTable(TableName.valueOf("n1", "test"));
+                admin.enableTable(TableName.valueOf("en_dis", "test"));
                 Assert.fail();
             } catch (IOException ex) {
                 Assert.assertTrue(ex.getCause() instanceof ObTableException);
@@ -405,10 +361,25 @@ public class OHTableAdminInterfaceTest {
             }
         }
 
-        admin.deleteTable(TableName.valueOf("test_multi_cf"));
-        assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
-        admin.deleteTable(TableName.valueOf("n1", "test"));
-        assertFalse(admin.tableExists(TableName.valueOf("n1", "test")));
+        // 6. disable a disabled table
+        {
+            if (admin.isTableEnabled(TableName.valueOf("en_dis", "test"))) {
+                admin.disableTable(TableName.valueOf("en_dis", "test"));
+            }
+            try {
+                admin.disableTable(TableName.valueOf("en_dis", "test"));
+                Assert.fail();
+            } catch (IOException ex) {
+                Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
+                        ((ObTableException) ex.getCause()).getErrorCode());
+            }
+        }
+
+        admin.deleteTable(TableName.valueOf("test_en_dis_tb"));
+        assertFalse(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
+        admin.deleteTable(TableName.valueOf("en_dis", "test"));
+        assertFalse(admin.tableExists(TableName.valueOf("en_dis", "test")));
     }
 
     private void batchGet(int rows, String tablegroup) throws Exception {
@@ -433,78 +404,60 @@ public class OHTableAdminInterfaceTest {
     public void testAdminGetRegionMetrics() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
-        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
+        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_get_region_metrics SHARDING = 'ADAPTIVE';\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group1` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
+                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group2` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
+                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group3` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS test_no_part SHARDING = 'ADAPTIVE';\n"+
-                "CREATE TABLE IF NOT EXISTS `test_no_part$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_no_part;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_no_part$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_no_part;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_no_part$family_with_group3` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_no_part;\n" +
-                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
-                "use `n1`;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS `n1:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group1` (\n" +
+                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "\n" +
+                "CREATE DATABASE IF NOT EXISTS `get_region`;\n" +
+                "use `get_region`;\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS `get_region:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group1` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group2` (\n" +
+                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group2` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group3` (\n" +
+                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group3` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
+                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
         st.close();
         conn.close();
-        String tablegroup1 = "test_multi_cf";
-        String tablegroup2 = "n1:test_multi_cf";
+        String tablegroup1 = "test_get_region_metrics";
+        String tablegroup2 = "get_region:test_multi_cf";
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
@@ -613,79 +566,33 @@ public class OHTableAdminInterfaceTest {
     public void testAdminDeleteTable() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
-        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group3` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
-                "use `n1`;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS `n1:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `n1:test_multi_cf$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `n1:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
+        st.execute("CREATE DATABASE IF NOT EXISTS `del_tb`");
         st.close();
         conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        assertTrue(admin.tableExists(TableName.valueOf("n1", "test_multi_cf")));
-        assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        createTable(admin, TableName.valueOf("test_del_tb"), "cf1", "cf2", "cf3");
+        createTable(admin, TableName.valueOf("del_tb", "test"), "cf1", "cf2", "cf3");
+        assertTrue(admin.tableExists(TableName.valueOf("del_tb", "test")));
+        assertTrue(admin.tableExists(TableName.valueOf("test_del_tb")));
         IOException thrown = assertThrows(IOException.class,
                 () -> {
                     admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
                 });
         Assert.assertTrue(thrown.getCause() instanceof ObTableException);
         Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
-        admin.deleteTable(TableName.valueOf("n1", "test_multi_cf"));
-        admin.deleteTable(TableName.valueOf("test_multi_cf"));
-        assertFalse(admin.tableExists(TableName.valueOf("n1", "test_multi_cf")));
-        assertFalse(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        admin.deleteTable(TableName.valueOf("del_tb", "test"));
+        admin.deleteTable(TableName.valueOf("test_del_tb"));
+        assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
+        assertFalse(admin.tableExists(TableName.valueOf("test_del_tb")));
     }
 
     @Test
     public void testAdminTableExists() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
-        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_multi_cf SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `test_multi_cf$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_multi_cf PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
-                "CREATE DATABASE IF NOT EXISTS `n1`;\n" +
-                "use `n1`;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS `n1:test_multi_cf` SHARDING = 'ADAPTIVE';");
+        st.execute("CREATE DATABASE IF NOT EXISTS `exist_tb`");
         st.close();
         conn.close();
         Configuration conf = ObHTableTestUtil.newConfiguration();
@@ -697,14 +604,16 @@ public class OHTableAdminInterfaceTest {
                     TableName.valueOf("random_string$");
                 });
         Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
-        Assert.assertTrue(admin.tableExists(TableName.valueOf("n1", "test_multi_cf")));
-        Assert.assertTrue(admin.tableExists(TableName.valueOf("test_multi_cf")));
+        createTable(admin, TableName.valueOf("test_exist_tb"), "cf1", "cf2", "cf3");
+        createTable(admin, TableName.valueOf("exist_tb", "test"), "cf1", "cf2", "cf3");å
+        Assert.assertTrue(admin.tableExists(TableName.valueOf("test_exist_tb")));
+        Assert.assertTrue(admin.tableExists(TableName.valueOf("exist_tb", "test")));
     }
 
     private void batchInsert(int rows, String tablegroup) throws Exception {
-        byte[] family1 = Bytes.toBytes("family_with_group1");
-        byte[] family2 = Bytes.toBytes("family_with_group2");
-        byte[] family3 = Bytes.toBytes("family_with_group3");
+        byte[] family1 = Bytes.toBytes("cf1");
+        byte[] family2 = Bytes.toBytes("cf2");
+        byte[] family3 = Bytes.toBytes("cf3");
         byte[] family1_column1 = "family1_column1".getBytes();
         byte[] family1_column2 = "family1_column2".getBytes();
         byte[] family1_column3 = "family1_column3".getBytes();
@@ -840,6 +749,7 @@ public class OHTableAdminInterfaceTest {
         hcd1.setMaxVersions(1);
         hcd1.setTimeToLive(86400);
         HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+        List<HColumnDescriptor> originalColumnDescriptors = Arrays.asList(hcd1, hcd2, hcd3);
 
         // 1. generate create table task, one task per table
         List<Callable<Void>> tasks = new ArrayList<>();
@@ -847,11 +757,19 @@ public class OHTableAdminInterfaceTest {
             int finalI = i;
             tasks.add(()->{
                 HTableDescriptor htd = new HTableDescriptor(tableNames.get(finalI));
-                htd.addFamily(hcd1);
-                htd.addFamily(hcd2);
-                htd.addFamily(hcd3);
+                List<HColumnDescriptor> columnDescriptors = new ArrayList<>(originalColumnDescriptors);
+                // 随机打乱列族顺序
+                Collections.shuffle(columnDescriptors);
+                String shuffledCfNames = columnDescriptors.stream()
+                        .map(hcd -> Bytes.toString(hcd.getName()))
+                        .collect(Collectors.joining(", "));
+                System.out.println("Table " + tableNames.get(finalI) + " shuffled column families: " + shuffledCfNames);
+                for (HColumnDescriptor hcd : columnDescriptors) {
+                    htd.addFamily(hcd);
+                }
                 try {
                     admin.createTable(htd);
+                    System.out.println("success to create table:" + tableNames.get(finalI));
                 } catch (Exception e) {
                     System.out.println(e);
                     if (!ignoreException) {
@@ -892,9 +810,31 @@ public class OHTableAdminInterfaceTest {
         }
 
         // 4. disable all tables;
+        List<Callable<Void>> disableTasks = new ArrayList<>();
+        for (int i = 0; i < tableNums; i++) {
+            int finalI = i;
+            disableTasks.add(()->{
+                try {
+                    admin.disableTable(tableNames.get(finalI));
+                    System.out.println("success to disable table:" + tableNames.get(finalI));
+                } catch (Exception e) {
+                    System.out.println(e);
+                    if (!ignoreException) {
+                        throw e;
+                    }
+                }
+                return null;
+            });
+        }
+        ExecutorService disExecutorService = Executors.newFixedThreadPool(tableNums);
+        disExecutorService.invokeAll(disableTasks);
+        disExecutorService.shutdown();
+        disExecutorService.awaitTermination(1, TimeUnit.MINUTES);
+
+        assertTrue(admin.isTableDisabled(tableNames.get(0)));
         for (int i = 0; i < tableNames.size(); i++) {
             TableName tableName = tableNames.get(i);
-            admin.disableTable(tableName);
+            assertTrue(admin.isTableDisabled(tableName));
         }
 
         // 5. generate delete table task
@@ -904,6 +844,7 @@ public class OHTableAdminInterfaceTest {
             delTasks.add(()->{
                 try {
                     admin.deleteTable(tableNames.get(finalI));
+                    System.out.println("success to drop table:" + tableNames.get(finalI));
                 } catch (Exception e) {
                     System.out.println(e);
                     if (!ignoreException) {
