@@ -17,7 +17,7 @@
 
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -53,7 +53,7 @@ public class OHCreateTableExecutor extends AbstractObTableMetaExecutor<Void> {
         final ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
         Map<String, Object> requestData = new HashMap<>();
-        requestData.put("htable_name", tableDescriptor.getTableName().getName());
+        requestData.put("htable_name", tableDescriptor.getTableName().getNameAsString());
         Map<String, Map<String, Integer>> columnFamilies = new HashMap<>();
         for (ColumnFamilyDescriptor columnDescriptor : tableDescriptor.getColumnFamilies()) {
             Map<String, Integer> columnFamily = new HashMap<>();
@@ -62,7 +62,8 @@ public class OHCreateTableExecutor extends AbstractObTableMetaExecutor<Void> {
             columnFamilies.put(columnDescriptor.getNameAsString(), columnFamily);
         }
         requestData.put("column_families", columnFamilies);
-        String jsonData = JSON.toJSONString(requestData);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
         execute(client, request);
     }
