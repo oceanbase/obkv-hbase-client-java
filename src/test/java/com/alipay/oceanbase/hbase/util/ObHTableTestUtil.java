@@ -229,4 +229,9 @@ public class ObHTableTestUtil {
         }
         return diff == 0;
     }
+
+    public static void executeSQL(Connection conn, String sql, boolean printSQL) throws SQLException {
+        System.out.println("execute sql: " + sql);
+        conn.createStatement().execute(sql);
+    }
 }
