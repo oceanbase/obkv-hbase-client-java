@@ -3,9 +3,11 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
 import org.apache.commons.cli.Option;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
@@ -63,10 +65,27 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean tableExists(TableName tableName) throws IOException {
-        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
-        return executor.tableExists(tableName.getNameAsString());
+        try {
+            OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+            ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+            OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
+            return executor.tableExists(tableName.getNameAsString());
+        } catch (Exception e) {
+            // try to get the original cause
+            Throwable cause = e.getCause();
+            while(cause != null && cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            if (cause instanceof ObTableException) {
+                int errCode = ((ObTableException) cause).getErrorCode();
+                // if the original cause is database_not_exist, means namespace in tableName does not exist
+                // for HBase, namespace not exist will not throw exceptions but will return false
+                if (errCode == ResultCodes.OB_ERR_BAD_DATABASE.errorCode) {
+                    return false;
+                }
+            }
+            throw e;
+        }
     }
 
     @Override
