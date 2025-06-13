@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 import java.util.Map;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
+import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.executeSQL;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
@@ -290,96 +291,125 @@ public class OHTableAdminInterfaceTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        createTable(admin, TableName.valueOf("test_en_dis_tb"), "cf1", "cf2", "cf3");
-        createTable(admin, TableName.valueOf("en_dis", "test"), "cf1", "cf2", "cf3");
-        assertTrue(admin.tableExists(TableName.valueOf("en_dis", "test")));
-        assertTrue(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
-        // 1. disable a non-existed table
-        {
-            IOException thrown = assertThrows(IOException.class,
-                    () -> {
-                        admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
-                    });
-            assertTrue(thrown.getCause() instanceof ObTableException);
-            Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
-        }
-        // 2. write an enabled table, should succeed
-        {
-            if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
-                admin.enableTable(TableName.valueOf("test_en_dis_tb"));
-            }
-            batchInsert(10, "test_en_dis_tb");
-            batchGet(10, "test_en_dis_tb");
-        }
+        try {
+            createTable(admin, TableName.valueOf("test_en_dis_tb"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("en_dis", "test"), "cf1", "cf2", "cf3");
+            assertTrue(admin.tableExists(TableName.valueOf("en_dis", "test")));
+            assertTrue(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
+            String kvAttrStrDefault = "{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\"}}";
+            String kvAttributeDisable = "{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"disable\"}}";
+            String kvAttributeEnable = "{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"enable\"}}";
 
-        // 3. disable a enable table
-        {
-            if (admin.isTableEnabled(TableName.valueOf("test_en_dis_tb"))) {
-                admin.disableTable(TableName.valueOf("test_en_dis_tb"));
+            checkKVAttributes("test_en_dis_tb$cf1", kvAttrStrDefault);
+            checkKVAttributes("test_en_dis_tb$cf2", kvAttrStrDefault);
+            checkKVAttributes("test_en_dis_tb$cf3", kvAttrStrDefault);
+            // 1. disable a non-existed table
+            {
+                IOException thrown = assertThrows(IOException.class,
+                        () -> {
+                            admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
+                        });
+                assertTrue(thrown.getCause() instanceof ObTableException);
+                Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
             }
-            // write and read disable table, should fail
-            try {
+            // 2. write an enabled table, should succeed
+            {
+                if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
+                    admin.enableTable(TableName.valueOf("test_en_dis_tb"));
+                }
+                checkKVAttributes("test_en_dis_tb$cf1", kvAttrStrDefault);
+                checkKVAttributes("test_en_dis_tb$cf2", kvAttrStrDefault);
+                checkKVAttributes("test_en_dis_tb$cf3", kvAttrStrDefault);
+
                 batchInsert(10, "test_en_dis_tb");
-                Assert.fail();
-            } catch (IOException ex) {
-                Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                System.out.println(ex.getCause().getMessage());
-            }
-            try {
                 batchGet(10, "test_en_dis_tb");
-                Assert.fail();
-            } catch (IOException ex) {
-                Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
-                        ((ObTableException) ex.getCause()).getErrorCode());
             }
 
+            // 3. disable a enable table
+            {
+                if (admin.isTableEnabled(TableName.valueOf("test_en_dis_tb"))) {
+                    admin.disableTable(TableName.valueOf("test_en_dis_tb"));
+                }
+            checkKVAttributes("test_en_dis_tb$cf1", kvAttributeDisable);
+            checkKVAttributes("test_en_dis_tb$cf2", kvAttributeDisable);
+            checkKVAttributes("test_en_dis_tb$cf3", kvAttributeDisable);
+                // write and read disable table, should fail
+                try {
+                    batchInsert(10, "test_en_dis_tb");
+                    Assert.fail();
+                } catch (IOException ex) {
+                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                    System.out.println(ex.getCause().getMessage());
+                }
+                try {
+                    batchGet(10, "test_en_dis_tb");
+                    Assert.fail();
+                } catch (IOException ex) {
+                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                    Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                            ((ObTableException) ex.getCause()).getErrorCode());
+                }
+
+            }
+
+            // 4. enable a disabled table
+            {
+                if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
+                    admin.enableTable(TableName.valueOf("test_en_dis_tb"));
+                }
+                checkKVAttributes("test_en_dis_tb$cf1", kvAttributeEnable);
+                checkKVAttributes("test_en_dis_tb$cf2", kvAttributeEnable);
+                checkKVAttributes("test_en_dis_tb$cf3", kvAttributeEnable);
+                // write an enabled table, should succeed
+                batchInsert(10, "test_en_dis_tb");
+                batchGet(10, "test_en_dis_tb");
+            }
+
+            // 5. enable an enabled table
+            {
+                if (admin.isTableDisabled(TableName.valueOf("en_dis", "test"))) {
+                    admin.enableTable(TableName.valueOf("en_dis", "test"));
+                }
+                checkKVAttributes("en_dis:test$cf1", kvAttrStrDefault);
+                checkKVAttributes("en_dis:test$cf2", kvAttrStrDefault);
+                checkKVAttributes("en_dis:test$cf3", kvAttrStrDefault);
+                try {
+                    admin.enableTable(TableName.valueOf("en_dis", "test"));
+                    Assert.fail();
+                } catch (IOException ex) {
+                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                    Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
+                            ((ObTableException) ex.getCause()).getErrorCode());
+                }
+            }
+
+            // 6. disable a disabled table
+            {
+                if (admin.isTableEnabled(TableName.valueOf("en_dis", "test"))) {
+                    admin.disableTable(TableName.valueOf("en_dis", "test"));
+                }
+                checkKVAttributes("en_dis:test$cf1", kvAttributeDisable);
+                checkKVAttributes("en_dis:test$cf1", kvAttributeDisable);
+                checkKVAttributes("en_dis:test$cf1", kvAttributeDisable);
+                try {
+                    admin.disableTable(TableName.valueOf("en_dis", "test"));
+                    Assert.fail();
+                } catch (IOException ex) {
+                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
+                    Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
+                            ((ObTableException) ex.getCause()).getErrorCode());
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            admin.deleteTable(TableName.valueOf("test_en_dis_tb"));
+            assertFalse(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
+            admin.deleteTable(TableName.valueOf("en_dis", "test"));
+            assertFalse(admin.tableExists(TableName.valueOf("en_dis", "test")));
         }
-
-        // 4. enable a disabled table
-        {
-            if (admin.isTableDisabled(TableName.valueOf("test_en_dis_tb"))) {
-                admin.enableTable(TableName.valueOf("test_en_dis_tb"));
-            }
-            // write an enabled table, should succeed
-            batchInsert(10, "test_en_dis_tb");
-            batchGet(10, "test_en_dis_tb");
-        }
-
-        // 5. enable an enabled table
-        {
-            if (admin.isTableDisabled(TableName.valueOf("en_dis", "test"))) {
-                admin.enableTable(TableName.valueOf("en_dis", "test"));
-            }
-            try {
-                admin.enableTable(TableName.valueOf("en_dis", "test"));
-                Assert.fail();
-            } catch (IOException ex) {
-                Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
-                        ((ObTableException) ex.getCause()).getErrorCode());
-            }
-        }
-
-        // 6. disable a disabled table
-        {
-            if (admin.isTableEnabled(TableName.valueOf("en_dis", "test"))) {
-                admin.disableTable(TableName.valueOf("en_dis", "test"));
-            }
-            try {
-                admin.disableTable(TableName.valueOf("en_dis", "test"));
-                Assert.fail();
-            } catch (IOException ex) {
-                Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
-                        ((ObTableException) ex.getCause()).getErrorCode());
-            }
-        }
-
-        admin.deleteTable(TableName.valueOf("test_en_dis_tb"));
-        assertFalse(admin.tableExists(TableName.valueOf("test_en_dis_tb")));
-        admin.deleteTable(TableName.valueOf("en_dis", "test"));
-        assertFalse(admin.tableExists(TableName.valueOf("en_dis", "test")));
     }
 
     private void batchGet(int rows, String tablegroup) throws Exception {
@@ -1003,90 +1033,109 @@ public class OHTableAdminInterfaceTest {
             assertTrue(admin.tableExists(tableName));
 
             /// execute the following ddl stmt in created by admin table, should be prohibited
-            // 4. alter table add constraint
+            // 3. alter table add constraint
             try {
-                String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 5. alter table add index
+            // 4. alter table add index
             try {
-                String sql = "alter table testHTableDefense$cf1 ADD INDEX idx_1(T)";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "alter table testHTableDefense$cf1 ADD INDEX idx_1(T)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 5. alter table add fk
+            // 5. alter table modify column to lob
             try {
-                String sql = "alter table testHTableDefense$cf1 MODIFY COLUMN V LONGTEXT";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "alter table testHTableDefense$cf1 MODIFY COLUMN V LONGTEXT", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 6. alter table modify column to lob
+            // 6. alter hbase admin table add fk
             try {
-                String sql = "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 7. create trigger
+            // 7. create a normal table to refer to hbase admin table
             try {
-                String sql = " CREATE TRIGGER hbase_trigger_1" +
+                executeSQL(conn, "create table  testHTableDefense_t1(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K));" , true);
+                fail();
+            } catch (SQLException e) {
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
+            }
+
+            // 8. alter a normal table to refer to hbase admin table
+            try {
+                executeSQL(conn, "create table testHTableDefense_t2(a varbinary(1024) primary key)", true);
+                executeSQL(conn, "alter table testHTableDefense_t2 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K);", true);
+                fail();
+            } catch (SQLException e) {
+                Assert.assertEquals(1235, e.getErrorCode());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
+            }
+            // 9. create a normal table A to refer to a table mock parent table B, and create table B using hbase admin
+            try {
+                executeSQL(conn, "SET foreign_key_checks = 0", true);
+
+                executeSQL(conn, "create table testHTableDefense_t3(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense2$cf1(K));", true);
+                HTableDescriptor htd2 = new HTableDescriptor(TableName.valueOf("testHTableDefense2"));
+                HColumnDescriptor hcd4 = new HColumnDescriptor("cf1".getBytes());
+                hcd4.setMaxVersions(2);
+                hcd4.setTimeToLive(172800);
+                htd2.addFamily(hcd4);
+                admin.createTable(htd2);
+                fail();
+            } catch (Exception e) {
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
+            }
+
+
+            // 10. create trigger
+            try {
+                executeSQL(conn, " CREATE TRIGGER hbase_trigger_1" +
                              " AFTER INSERT ON testHTableDefense$cf1 FOR EACH ROW" +
-                             " BEGIN END";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                             " BEGIN END", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 8. create view
+            // 11. create view
             try {
-                String sql = " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 9. alter view
+            // 12. alter view
             try {
-                String sql = "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 10. create index
+            // 13. create index
             try {
-                String sql = " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
@@ -1094,25 +1143,19 @@ public class OHTableAdminInterfaceTest {
             }
 
 
-            // 11. explicit create table and specify created_by:admin, should be prohibited
+            // 14. explicit create table and specify created_by:admin, should be prohibited
             try {
-                String sql = "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'";
-                System.out.println("execute sql: " + sql);
-                conn.createStatement().execute(sql);
+                executeSQL(conn, "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
                 Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
-            // 12. alter table to created_by:admin, should be prohibited
+            // 15. alter table to created_by:admin, should be prohibited
             try {
-                String sql1 = "CREATE TABLE testHTableDefense$cf3(a int primary key)";
-                System.out.println("execute sql: " + sql1);
-                conn.createStatement().execute(sql1);
-                String sql2 = "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'";
-                System.out.println("execute sql: " + sql2);
-                conn.createStatement().execute(sql2);
+                executeSQL(conn, "CREATE TABLE testHTableDefense$cf3(a int primary key)", true);
+                executeSQL(conn, "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
@@ -1123,29 +1166,21 @@ public class OHTableAdminInterfaceTest {
                 conn.createStatement().execute(sql3);
             }
 
-            // 13. disable a htable did not created by admin is not suppported
+            // 16. disable a htable did not created by admin is not suppported
             try {
-                String sql1 = "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2";
-                System.out.println("execute sql: " + sql1);
-                conn.createStatement().execute(sql1);
-                String sql2 = "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf4(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2";
-                System.out.println("execute sql: " + sql2);
-                conn.createStatement().execute(sql2);
+                executeSQL(conn, "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2", true);
+                executeSQL(conn, "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf4(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2", true);
                 admin.disableTable(TableName.valueOf("testHTableDefense2"));
                 fail();
             } catch (Exception e) {
                 Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
-
             }
 
-            // 14. delete a htable did not created by admin is not suppported
+            // 17. delete a htable did not created by admin is not suppported
             try {
-                String sql1 = "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2";
-                System.out.println("execute sql: " + sql1);
-                conn.createStatement().execute(sql1);
-                String sql2 = "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf5(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2";
-                System.out.println("execute sql: " + sql2);
-                conn.createStatement().execute(sql2);
+                executeSQL(conn, "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2", true);
+                executeSQL(conn,
+                        "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf5(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2", true);
                 admin.deleteTable(TableName.valueOf("testHTableDefense2"));
                 fail();
             } catch (Exception e) {
@@ -1158,15 +1193,21 @@ public class OHTableAdminInterfaceTest {
         } finally {
             admin.disableTable(tableName);
             admin.deleteTable(tableName);
-            String sql1 = "DROP TABLE IF EXISTS testHTableDefense2$cf4";
-            System.out.println("execute sql: " + sql1);
-            conn.createStatement().execute(sql1);
-            String sql2 = "DROP TABLE IF EXISTS testHTableDefense2$cf5";
-            System.out.println("execute sql: " + sql2);
-            conn.createStatement().execute(sql2);
-            String sql3 = "DROP TABLEGROUP IF EXISTS testHTableDefense2";
-            System.out.println("execute sql: " + sql3);
-            conn.createStatement().execute(sql3);
+            executeSQL(conn, "DROP TABLE IF EXISTS testHTableDefense2$cf4", true);
+            executeSQL(conn, "DROP TABLE IF EXISTS testHTableDefense2$cf5", true);
+            executeSQL(conn, "DROP TABLEGROUP IF EXISTS testHTableDefense2", true);
+            executeSQL(conn, "DROP TABLE IF EXISTS testHTableDefense_t1", true);
+            executeSQL(conn, "DROP TABLE IF EXISTS testHTableDefense_t2", true);
+            executeSQL(conn, "DROP TABLE IF EXISTS testHTableDefense_t3", true);
         }
+    }
+
+    void checkKVAttributes(String tableName, String kvAttributes) throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        java.sql.ResultSet resultSet = conn.createStatement().executeQuery("select kv_attributes from oceanbase.__all_table where table_name = '" + tableName + "'");
+        resultSet.next();
+        String value = resultSet.getString(1);
+        Assert.assertEquals(kvAttributes, value);
+        Assert.assertFalse(resultSet.next());
     }
 }
