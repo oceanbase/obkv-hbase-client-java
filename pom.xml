@@ -116,6 +116,10 @@
             <version>${hbase.version}</version>
             <exclusions>
                 <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </exclusion>
+                <exclusion>
                     <artifactId>jasper-compiler</artifactId>
                     <groupId>tomcat</groupId>
                 </exclusion>
@@ -197,11 +201,6 @@
             <artifactId>logback-classic</artifactId>
             <version>1.2.12</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.19.0</version>
         </dependency>
     </dependencies>
     <repositories>
