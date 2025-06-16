@@ -219,10 +219,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             execBuffer.clear();
         } catch (Exception ex) {
             // do not recollect error operations, notify outside
-            LOGGER.error("error happens: table name = ", tableName.getNameAsString(), ex);
-            if (ex.getCause() instanceof RetriesExhaustedWithDetailsException) {
-                LOGGER.error(tableName.getNameAsString() + ": One or more of the operations have failed after retries.", ex);
-                RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex.getCause();
+            LOGGER.error("error happens, table name: {}", tableName.getNameAsString(), ex);
+            if (ex instanceof RetriesExhaustedWithDetailsException) {
+                LOGGER.error("TableName: {}, One or more of the operations have failed after retries.", tableName.getNameAsString(), ex);
+                RetriesExhaustedWithDetailsException retryException = (RetriesExhaustedWithDetailsException) ex;
                 if (listener != null) {
                     listener.onException(retryException, this);
                 } else {
