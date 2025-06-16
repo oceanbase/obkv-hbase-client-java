@@ -435,7 +435,7 @@ public class OHTableAdminInterfaceTest {
         Statement st = conn.createStatement();
         st.execute("CREATE TABLEGROUP IF NOT EXISTS test_get_region_metrics SHARDING = 'ADAPTIVE';\n" +
                 "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group1` (\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf1` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
@@ -443,7 +443,7 @@ public class OHTableAdminInterfaceTest {
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
                 "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group2` (\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf2` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
@@ -451,7 +451,7 @@ public class OHTableAdminInterfaceTest {
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
                 "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group3` (\n" +
+                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf3` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
@@ -459,24 +459,46 @@ public class OHTableAdminInterfaceTest {
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
                 "\n" +
+                "CREATE TABLEGROUP IF NOT EXISTS test_no_part SHARDING = 'ADAPTIVE';\n"+
+                "CREATE TABLE IF NOT EXISTS `test_no_part$cf1` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_no_part;\n" +
+                "CREATE TABLE IF NOT EXISTS `test_no_part$cf2` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_no_part;\n" +
+                "CREATE TABLE IF NOT EXISTS `test_no_part$cf3` (\n" +
+                "    `K` varbinary(1024) NOT NULL,\n" +
+                "    `Q` varbinary(256) NOT NULL,\n" +
+                "    `T` bigint(20) NOT NULL,\n" +
+                "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                ") TABLEGROUP = test_no_part;\n" +
                 "CREATE DATABASE IF NOT EXISTS `get_region`;\n" +
                 "use `get_region`;\n" +
                 "CREATE TABLEGROUP IF NOT EXISTS `get_region:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group1` (\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf1` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group2` (\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf2` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
                 "    `V` varbinary(1024) DEFAULT NULL,\n" +
                 "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
                 ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group3` (\n" +
+                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf3` (\n" +
                 "    `K` varbinary(1024) NOT NULL,\n" +
                 "    `Q` varbinary(256) NOT NULL,\n" +
                 "    `T` bigint(20) NOT NULL,\n" +
@@ -511,7 +533,7 @@ public class OHTableAdminInterfaceTest {
         List<RegionMetrics> metrics = admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
         long cost = System.currentTimeMillis() - start;
         System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + tablegroup1);
-        assertEquals(30, metrics.size());
+        assertEquals(9, metrics.size());
 
         // test getRegionMetrics concurrently reading while writing
         ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -529,7 +551,7 @@ public class OHTableAdminInterfaceTest {
                             regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
                             long thrCost = System.currentTimeMillis() - thrStart;
                             System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                            if (regionMetrics.size() != 30) {
+                            if (regionMetrics.size() != 9) {
                                 throw new ObTableGetException(
                                         "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
                             }
