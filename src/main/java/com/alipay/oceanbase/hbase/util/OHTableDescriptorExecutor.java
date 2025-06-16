@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase.util;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
@@ -32,8 +31,10 @@ import org.apache.hadoop.hbase.TableName;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTableDescriptor> {
     private final String        tableName;
@@ -56,9 +57,11 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
               "cfDescs": {
                 "cf1": {
                   "TTL":604800
+                  "maxVersions": 3
                 },
                 "cf2": {
                   "TTL":259200
+                  "maxVersions": 2
                 }
               },
               "tbDesc": {
@@ -70,14 +73,17 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
             HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
             JsonNode cfDescsNode = Optional.<JsonNode>ofNullable(jsonMap.get("cfDescs"))
                     .orElseThrow(() -> new IOException("cfDesc is null"));
-            Map<String, Object> cfDescsMap = objectMapper.convertValue(cfDescsNode, new TypeReference<Map<String, Object>>(){});
-            for (Map.Entry<String, Object> entry : cfDescsMap.entrySet()) {
+            Stream<Map.Entry<String, JsonNode>> stream = cfDescsNode.propertyStream();
+            stream.forEach(entry -> {
                 String cfName = entry.getKey();
-                JsonNode attributes = (JsonNode) entry.getValue();
+                JsonNode value = entry.getValue();
+                int ttl = value.path("TTL").asInt();
+                int maxVersions = value.path("maxVersions").asInt();
                 HColumnDescriptor cf = new HColumnDescriptor(cfName);
-                cf.setTimeToLive(attributes.get("TTL").asInt());
+                cf.setTimeToLive(ttl);
+                cf.setMaxVersions(maxVersions);
                 tableDescriptor.addFamily(cf);
-            }
+            });
             return tableDescriptor;
         } catch (IllegalArgumentException e) {
             throw new IOException("Failed to parse response", e);
