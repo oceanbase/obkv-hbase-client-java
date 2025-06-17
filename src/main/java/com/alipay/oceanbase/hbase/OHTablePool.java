@@ -805,27 +805,9 @@ public class OHTablePool implements Closeable {
             return table.checkAndPut(row, family, qualifier, compareOp, value, put);
         }
 
-        /**
-         * Atomically checks if a row/family/qualifier value matches the expected
-         * value. If it does, it adds the put.  If the passed value is null, the check
-         * is for the lack of column (ie: non-existence)
-         * <p>
-         * The expected value argument of this call is on the left and the current
-         * value of the cell is on the right side of the comparison operator.
-         * <p>
-         * Ie. eg. GREATER operator means expected value > existing <=> add the put.
-         *
-         * @param row       to check
-         * @param family    column family to check
-         * @param qualifier column qualifier to check
-         * @param op        comparison operator to use
-         * @param value     the expected value
-         * @param put       data to put if check succeeds
-         * @return true if the new put was executed, false otherwise
-         * @throws IOException e
-         */
         @Override
-        public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Put put) throws IOException {
+        public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op,
+                                   byte[] value, Put put) throws IOException {
             return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
         }
 
@@ -852,27 +834,10 @@ public class OHTablePool implements Closeable {
             return table.checkAndDelete(row, family, qualifier, compareOp, value, delete);
         }
 
-        /**
-         * Atomically checks if a row/family/qualifier value matches the expected
-         * value. If it does, it adds the delete.  If the passed value is null, the
-         * check is for the lack of column (ie: non-existence)
-         * <p>
-         * The expected value argument of this call is on the left and the current
-         * value of the cell is on the right side of the comparison operator.
-         * <p>
-         * Ie. eg. GREATER operator means expected value > existing <=> add the delete.
-         *
-         * @param row       to check
-         * @param family    column family to check
-         * @param qualifier column qualifier to check
-         * @param op        comparison operator to use
-         * @param value     the expected value
-         * @param delete    data to delete if check succeeds
-         * @return true if the new delete was executed, false otherwise
-         * @throws IOException e
-         */
         @Override
-        public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Delete delete) throws IOException {
+        public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier,
+                                      CompareOperator op, byte[] value, Delete delete)
+                                                                                      throws IOException {
             return checkAndDelete(row, family, qualifier, getCompareOp(op), value, delete);
         }
 
@@ -893,11 +858,6 @@ public class OHTablePool implements Closeable {
             return table.incrementColumnValue(row, family, qualifier, amount, durability);
         }
 
-        /**
-         * Returns the actual table back to the pool
-         *
-         * @throws IOException if failed
-         */
         public void close() throws IOException {
             returnTable(table);
         }
@@ -981,27 +941,10 @@ public class OHTablePool implements Closeable {
             return table.checkAndMutate(row, family, qualifier, compareOp, value, mutations);
         }
 
-        /**
-         * Atomically checks if a row/family/qualifier value matches the expected value.
-         * If it does, it performs the row mutations.  If the passed value is null, the check
-         * is for the lack of column (ie: non-existence)
-         * <p>
-         * The expected value argument of this call is on the left and the current
-         * value of the cell is on the right side of the comparison operator.
-         * <p>
-         * Ie. eg. GREATER operator means expected value > existing <=> perform row mutations.
-         *
-         * @param row       to check
-         * @param family    column family to check
-         * @param qualifier column qualifier to check
-         * @param op        the comparison operator
-         * @param value     the expected value
-         * @param mutation  mutations to perform if check succeeds
-         * @return true if the new put was executed, false otherwise
-         * @throws IOException e
-         */
         @Override
-        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, RowMutations mutation) throws IOException {
+        public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
+                                      CompareOperator op, byte[] value, RowMutations mutation)
+                                                                                              throws IOException {
             return checkAndMutate(row, family, qualifier, getCompareOp(op), value, mutation);
         }
 

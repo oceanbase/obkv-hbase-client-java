@@ -249,14 +249,13 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
     }
 
-    
     @Override
     public void close() throws IOException {
         if (closed) {
             return;
         }
         // reset timeout, timeTick and Timer
-//        disableWriteBufferPeriodicFlush();
+        //        disableWriteBufferPeriodicFlush();
         try {
             execute(true);
         } finally {
@@ -303,9 +302,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         this.ohTable.setOperationTimeout(operationTimeout);
     }
 
-    /**
-     * Count the mutations which haven't been processed.
-     */
     @VisibleForTesting
     public int size() {
         return undealtMutationCount.get();

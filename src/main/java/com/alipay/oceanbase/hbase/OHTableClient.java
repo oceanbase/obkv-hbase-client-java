@@ -178,7 +178,8 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
-    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, RowMutations mutation) throws IOException {
+    public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier, CompareOperator op,
+                                  byte[] value, RowMutations mutation) throws IOException {
         return checkAndMutate(row, family, qualifier, getCompareOp(op), value, mutation);
     }
 
@@ -375,7 +376,8 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
-    public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Put put) throws IOException {
+    public boolean checkAndPut(byte[] row, byte[] family, byte[] qualifier, CompareOperator op,
+                               byte[] value, Put put) throws IOException {
         return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
     }
 
@@ -407,7 +409,8 @@ public class OHTableClient implements Table, Lifecycle {
     }
 
     @Override
-    public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, CompareOperator op, byte[] value, Delete delete) throws IOException {
+    public boolean checkAndDelete(byte[] row, byte[] family, byte[] qualifier, CompareOperator op,
+                                  byte[] value, Delete delete) throws IOException {
         return ohTable.checkAndDelete(row, family, qualifier, getCompareOp(op), value, delete);
     }
 

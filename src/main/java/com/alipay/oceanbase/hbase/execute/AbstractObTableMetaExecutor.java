@@ -35,10 +35,7 @@ public abstract class AbstractObTableMetaExecutor<T> implements ObTableMetaExecu
         ObTable table = client.getRandomTable();
         ObTableMetaResponse response;
         try {
-            response = (ObTableMetaResponse) client.executeWithRetry(
-                    table,
-                    request,
-                    null /*tableName*/
+            response = (ObTableMetaResponse) client.executeWithRetry(table, request, null /*tableName*/
             );
         } catch (Exception e) {
             throw new IOException("Failed to execute request", e);

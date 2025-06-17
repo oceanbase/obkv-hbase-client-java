@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put>  writeBuffer            = new ArrayList<Put>();
+    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -459,8 +459,8 @@ public class OHTable implements Table {
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
-                                                              OHConnectionConfiguration ohConnectionConf)
-                                                                                                         throws IllegalArgumentException {
+                                                                    OHConnectionConfiguration ohConnectionConf)
+                                                                                                               throws IllegalArgumentException {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
             if (params.length != 2) {
@@ -500,13 +500,15 @@ public class OHTable implements Table {
 
     @Override
     public HTableDescriptor getTableDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
     @Override
     public TableDescriptor getDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
@@ -909,10 +911,12 @@ public class OHTable implements Table {
             byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                                   + columnName.length];
                     System.arraycopy(family, 0, newQualifier, 0, family.length);
                     newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1,
+                        columnName.length);
                     columnFilters.add(newQualifier);
                 }
             } else {
@@ -1750,6 +1754,7 @@ public class OHTable implements Table {
     public void setReadRpcTimeout(int readRpcTimeout) {
         this.readRpcTimeout = readRpcTimeout;
     }
+
     @Override
     public long getReadRpcTimeout(TimeUnit unit) {
         return getReadRpcTimeout();
@@ -1769,7 +1774,6 @@ public class OHTable implements Table {
     public void setWriteRpcTimeout(int writeRpcTimeout) {
         this.writeRpcTimeout = writeRpcTimeout;
     }
-
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
         this.obTableClient.setRuntimeBatchExecutor(runtimeBatchExecutor);
@@ -1902,7 +1906,7 @@ public class OHTable implements Table {
                 if (columnQualifier == null) {
                     obHTableFilter.addSelectColumnQualifier(new byte[0]);
                 } else {
-                   obHTableFilter.addSelectColumnQualifier(columnQualifier);
+                    obHTableFilter.addSelectColumnQualifier(columnQualifier);
                 }
             }
         }
@@ -1960,11 +1964,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
-                    scan.includeStartRow(), true, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(),
+                scan.getStartRow(), scan.includeStartRow(), true, ts);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
-                    scan.includeStopRow(), false, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(),
+                scan.getStopRow(), scan.includeStopRow(), false, ts);
         }
         obTableQuery.setBatchSize(scan.getBatch());
         obTableQuery.setLimit(scan.getLimit());
@@ -2044,10 +2048,11 @@ public class OHTable implements Table {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getTypeByte());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
-        if(isTableGroup) {
+        if (isTableGroup) {
             // construct new_kv otherwise filter will fail to match targeted columns
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2130,12 +2135,10 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                        filter = buildObHTableFilter(null, new TimeRange(0, kv.getTimestamp() + 1),
                             Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 }
@@ -2155,7 +2158,8 @@ public class OHTable implements Table {
         Cell newCell = kv;
         if (isTableGroup && family != null) {
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);

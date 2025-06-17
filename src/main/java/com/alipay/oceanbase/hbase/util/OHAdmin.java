@@ -1,3 +1,20 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
@@ -36,6 +53,7 @@ public class OHAdmin implements Admin {
     private boolean                aborted = false;
     private final OHConnectionImpl connection;
     private final Configuration    conf;
+
     OHAdmin(OHConnectionImpl connection) {
         this.connection = connection;
         this.conf = connection.getConfiguration();
@@ -67,13 +85,14 @@ public class OHAdmin implements Admin {
     public boolean tableExists(TableName tableName) throws IOException {
         try {
             OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-            ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+            ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+                tableName, connectionConf);
             OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
             return executor.tableExists(tableName.getNameAsString());
         } catch (Exception e) {
             // try to get the original cause
             Throwable cause = e.getCause();
-            while(cause != null && cause.getCause() != null) {
+            while (cause != null && cause.getCause() != null) {
                 cause = cause.getCause();
             }
             if (cause instanceof ObTableException) {
@@ -119,7 +138,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public List<TableDescriptor> listTableDescriptors(Pattern pattern, boolean b) throws IOException {
+    public List<TableDescriptor> listTableDescriptors(Pattern pattern, boolean b)
+                                                                                 throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -154,15 +174,18 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public HTableDescriptor getTableDescriptor(TableName tableName) throws TableNotFoundException, IOException {
+    public HTableDescriptor getTableDescriptor(TableName tableName) throws TableNotFoundException,
+                                                                   IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(
+            tableName.getNameAsString(), tableClient);
         try {
             return executor.getTableDescriptor();
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
                 throw new TableNotFoundException(tableName);
@@ -175,13 +198,15 @@ public class OHAdmin implements Admin {
     @Override
     public TableDescriptor getDescriptor(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(
+            tableName.getNameAsString(), tableClient);
         try {
             return executor.getTableDescriptor();
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
                 throw new TableNotFoundException(tableName);
@@ -194,13 +219,14 @@ public class OHAdmin implements Admin {
     @Override
     public void createTable(TableDescriptor tableDescriptor) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableDescriptor.getTableName(), connectionConf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableDescriptor.getTableName(), connectionConf);
         OHCreateTableExecutor executor = new OHCreateTableExecutor(tableClient);
         try {
             executor.createTable(tableDescriptor, null);
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else {
                 throw e;
@@ -209,7 +235,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void createTable(TableDescriptor tableDescriptor, byte[] bytes, byte[] bytes1, int i) throws IOException {
+    public void createTable(TableDescriptor tableDescriptor, byte[] bytes, byte[] bytes1, int i)
+                                                                                                throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -219,20 +246,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> createTableAsync(TableDescriptor tableDescriptor, byte[][] bytes) throws IOException {
+    public Future<Void> createTableAsync(TableDescriptor tableDescriptor, byte[][] bytes)
+                                                                                         throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
     public void deleteTable(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
         OHDeleteTableExecutor executor = new OHDeleteTableExecutor(tableClient);
         try {
             executor.deleteTable(tableName.getNameAsString());
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else {
                 throw e;
@@ -268,13 +297,15 @@ public class OHAdmin implements Admin {
     @Override
     public void enableTable(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient,
+            ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
         try {
             executor.enableTable(tableName.getNameAsString());
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else {
                 throw e;
@@ -305,13 +336,15 @@ public class OHAdmin implements Admin {
     @Override
     public void disableTable(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_DISABLE_TABLE);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient,
+            ObTableRpcMetaType.HTABLE_DISABLE_TABLE);
         try {
             executor.disableTable(tableName.getNameAsString());
         } catch (IOException e) {
             if (e.getCause() instanceof ObTableTransportException
-                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
             } else {
                 throw e;
@@ -341,8 +374,10 @@ public class OHAdmin implements Admin {
 
     private boolean isDisabled(TableName tableName) throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableDescriptorExecutor tableDescriptor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHTableDescriptorExecutor tableDescriptor = new OHTableDescriptorExecutor(
+            tableName.getNameAsString(), tableClient);
         return tableDescriptor.isDisable();
     }
 
@@ -367,12 +402,15 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void addColumnFamily(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+    public void addColumnFamily(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor)
+                                                                                                   throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public Future<Void> addColumnFamilyAsync(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+    public Future<Void> addColumnFamilyAsync(TableName tableName,
+                                             ColumnFamilyDescriptor columnFamilyDescriptor)
+                                                                                           throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -387,17 +425,22 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> deleteColumnFamilyAsync(TableName tableName, byte[] bytes) throws IOException {
+    public Future<Void> deleteColumnFamilyAsync(TableName tableName, byte[] bytes)
+                                                                                  throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void modifyColumnFamily(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+    public void modifyColumnFamily(TableName tableName,
+                                   ColumnFamilyDescriptor columnFamilyDescriptor)
+                                                                                 throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public Future<Void> modifyColumnFamilyAsync(TableName tableName, ColumnFamilyDescriptor columnFamilyDescriptor) throws IOException {
+    public Future<Void> modifyColumnFamilyAsync(TableName tableName,
+                                                ColumnFamilyDescriptor columnFamilyDescriptor)
+                                                                                              throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -462,12 +505,15 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void compact(TableName tableName, CompactType compactType) throws IOException, InterruptedException {
+    public void compact(TableName tableName, CompactType compactType) throws IOException,
+                                                                     InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void compact(TableName tableName, byte[] bytes, CompactType compactType) throws IOException, InterruptedException {
+    public void compact(TableName tableName, byte[] bytes, CompactType compactType)
+                                                                                   throws IOException,
+                                                                                   InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -502,17 +548,21 @@ public class OHAdmin implements Admin {
      * @throws InterruptedException
      */
     @Override
-    public void compactRegionServer(ServerName sn, boolean major) throws IOException, InterruptedException {
+    public void compactRegionServer(ServerName sn, boolean major) throws IOException,
+                                                                 InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void majorCompact(TableName tableName, CompactType compactType) throws IOException, InterruptedException {
+    public void majorCompact(TableName tableName, CompactType compactType) throws IOException,
+                                                                          InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void majorCompact(TableName tableName, byte[] bytes, CompactType compactType) throws IOException, InterruptedException {
+    public void majorCompact(TableName tableName, byte[] bytes, CompactType compactType)
+                                                                                        throws IOException,
+                                                                                        InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -607,7 +657,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> mergeRegionsAsync(byte[] bytes, byte[] bytes1, boolean b) throws IOException {
+    public Future<Void> mergeRegionsAsync(byte[] bytes, byte[] bytes1, boolean b)
+                                                                                 throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -642,7 +693,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void modifyTable(TableName tableName, TableDescriptor tableDescriptor) throws IOException {
+    public void modifyTable(TableName tableName, TableDescriptor tableDescriptor)
+                                                                                 throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -652,7 +704,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> modifyTableAsync(TableName tableName, TableDescriptor tableDescriptor) throws IOException {
+    public Future<Void> modifyTableAsync(TableName tableName, TableDescriptor tableDescriptor)
+                                                                                              throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -734,10 +787,13 @@ public class OHAdmin implements Admin {
      * @throws IOException if a remote or network exception occurs
      */
     @Override
-    public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName, TableName tableName) throws IOException {
+    public Map<byte[], RegionLoad> getRegionLoad(ServerName serverName, TableName tableName)
+                                                                                            throws IOException {
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHRegionLoadExecutor executor = new OHRegionLoadExecutor(tableName.getNameAsString(), tableClient);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(
+            tableName, connectionConf);
+        OHRegionLoadExecutor executor = new OHRegionLoadExecutor(tableName.getNameAsString(),
+            tableClient);
         return executor.getRegionLoad();
     }
 
@@ -752,7 +808,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> createNamespaceAsync(NamespaceDescriptor namespaceDescriptor) throws IOException {
+    public Future<Void> createNamespaceAsync(NamespaceDescriptor namespaceDescriptor)
+                                                                                     throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -762,7 +819,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public Future<Void> modifyNamespaceAsync(NamespaceDescriptor namespaceDescriptor) throws IOException {
+    public Future<Void> modifyNamespaceAsync(NamespaceDescriptor namespaceDescriptor)
+                                                                                     throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -777,7 +835,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public NamespaceDescriptor getNamespaceDescriptor(String s) throws NamespaceNotFoundException, IOException {
+    public NamespaceDescriptor getNamespaceDescriptor(String s) throws NamespaceNotFoundException,
+                                                               IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -816,7 +875,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public HTableDescriptor[] getTableDescriptorsByTableName(List<TableName> list) throws IOException {
+    public HTableDescriptor[] getTableDescriptorsByTableName(List<TableName> list)
+                                                                                  throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -872,7 +932,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public CompactionState getCompactionState(TableName tableName, CompactType compactType) throws IOException {
+    public CompactionState getCompactionState(TableName tableName, CompactType compactType)
+                                                                                           throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -892,32 +953,45 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void snapshot(String s, TableName tableName) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(String s, TableName tableName) throws IOException,
+                                                       SnapshotCreationException,
+                                                       IllegalArgumentException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void snapshot(byte[] bytes, TableName tableName) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(byte[] bytes, TableName tableName) throws IOException,
+                                                           SnapshotCreationException,
+                                                           IllegalArgumentException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void snapshot(String s, TableName tableName, SnapshotType snapshotType) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(String s, TableName tableName, SnapshotType snapshotType)
+                                                                                  throws IOException,
+                                                                                  SnapshotCreationException,
+                                                                                  IllegalArgumentException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void snapshot(SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException, IllegalArgumentException {
+    public void snapshot(SnapshotDescription snapshotDescription) throws IOException,
+                                                                 SnapshotCreationException,
+                                                                 IllegalArgumentException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void snapshotAsync(SnapshotDescription snapshotDescription) throws IOException, SnapshotCreationException {
+    public void snapshotAsync(SnapshotDescription snapshotDescription) throws IOException,
+                                                                      SnapshotCreationException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public boolean isSnapshotFinished(SnapshotDescription snapshotDescription) throws IOException, HBaseSnapshotException, UnknownSnapshotException {
+    public boolean isSnapshotFinished(SnapshotDescription snapshotDescription)
+                                                                              throws IOException,
+                                                                              HBaseSnapshotException,
+                                                                              UnknownSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -937,7 +1011,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void restoreSnapshot(byte[] bytes, boolean b) throws IOException, RestoreSnapshotException {
+    public void restoreSnapshot(byte[] bytes, boolean b) throws IOException,
+                                                        RestoreSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -947,27 +1022,35 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void restoreSnapshot(String s, boolean b, boolean b1) throws IOException, RestoreSnapshotException {
+    public void restoreSnapshot(String s, boolean b, boolean b1) throws IOException,
+                                                                RestoreSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void cloneSnapshot(byte[] bytes, TableName tableName) throws IOException, TableExistsException, RestoreSnapshotException {
+    public void cloneSnapshot(byte[] bytes, TableName tableName) throws IOException,
+                                                                TableExistsException,
+                                                                RestoreSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void cloneSnapshot(String s, TableName tableName, boolean b) throws IOException, TableExistsException, RestoreSnapshotException {
+    public void cloneSnapshot(String s, TableName tableName, boolean b) throws IOException,
+                                                                       TableExistsException,
+                                                                       RestoreSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public void cloneSnapshot(String s, TableName tableName) throws IOException, TableExistsException, RestoreSnapshotException {
+    public void cloneSnapshot(String s, TableName tableName) throws IOException,
+                                                            TableExistsException,
+                                                            RestoreSnapshotException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public Future<Void> cloneSnapshotAsync(String s, TableName tableName) throws IOException, TableExistsException {
+    public Future<Void> cloneSnapshotAsync(String s, TableName tableName) throws IOException,
+                                                                         TableExistsException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -977,12 +1060,14 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public byte[] execProcedureWithReturn(String s, String s1, Map<String, String> map) throws IOException {
+    public byte[] execProcedureWithReturn(String s, String s1, Map<String, String> map)
+                                                                                       throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
     @Override
-    public boolean isProcedureFinished(String s, String s1, Map<String, String> map) throws IOException {
+    public boolean isProcedureFinished(String s, String s1, Map<String, String> map)
+                                                                                    throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1007,7 +1092,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public List<SnapshotDescription> listTableSnapshots(Pattern pattern, Pattern pattern1) throws IOException {
+    public List<SnapshotDescription> listTableSnapshots(Pattern pattern, Pattern pattern1)
+                                                                                          throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1076,25 +1162,12 @@ public class OHAdmin implements Admin {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Turn the Split or Merge switches on or off.
-     *
-     * @param enabled     enabled or not
-     * @param synchronous If <code>true</code>, it waits until current split() call, if outstanding, to return.
-     * @param switchTypes switchType list {@link MasterSwitchType}
-     * @return Previous switch value array
-     */
     @Override
-    public boolean[] splitOrMergeEnabledSwitch(boolean enabled, boolean synchronous, MasterSwitchType... switchTypes) throws IOException {
+    public boolean[] splitOrMergeEnabledSwitch(boolean enabled, boolean synchronous,
+                                               MasterSwitchType... switchTypes) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
-    /**
-     * Query the current state of the switch.
-     *
-     * @param switchType
-     * @return <code>true</code> if the switch is enabled, <code>false</code> otherwise.
-     */
     @Override
     public boolean splitOrMergeEnabledSwitch(MasterSwitchType switchType) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
@@ -1121,7 +1194,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void updateReplicationPeerConfig(String s, ReplicationPeerConfig replicationPeerConfig) throws IOException {
+    public void updateReplicationPeerConfig(String s, ReplicationPeerConfig replicationPeerConfig)
+                                                                                                  throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1131,7 +1205,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public List<ReplicationPeerDescription> listReplicationPeers(Pattern pattern) throws IOException {
+    public List<ReplicationPeerDescription> listReplicationPeers(Pattern pattern)
+                                                                                 throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1146,7 +1221,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void recommissionRegionServer(ServerName serverName, List<byte[]> list) throws IOException {
+    public void recommissionRegionServer(ServerName serverName, List<byte[]> list)
+                                                                                  throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -1166,7 +1242,8 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public void clearCompactionQueues(ServerName serverName, Set<String> set) throws IOException, InterruptedException {
+    public void clearCompactionQueues(ServerName serverName, Set<String> set) throws IOException,
+                                                                             InterruptedException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 

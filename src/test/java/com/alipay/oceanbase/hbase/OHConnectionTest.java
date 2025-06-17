@@ -81,7 +81,8 @@ public class OHConnectionTest {
 
     @After
     public void after() throws IOException {
-        if (hTable != null) hTable.close();
+        if (hTable != null)
+            hTable.close();
     }
 
     @Test
@@ -841,7 +842,6 @@ public class OHConnectionTest {
         }
     }
 
-
     /*
     CREATE TABLEGROUP test_region_locator SHARDING = 'ADAPTIVE';
     CREATE TABLE `test_region_locator$family_region_locator` (
@@ -989,7 +989,7 @@ public class OHConnectionTest {
             });
         }
     }
-    
+
     @Test
     public void testHRegionLocation() throws IOException {
         final String tableNameStr = "test_region_locator";
@@ -1034,7 +1034,7 @@ public class OHConnectionTest {
             });
         }
     }
-    
+
     @Test
     public void testKeyPartitionWithRegionLocator() throws IOException {
         final String tableNameStr = "test_multi_cf";

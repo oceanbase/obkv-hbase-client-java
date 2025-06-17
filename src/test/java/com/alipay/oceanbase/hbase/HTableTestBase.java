@@ -2630,7 +2630,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         DependentColumnFilter dependentColumnFilter = new DependentColumnFilter(
-                Bytes.toBytes(family), Bytes.toBytes(column1));
+            Bytes.toBytes(family), Bytes.toBytes(column1));
         get.setFilter(dependentColumnFilter);
         r = hTable.get(get);
         Assert.assertEquals(3, r.rawCells().length);
@@ -2657,7 +2657,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         ValueFilter valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL,
-                new BinaryComparator(toBytes(value2)));
+            new BinaryComparator(toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
@@ -2666,7 +2666,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value1)));
+            toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.rawCells().length);
@@ -2678,7 +2678,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.rawCells().length);
@@ -2687,7 +2687,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.rawCells().length);
@@ -2696,7 +2696,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
-                toBytes(value1)));
+            toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(2, r.rawCells().length);
@@ -2705,7 +2705,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-                new BinaryComparator(toBytes(value1)));
+            new BinaryComparator(toBytes(value1)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.rawCells().length);
@@ -2714,7 +2714,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         valueFilter = new ValueFilter(CompareFilter.CompareOp.GREATER, new BinaryComparator(
-                toBytes(value3)));
+            toBytes(value3)));
         get.setFilter(valueFilter);
         r = hTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
@@ -2736,7 +2736,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         QualifierFilter qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-                new BinaryComparator(toBytes(column1)));
+            new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(3, r.rawCells().length);
@@ -2745,7 +2745,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(column2)));
+            toBytes(column2)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.rawCells().length);
@@ -2754,7 +2754,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER,
-                new BinaryComparator(toBytes(column1)));
+            new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(4, r.rawCells().length);
@@ -2763,7 +2763,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
         qualifierFilter = new QualifierFilter(CompareFilter.CompareOp.GREATER_OR_EQUAL,
-                new BinaryComparator(toBytes(column1)));
+            new BinaryComparator(toBytes(column1)));
         get.setFilter(qualifierFilter);
         r = hTable.get(get);
         Assert.assertEquals(7, r.rawCells().length);
@@ -2807,7 +2807,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new SingleColumnValueFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
+            .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2817,7 +2817,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new SingleColumnValueExcludeFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
+            .toBytes(column1), CompareFilter.CompareOp.EQUAL, Bytes.toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2827,7 +2827,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new DependentColumnFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column1), false));
+            .toBytes(column1), false));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2837,7 +2837,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new DependentColumnFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column2), false));
+            .toBytes(column2), false));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2847,7 +2847,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new DependentColumnFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column2)));
+            .toBytes(column2)));
         get = new Get(toBytes(key2));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2857,7 +2857,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new DependentColumnFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column2), true));
+            .toBytes(column2), true));
         get = new Get(toBytes(key2));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2867,8 +2867,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new DependentColumnFilter(Bytes.toBytes(family), Bytes
-                .toBytes(column2), false, CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value2))));
+            .toBytes(column2), false, CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            toBytes(value2))));
         get = new Get(toBytes(key2));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2879,7 +2879,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(1));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.GREATER,
-                new BinaryComparator(toBytes(column2))));
+            new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2890,7 +2890,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         filterList = new FilterList(MUST_PASS_ONE);
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-                new BinaryComparator(toBytes(column2))));
+            new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2901,7 +2901,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-                new BinaryComparator(toBytes(column2))));
+            new BinaryComparator(toBytes(column2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2922,7 +2922,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         filterList = new FilterList();
         filterList.addFilter(new QualifierFilter(CompareFilter.CompareOp.EQUAL,
-                new BinaryComparator(toBytes(column2))));
+            new BinaryComparator(toBytes(column2))));
         filterList.addFilter(new ColumnCountGetFilter(2));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -2934,7 +2934,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         filterList = new FilterList();
         filterList.addFilter(new ColumnCountGetFilter(2));
         filterList.addFilter(new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value2))));
+            toBytes(value2))));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
         get.addFamily(toBytes(family));
@@ -2993,7 +2993,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         // 任何一个版本满足则返回本行
         SingleColumnValueFilter singleColumnValueFilter;
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3004,7 +3004,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
 
         SingleColumnValueExcludeFilter singleColumnValueExcludeFilter;
         singleColumnValueExcludeFilter = new SingleColumnValueExcludeFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value1)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3014,7 +3014,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(4, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value2)));
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3024,7 +3024,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(0, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
+            Bytes.toBytes(column1), CompareFilter.CompareOp.EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3035,7 +3035,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(7, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
                 toBytes(value1)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3046,7 +3046,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(0, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3057,7 +3057,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(7, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column2), CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.LESS_OR_EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3068,7 +3068,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(7, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER_OR_EQUAL, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER_OR_EQUAL, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3079,7 +3079,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(7, r.rawCells().length);
 
         singleColumnValueFilter = new SingleColumnValueFilter(Bytes.toBytes(family),
-                Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER, new BinaryComparator(
+            Bytes.toBytes(column2), CompareFilter.CompareOp.GREATER, new BinaryComparator(
                 toBytes(value2)));
         singleColumnValueFilter.setLatestVersionOnly(false);
         get = new Get(toBytes(key1));
@@ -3096,7 +3096,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         tryPut(hTable, putKey1Column2Value2);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         SkipFilter skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3106,7 +3106,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(2, r.rawCells().length);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3119,7 +3119,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         tryPut(hTable, putKey1Column2Value1);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3129,7 +3129,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(0, r.rawCells().length);
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         skipFilter = new SkipFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -3154,7 +3154,7 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         WhileMatchFilter whileMatchFilter;
 
         valueFilter = new ValueFilter(CompareFilter.CompareOp.NOT_EQUAL, new BinaryComparator(
-                toBytes(value2)));
+            toBytes(value2)));
         whileMatchFilter = new WhileMatchFilter(valueFilter);
         get = new Get(toBytes(key1));
         get.setMaxVersions(10);
@@ -4988,7 +4988,8 @@ public abstract class HTableTestBase extends HTableMultiCFTestBase {
         Assert.assertEquals(2, r.rawCells().length);
         delete = new Delete(key.getBytes());
         delete.addColumns(family.getBytes(), column.getBytes());
-        ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(), CompareFilter.CompareOp.EQUAL, value.getBytes(), delete);
+        ret = hTable.checkAndDelete(key.getBytes(), family.getBytes(), column.getBytes(),
+            CompareFilter.CompareOp.EQUAL, value.getBytes(), delete);
         Assert.assertTrue(ret);
         get = new Get(key.getBytes());
         get.setMaxVersions(Integer.MAX_VALUE);

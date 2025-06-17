@@ -1,23 +1,39 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.util;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.hbase.RegionLoad;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class OHRegionLoadExecutor extends AbstractObTableMetaExecutor<Map<byte[], RegionLoad>> {
-    private final String tableName;
+    private final String        tableName;
     private final ObTableClient client;
+
     OHRegionLoadExecutor(String tableName, ObTableClient client) {
         this.tableName = tableName;
         this.client = client;
@@ -33,15 +49,24 @@ public class OHRegionLoadExecutor extends AbstractObTableMetaExecutor<Map<byte[]
     @Override
     public Map<byte[], RegionLoad> parse(ObTableMetaResponse response) throws IOException {
         Map<byte[], RegionLoad> regionLoadMap = new LinkedHashMap<>();
-        JSONObject metrcisJSONObject = JSON.parseObject(response.getData());
-        String tableGroupName = metrcisJSONObject.getString("tableName");
-        JSONObject regionList = metrcisJSONObject.getJSONObject("regionList");
-        List<Integer> regions = regionList.getJSONArray("regions").toJavaList(Integer.class);
-        List<Integer> memTableSizeList = regionList.getJSONArray("memTableSize").toJavaList(Integer.class);
-        List<Integer> ssTableSizeList = regionList.getJSONArray("ssTableSize").toJavaList(Integer.class);
-        if (regions.isEmpty() || regions.size() != memTableSizeList.size() || memTableSizeList.size() != ssTableSizeList.size()) {
-            throw new IOException("size length has to be the same");
+        // use jackson to parse json
+        final ObjectMapper objectMapper = new ObjectMapper();
+        final JsonNode jsonMap = Optional.<JsonNode>ofNullable(objectMapper.readTree(response.getData())).orElse(null);
+        if (jsonMap == null) {
+            throw new IOException("jsonMap is null");
         }
+        JsonNode tableGroupNameNode = Optional.<JsonNode>ofNullable(jsonMap.get("tableName"))
+                .orElseThrow(() -> new IOException("tableName is null"));
+        String tableGroupName = tableGroupNameNode.asText();
+
+        JsonNode regionListNode = Optional.<JsonNode>ofNullable(jsonMap.get("regionList"))
+                .orElseThrow(() -> new IOException("regionList is null"));
+        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("regions"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("regions is null"));
+        List<Integer> memTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("memTableSize"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("memTableSize is null"));
+        List<Integer> ssTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("ssTableSize"), new TypeReference<List<Integer>>() {}))
+                .orElseThrow(() -> new IOException("ssTableSize is null"));
         for (int i = 0; i < regions.size(); ++i) {
             String name_str = Integer.toString(regions.get(i));
             byte[] name = name_str.getBytes();
@@ -60,12 +85,15 @@ public class OHRegionLoadExecutor extends AbstractObTableMetaExecutor<Map<byte[]
     public ObTableRpcMetaType getMetaType() throws IOException {
         return ObTableRpcMetaType.HTABLE_REGION_METRICS;
     }
-    
+
     public Map<byte[], RegionLoad> getRegionLoad() throws IOException {
-        final ObTableMetaRequest request = new ObTableMetaRequest();
+        ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
-        final Map<String, String> requestData = new HashMap<>();
+        Map<String, Object> requestData = new HashMap<>();
         requestData.put("table_name", tableName);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
+        request.setData(jsonData);
         return execute(client, request);
     }
 }
