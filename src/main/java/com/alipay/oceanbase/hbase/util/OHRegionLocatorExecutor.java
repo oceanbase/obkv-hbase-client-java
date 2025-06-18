@@ -141,33 +141,43 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
             throw new ObTableUnexpectedException(
                     "The number of partitions should be an integer multiple of the number of tables");
         }
-        // the size of partitions the multiple of the number of zones, the number of tablets and the number of tables
-        final int regionCount = partitions.size() / tableIdDict.size(); // get tablet boundaries of leaders and followers
         final List<byte[]> startKeysList = new ArrayList<>();
         final List<byte[]> endKeysList = new ArrayList<>();
-
-        for (int i = 0; i < regionCount; ++i) {
+        // Currently based on SHARDING = 'ADAPTIVE' Table Group implementation for multi-CF, 
+        // where one constraint is that Tables within the same Table Group have the same partitioning method,
+        // thus their associated partition boundaries are consistent.
+        //
+        // In native HBase, a Region can contain multiple CFs. 
+        // Similarly, for OBKV-HBase, multiple CFs corresponding to related tablets also reside on the same machine.
+        // Therefore, here we maintain the same behavior by returning all partitions from just one table.
+        final int regionCountPerTable = partitions.size() / tableIdDict.size();
+        
+        List<Object> oneTableLeaders = new ArrayList<>();
+        for (int i = 0; i < regionCountPerTable; ++i) {
             boolean isLeader = ((int) ((List<Object>) partitions.get(i)).get(4) == 1);
-            if (!isLeader) { // only record leader's boundary
-                continue;
+            if (isLeader) {
+                oneTableLeaders.add(partitions.get(i));
             }
+        }
+        // Note that the number of leaders per single table != (regionCountPerTable / replicaDict.size()).
+        for (int i = 0; i < oneTableLeaders.size(); ++i) {
             if (i == 0) {
                 startKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
-                endKeysList.add(((List<Object>) partitions.get(i)).get(2).toString().getBytes());
-            } else if (i == regionCount - 1) {
-                startKeysList.add(((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes());
+                endKeysList.add(((List<Object>) oneTableLeaders.get(i)).get(2).toString().getBytes());
+            } else if (i == oneTableLeaders.size() - 1) {
+                startKeysList.add(((List<Object>) oneTableLeaders.get(i - 1)).get(2).toString().getBytes());
                 endKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
             } else {
-                startKeysList.add(((List<Object>) partitions.get(i - 1)).get(2).toString().getBytes());
-                endKeysList.add(((List<Object>) partitions.get(i)).get(2).toString().getBytes());
+                startKeysList.add(((List<Object>) oneTableLeaders.get(i - 1)).get(2).toString().getBytes());
+                endKeysList.add(((List<Object>) oneTableLeaders.get(i)).get(2).toString().getBytes());
             }
         }
         final byte[][] startKeys = startKeysList.toArray(new byte[0][]);
         final byte[][] endKeys = endKeysList.toArray(new byte[0][]);
-        // Create region locations for all regions
-        final List<HRegionLocation> regionLocations = IntStream.range(0, regionCount)
+        // Create region locations for all regions in one table
+        final List<HRegionLocation> regionLocations = IntStream.range(0, regionCountPerTable)
                 .mapToObj(i -> {
-                    final List<Object> partition = (List<Object>) partitions.get(Math.min(i, regionCount - 1));
+                    final List<Object> partition = (List<Object>) partitions.get(Math.min(i, regionCountPerTable - 1));
                     final int replicationIdx = (int) partition.get(3);
                     final List<Object> hostInfo = (List<Object>) replicaDict.get(replicationIdx);
 
@@ -176,10 +186,11 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             (int) hostInfo.get(1),
                             i
                     );
+                    int boundIndex = i / replicaDict.size();
                     final HRegionInfo regionInfo = new HRegionInfo(
                             TableName.valueOf(tableName),
-                            startKeys[i],
-                            endKeys[i]
+                            startKeys[boundIndex],
+                            endKeys[boundIndex]
                     );
                     return new HRegionLocation(regionInfo, serverName, i);
                 })
