@@ -120,7 +120,7 @@ public class ObTableClientManager {
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
             } catch (Exception e) {
-                throw new IOException(e);
+                throw OHBaseExceptionUtil.convertTableException(e);
             } finally {
                 lock.unlock();
             }
