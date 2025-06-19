@@ -28,17 +28,18 @@ import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class OHRegionLocator implements RegionLocator {
-    private byte[][]              startKeys;
-    private byte[][]              endKeys;
-    private ObTableClient         tableClient;
-    private TableName             tableName;
+    private byte[][]                    startKeys;
+    private byte[][]                    endKeys;
+    private final ObTableClient         tableClient;
+    private final TableName             tableName;
 
-    private List<HRegionLocation> regionLocations;
+    private List<Pair<HRegionLocation, Boolean>> regionLocations;
 
     public OHRegionLocator(byte[][] startKeys, byte[][] endKeys,
-                           List<HRegionLocation> regionLocations, TableName tableName,
+                           List<Pair<HRegionLocation, Boolean>> regionLocations, TableName tableName,
                            ObTableClient tableClient) {
         this.startKeys = startKeys;
         this.endKeys = endKeys;
@@ -50,12 +51,16 @@ public class OHRegionLocator implements RegionLocator {
     @Override
     public HRegionLocation getRegionLocation(byte[] bytes) throws IOException {
         // check if bytes is in the range of startKeys and endKeys
-        for (HRegionLocation regionLocation : regionLocations) {
-            if (regionLocation.getRegionInfo().containsRow(bytes)) {
-                return regionLocation;
+        for (Pair<HRegionLocation, Boolean> pair : regionLocations) {
+            if (pair.getSecond() && pair.getFirst().getRegionInfo().containsRow(bytes)) {
+                return pair.getFirst();
             }
         }
         return null;
+    }
+
+    public List<Pair<HRegionLocation, Boolean>> getRegionLocationPair() {
+        return regionLocations;
     }
 
     @Override
@@ -64,10 +69,10 @@ public class OHRegionLocator implements RegionLocator {
             OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(),
                 tableClient);
             try {
-                RegionLocator location = executor.getRegionLocator(tableName.toString());
+                OHRegionLocator location = executor.getRegionLocator(tableName.toString());
                 this.startKeys = location.getStartKeys();
                 this.endKeys = location.getEndKeys();
-                this.regionLocations = location.getAllRegionLocations();
+                this.regionLocations = location.getRegionLocationPair();
             } catch (IOException e) {
                 if (e.getCause() instanceof ObTableTransportException
                     && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
@@ -82,7 +87,7 @@ public class OHRegionLocator implements RegionLocator {
 
     @Override
     public List<HRegionLocation> getAllRegionLocations() throws IOException {
-        return regionLocations;
+        return regionLocations.stream().map(Pair::getFirst).collect(Collectors.toList());
     }
 
     /**

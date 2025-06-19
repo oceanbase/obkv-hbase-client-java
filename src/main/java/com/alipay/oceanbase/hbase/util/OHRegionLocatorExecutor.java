@@ -28,6 +28,7 @@ import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
 import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
 import java.util.*;
@@ -72,25 +73,25 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                     "partitions": [
                       // 表1001的3个分区，每个分区3副本
                       [0, 50001, "rowkey_1", 0, 1], // leader
-                      [0, 50001, "rowkey_1", 1, 0], // follower
-                      [0, 50001, "rowkey_1", 2, 0], // follower
+                      [0, 50001, "rowkey_1", 1, 2], // follower
+                      [0, 50001, "rowkey_1", 2, 2], // follower
                       [0, 50002, "rowkey_2", 0, 1],
-                      [0, 50002, "rowkey_2", 1, 0],
-                      [0, 50002, "rowkey_2", 2, 0],
+                      [0, 50002, "rowkey_2", 1, 2],
+                      [0, 50002, "rowkey_2", 2, 2],
                       [0, 50003, "rowkey_3", 0, 1],
-                      [0, 50003, "rowkey_3", 1, 0],
-                      [0, 50003, "rowkey_3", 2, 0],
+                      [0, 50003, "rowkey_3", 1, 2],
+                      [0, 50003, "rowkey_3", 2, 2],
                 
                       // 表1002的3个分区，每个分区3副本
                       [1, 50004, "rowkey_1", 0, 1],
-                      [1, 50004, "rowkey_1", 1, 0],
-                      [1, 50004, "rowkey_1", 2, 0],
+                      [1, 50004, "rowkey_1", 1, 2],
+                      [1, 50004, "rowkey_1", 2, 2],
                       [1, 50005, "rowkey_2", 0, 1],
-                      [1, 50005, "rowkey_2", 1, 0],
-                      [1, 50005, "rowkey_2", 2, 0],
+                      [1, 50005, "rowkey_2", 1, 2],
+                      [1, 50005, "rowkey_2", 2, 2],
                       [1, 50006, "rowkey_3", 0, 1],
-                      [1, 50006, "rowkey_3", 1, 0],
-                      [1, 50006, "rowkey_3", 2, 0]
+                      [1, 50006, "rowkey_3", 1, 2],
+                      [1, 50006, "rowkey_3", 2, 2]
                     ]
                   }
              */
@@ -175,7 +176,7 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
         final byte[][] startKeys = startKeysList.toArray(new byte[0][]);
         final byte[][] endKeys = endKeysList.toArray(new byte[0][]);
         // Create region locations for all regions in one table
-        final List<HRegionLocation> regionLocations = IntStream.range(0, regionCountPerTable)
+        final List regionLocations = IntStream.range(0, regionCountPerTable)
                 .mapToObj(i -> {
                     final List<Object> partition = (List<Object>) partitions.get(Math.min(i, regionCountPerTable - 1));
                     final int replicationIdx = (int) partition.get(3);
@@ -192,7 +193,9 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             startKeys[boundIndex],
                             endKeys[boundIndex]
                     );
-                    return new HRegionLocation(regionInfo, serverName, i);
+                    HRegionLocation location = new HRegionLocation(regionInfo, serverName, i);
+                    Boolean role = (int) partition.get(4) == 1;
+                    return new Pair(location, role);
                 })
                 .collect(Collectors.toList());
 
@@ -215,8 +218,8 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
         final byte[][] endKeys = new byte[1][];
         startKeys[0] = HConstants.EMPTY_BYTE_ARRAY;
         endKeys[0] = HConstants.EMPTY_BYTE_ARRAY;
-
-        final List<HRegionLocation> regionLocations = IntStream.range(0, partitions.size())
+        final int regionCountPerTable = partitions.size() / tableIdDict.size();
+        final List regionLocations = IntStream.range(0, regionCountPerTable)
                 .mapToObj(i -> {
                     final List<Object> partition = (List<Object>) partitions.get(i);
                     final int replicationIdx = (int) partition.get(3);
@@ -232,10 +235,12 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             startKeys[0],
                             endKeys[0]
                     );
-                    return new HRegionLocation(regionInfo, serverName, i);
+                    HRegionLocation location = new HRegionLocation(regionInfo, serverName, i);
+                    Boolean role = (int) partition.get(4) == 1;
+                    return new Pair(location, role);
                 })
                 .collect(Collectors.toList());
-
+        
         return new OHRegionLocator(startKeys, endKeys, regionLocations, TableName.valueOf(tableName), client);
     }
 
