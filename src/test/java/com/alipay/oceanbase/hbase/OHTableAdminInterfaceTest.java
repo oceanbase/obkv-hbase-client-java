@@ -29,9 +29,10 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
-
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -45,7 +46,7 @@ import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.executeSQL;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
-import static  com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
+import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 
 public class OHTableAdminInterfaceTest {
     public OHTablePool setUpLoadPool() throws IOException {
@@ -56,6 +57,28 @@ public class OHTableAdminInterfaceTest {
         ohTablePool.setRuntimeBatchExecutor("test", Executors.newFixedThreadPool(3));
 
         return ohTablePool;
+    }
+
+    public static void openHbaseAdminDDL() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM SET _enable_kv_hbase_admin_ddl = true;";
+        conn.createStatement().execute(stmt);
+    }
+
+    public static void closeHbaseAdminDDL() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        String stmt = "ALTER SYSTEM SET _enable_kv_hbase_admin_ddl = false;";
+        conn.createStatement().execute(stmt);
+    }
+
+    @BeforeClass
+    public static void before() throws Exception {
+        openHbaseAdminDDL();
+    }
+
+    @AfterClass
+    public static void finish() throws Exception {
+        closeHbaseAdminDDL();
     }
 
     public OHTablePool setUpPool() throws IOException {
@@ -321,7 +344,8 @@ public class OHTableAdminInterfaceTest {
         Assert.assertEquals(0, startEndKeys.getSecond()[0].length);
     }
 
-    public static void createTable(Admin admin, TableName tableName, String... columnFamilies) throws IOException {
+    public static void createTable(Admin admin, TableName tableName, String... columnFamilies)
+                                                                                              throws IOException {
         HTableDescriptor htd = new HTableDescriptor(tableName);
         // Add column families
         for (String cf : columnFamilies) {
@@ -427,10 +451,8 @@ public class OHTableAdminInterfaceTest {
                 try {
                     admin.enableTable(TableName.valueOf("en_dis", "test"));
                     Assert.fail();
-                } catch (IOException ex) {
-                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                    Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_ENABLED.errorCode,
-                            ((ObTableException) ex.getCause()).getErrorCode());
+                } catch (Exception ex) {
+                    Assert.assertEquals(TableNotDisabledException.class, ex.getClass());
                 }
             }
 
@@ -445,10 +467,8 @@ public class OHTableAdminInterfaceTest {
                 try {
                     admin.disableTable(TableName.valueOf("en_dis", "test"));
                     Assert.fail();
-                } catch (IOException ex) {
-                    Assert.assertTrue(ex.getCause() instanceof ObTableException);
-                    Assert.assertEquals(ResultCodes.OB_KV_TABLE_NOT_DISABLED.errorCode,
-                            ((ObTableException) ex.getCause()).getErrorCode());
+                } catch (Exception ex) {
+                    Assert.assertEquals(TableNotEnabledException.class, ex.getClass());
                 }
             }
 
@@ -1255,7 +1275,9 @@ public class OHTableAdminInterfaceTest {
 
     void checkKVAttributes(String tableName, String kvAttributes) throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
-        java.sql.ResultSet resultSet = conn.createStatement().executeQuery("select kv_attributes from oceanbase.__all_table where table_name = '" + tableName + "'");
+        java.sql.ResultSet resultSet = conn.createStatement().executeQuery(
+            "select kv_attributes from oceanbase.__all_table where table_name = '" + tableName
+                    + "'");
         resultSet.next();
         String value = resultSet.getString(1);
         Assert.assertEquals(kvAttributes, value);
@@ -1328,5 +1350,172 @@ public class OHTableAdminInterfaceTest {
         admin.deleteTable(TableName.valueOf(tableName));
         assertFalse("Table should not exist after normal delete", 
                    admin.tableExists(TableName.valueOf(tableName)));
+    }
+
+    @Test
+    public void testHbaseAdminDDLKnob() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        try {
+            closeHbaseAdminDDL();
+            try {
+                createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+                fail();
+            } catch (Exception e) {
+                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+            }
+
+            try {
+                admin.disableTable(TableName.valueOf("t1"));
+                fail();
+            } catch (Exception e) {
+                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+            }
+
+            try {
+                admin.enableTable(TableName.valueOf("t1"));
+                fail();
+            } catch (Exception e) {
+                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+            }
+
+            try {
+                admin.deleteTable(TableName.valueOf("t1"));
+                fail();
+            } catch (Exception e) {
+                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            openHbaseAdminDDL();
+        }
+    }
+
+    @Test
+    public void testHbaseDDLException() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        // 1. create a created table
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableExistsException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 2. delete a non-exist table
+        try {
+            admin.deleteTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotFoundException.class);
+        }
+
+        // 3. enable a enabled table
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            admin.enableTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotDisabledException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 4. disable a disabled table
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            admin.disableTable(TableName.valueOf("t1"));
+            admin.disableTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotEnabledException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 5. get htable descriptor from an uncreated table
+        try {
+            HTableDescriptor descriptor = admin.getTableDescriptor(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotFoundException.class);
+        }
+
+        // 6. get region metrics from an uncreated table
+        try {
+            admin.getRegionMetrics(null, TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Assert.assertEquals(e.getClass(), TableNotFoundException.class);
+        }
+
+        // 6. create a table in an uncreated namespace
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableExistsException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 7. delete a non-exist table in an uncreated namespace
+        try {
+            admin.deleteTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotFoundException.class);
+        }
+
+        // 8. enable a enabled table in an uncreated namespace
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            admin.enableTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotDisabledException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 9. disable a disabled table in an uncreated namespace
+        try {
+            createTable(admin, TableName.valueOf("t1"), "cf1", "cf2", "cf3");
+            admin.disableTable(TableName.valueOf("t1"));
+            admin.disableTable(TableName.valueOf("t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), TableNotEnabledException.class);
+        } finally {
+            admin.deleteTable(TableName.valueOf("t1"));
+        }
+
+        // 10. get a table metrics from an uncreated namespace
+        try {
+            admin.getRegionMetrics(null, TableName.valueOf("n1:t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
+        }
+
+        // 11. check table exists from an uncreated namespace
+        try {
+            admin.tableExists(TableName.valueOf("n1:t1"));
+            fail();
+        } catch (Exception e) {
+            Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
+        }
+
     }
 }
