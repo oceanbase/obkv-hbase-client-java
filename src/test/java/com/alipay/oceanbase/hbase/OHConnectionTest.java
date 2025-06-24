@@ -1050,6 +1050,39 @@ public class OHConnectionTest {
         Assert.assertEquals(startKeys[0], endKeys[0]);
         Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
     }
+    
+    @Test
+    public void testRangeKeySecondaryPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_secondary_range_key";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
+    }
+
+    @Test
+    public void testKeyRangeSecondaryPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_secondary_key_range";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
+    }
+
 
     @Test
     public void testBufferedMutatorPeriodicFlush() throws Exception {
