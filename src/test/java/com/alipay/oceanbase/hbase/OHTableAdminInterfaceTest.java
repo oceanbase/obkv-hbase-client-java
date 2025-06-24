@@ -94,8 +94,9 @@ public class OHTableAdminInterfaceTest {
         EN_CREATE_HTABLE_TG_FINISH_ERR(2621),
         EN_CREATE_HTABLE_CF_FINISH_ERR(2622),
         EN_DISABLE_HTABLE_CF_FINISH_ERR(2623),
-        EN_DELETE_HTABLE_CF_FINISH_ERR(2624);
-        
+        EN_DELETE_HTABLE_CF_FINISH_ERR(2624),
+        EN_DELETE_HTABLE_SKIP_CF_ERR(2625);
+
         private final int errCode;
         
         ErrSimPoint(int errCode) {
@@ -568,7 +569,7 @@ public class OHTableAdminInterfaceTest {
                     admin.getRegionMetrics(null, TableName.valueOf("tablegroup_not_exists"));
                 });
         Assert.assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
 
         // test use serverName without tableName to get region metrics
         assertThrows(FeatureNotSupportedException.class,
@@ -663,6 +664,19 @@ public class OHTableAdminInterfaceTest {
         assertEquals(3, metrics.size());
     }
 
+    private void deleteTableIfExists(Admin admin, TableName tableName) throws Exception {
+        if (admin.tableExists(tableName)) {
+            if (admin.isTableEnabled(tableName)) {
+                admin.disableTable(tableName);
+            }
+            admin.deleteTable(tableName);
+        }
+    }
+
+    private void deleteTableIfExists(Admin admin, String tableName) throws Exception {
+        deleteTableIfExists(admin, TableName.valueOf(tableName));
+    }
+
     @Test
     public void testAdminDeleteTable() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
@@ -673,20 +687,28 @@ public class OHTableAdminInterfaceTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        createTable(admin, TableName.valueOf("test_del_tb"), "cf1", "cf2", "cf3");
-        createTable(admin, TableName.valueOf("del_tb", "test"), "cf1", "cf2", "cf3");
-        assertTrue(admin.tableExists(TableName.valueOf("del_tb", "test")));
-        assertTrue(admin.tableExists(TableName.valueOf("test_del_tb")));
-        IOException thrown = assertThrows(IOException.class,
-                () -> {
-                    admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
-                });
-        Assert.assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
-        admin.deleteTable(TableName.valueOf("del_tb", "test"));
-        admin.deleteTable(TableName.valueOf("test_del_tb"));
-        assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
-        assertFalse(admin.tableExists(TableName.valueOf("test_del_tb")));
+        try {
+            createTable(admin, TableName.valueOf("test_del_tb"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("del_tb", "test"), "cf1", "cf2", "cf3");
+            assertTrue(admin.tableExists(TableName.valueOf("del_tb", "test")));
+            assertTrue(admin.tableExists(TableName.valueOf("test_del_tb")));
+            IOException thrown = assertThrows(IOException.class,
+                    () -> {
+                        admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
+                    });
+            Assert.assertTrue(thrown.getCause() instanceof ObTableException);
+            Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+            admin.deleteTable(TableName.valueOf("del_tb", "test"));
+            admin.deleteTable(TableName.valueOf("test_del_tb"));
+            assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
+            assertFalse(admin.tableExists(TableName.valueOf("test_del_tb")));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            deleteTableIfExists(admin, "test_del_tb");
+            deleteTableIfExists(admin, "del_tb");
+        }
     }
 
     @Test
@@ -1305,51 +1327,62 @@ public class OHTableAdminInterfaceTest {
         htd.addFamily(hcd1);
         htd.addFamily(hcd2);
         htd.addFamily(hcd3);
-        
-        // 1. open err EN_CREATE_HTABLE_TG_FINISH_ERR
-        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, true);
-        ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
-        assertFalse("Table should not exist after TG error injection", 
-                   admin.tableExists(TableName.valueOf(tableName)));
-        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, false);
-        
-        // 2. open err EN_CREATE_HTABLE_CF_FINISH_ERR
-        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, true);
-        ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
-        assertFalse("Table should not exist after CF error injection", 
-                   admin.tableExists(TableName.valueOf(tableName)));
-        setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, false);
-        
-        // 3. create table without error
-        admin.createTable(htd);
-        assertTrue("Table should exist after normal creation", 
-                  admin.tableExists(TableName.valueOf(tableName)));
-        assertEquals("Table should have 3 column families", 3, 
+
+        try {
+            // 1. open err EN_CREATE_HTABLE_TG_FINISH_ERR
+            setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, true);
+            ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
+            assertFalse("Table should not exist after TG error injection",
+                    admin.tableExists(TableName.valueOf(tableName)));
+            setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_TG_FINISH_ERR, false);
+
+            // 2. open err EN_CREATE_HTABLE_CF_FINISH_ERR
+            setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, true);
+            ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.createTable(htd));
+            assertFalse("Table should not exist after CF error injection",
+                    admin.tableExists(TableName.valueOf(tableName)));
+            setErrSimPoint(ErrSimPoint.EN_CREATE_HTABLE_CF_FINISH_ERR, false);
+
+            // 3. create table without error
+            admin.createTable(htd);
+            assertTrue("Table should exist after normal creation",
+                    admin.tableExists(TableName.valueOf(tableName)));
+            assertEquals("Table should have 3 column families", 3,
                     admin.getTableDescriptor(TableName.valueOf(tableName)).getFamilies().size());
-        
-        // 4. open err EN_DISABLE_HTABLE_CF_FINISH_ERR
-        setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, true);
-        admin.disableTable(TableName.valueOf(tableName));
-        assertFalse("Table should not be disabled after disable error injection", 
-                   admin.isTableDisabled(TableName.valueOf(tableName)));
-        setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, false);
-        
-        // 5. disable table without error
-        admin.disableTable(TableName.valueOf(tableName));
-        assertTrue("Table should be disabled after normal disable", 
-                  admin.isTableDisabled(TableName.valueOf(tableName)));
-        
-        // 6. open err EN_DELETE_HTABLE_CF_FINISH_ERR
-        setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, true);
-        admin.deleteTable(TableName.valueOf(tableName));
-        assertTrue("Table should still exist after delete error injection", 
-                  admin.tableExists(TableName.valueOf(tableName)));
-        setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, false);
-        
-        // 7. delete table without error
-        admin.deleteTable(TableName.valueOf(tableName));
-        assertFalse("Table should not exist after normal delete", 
-                   admin.tableExists(TableName.valueOf(tableName)));
+
+            // 4. open err EN_DISABLE_HTABLE_CF_FINISH_ERR
+            setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, true);
+            ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.disableTable(TableName.valueOf(tableName)));
+            assertFalse("Table should not be disabled after disable error injection",
+                    admin.isTableDisabled(TableName.valueOf(tableName)));
+            setErrSimPoint(ErrSimPoint.EN_DISABLE_HTABLE_CF_FINISH_ERR, false);
+
+            // 5. disable table without error
+            admin.disableTable(TableName.valueOf(tableName));
+            assertTrue("Table should be disabled after normal disable",
+                    admin.isTableDisabled(TableName.valueOf(tableName)));
+
+            // 6. open err EN_DELETE_HTABLE_CF_FINISH_ERR
+            setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, true);
+            ObHTableTestUtil.executeIgnoreUnexpectedError(() -> admin.deleteTable(TableName.valueOf(tableName)));
+            assertTrue("Table should still exist after delete error injection",
+                    admin.tableExists(TableName.valueOf(tableName)));
+            setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, false);
+
+            // 7. delete table without error
+            admin.deleteTable(TableName.valueOf(tableName));
+            assertFalse("Table should not exist after normal delete",
+                    admin.tableExists(TableName.valueOf(tableName)));
+        } catch (Exception e) {
+            e.printStackTrace();
+            assertTrue(false);
+        } finally {
+            if (admin.tableExists(TableName.valueOf(tableName))) {
+                setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_CF_FINISH_ERR, false);
+                setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_SKIP_CF_ERR, false);
+                admin.deleteTable(TableName.valueOf(tableName));
+            }
+        }
     }
 
     @Test
@@ -1517,5 +1550,152 @@ public class OHTableAdminInterfaceTest {
             Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
         }
 
+    }
+
+    // Test cases for abnormal scene in CreateTableGroupHelper/DropTableGroupHelper
+    @Test
+    public void testCreateDropTableGroup() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        java.sql.Connection sysConn = ObHTableTestUtil.getSysConnection();
+        String tenantName = "mysql";
+
+        byte[] tableName = Bytes.toBytes("test_create_drop_tg_helper");
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+        byte[] cf3 = Bytes.toBytes("cf3");
+
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+        HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
+
+        HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
+        htd.addFamily(hcd1);
+        htd.addFamily(hcd2);
+        htd.addFamily(hcd3);
+
+        try {
+            admin.createTable(htd);
+
+            // 1. open err EN_DELETE_HTABLE_SKIP_CF_ERR, will skip delete cf table when delete hbase table
+            // and the subsequent delete htable operations will return OB_TABLEGROUP_NOT_EMPTY
+            setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_SKIP_CF_ERR, true);
+            ObHTableTestUtil.executeIgnoreExpectedErrors(() -> admin.deleteTable(TableName.valueOf(tableName)), "OB_TABLEGROUP_NOT_EMPTY");
+            assertTrue("Table should still exist after delete error injection",
+                    admin.tableExists(TableName.valueOf(tableName)));
+            setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_SKIP_CF_ERR, false);
+
+            // 2. create a database and set default tablegroup to test_create_drop_tg_helper,
+            // and the subsequent delete htable operation will return OB_TABLEGROUP_NOT_EMPTY
+            executeSQL(conn, "create database db_test_create_drop_tg_helper default tablegroup test_create_drop_tg_helper", true);
+            ObHTableTestUtil.executeIgnoreExpectedErrors(() -> admin.deleteTable(TableName.valueOf(tableName)), "OB_TABLEGROUP_NOT_EMPTY");
+            executeSQL(conn, "drop database db_test_create_drop_tg_helper", true);
+
+            // 3. set tenant's default tablegroup to test_create_drop_tg_helper,
+            // and the subsequent delete htable operation will return OB_TABLEGROUP_NOT_EMPTY
+            executeSQL(sysConn, String.format("alter tenant %s set default tablegroup = test_create_drop_tg_helper", tenantName), true);
+            ObHTableTestUtil.executeIgnoreExpectedErrors(() -> admin.deleteTable(TableName.valueOf(tableName)), "OB_TABLEGROUP_NOT_EMPTY");
+            executeSQL(sysConn, String.format("alter tenant %s set default tablegroup = null", tenantName), true);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            executeSQL(conn, "drop database if exists db_test_create_drop_tg_helper", true);
+            executeSQL(sysConn, String.format("alter tenant %s set default tablegroup = null", tenantName), true);
+            if (admin.tableExists(TableName.valueOf(tableName))) {
+                setErrSimPoint(ErrSimPoint.EN_DELETE_HTABLE_SKIP_CF_ERR, false);
+                admin.deleteTable(TableName.valueOf(tableName));
+            }
+        }
+    }
+
+    private void checkDDLStmtStr(List<Map.Entry<Integer, String>> ddlStmts) throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        java.sql.ResultSet resultSet = conn.createStatement().executeQuery(
+                String.format("select operation_type, ddl_stmt_str from oceanbase.__all_ddl_operation order by gmt_modified desc limit %d", ddlStmts.size() + 2));
+        Assert.assertTrue(resultSet.next());
+        int operationType = resultSet.getInt("operation_type");
+        Assert.assertEquals(1503, operationType);
+        String ddlStmtStr = resultSet.getString("ddl_stmt_str");
+        Assert.assertEquals("", ddlStmtStr);
+
+        for (int i = 0; i < ddlStmts.size(); i++) {
+            Assert.assertTrue(resultSet.next());
+            operationType = resultSet.getInt("operation_type");
+            Assert.assertEquals(ddlStmts.get(i).getKey().intValue(), operationType);
+            ddlStmtStr = resultSet.getString("ddl_stmt_str");
+            Assert.assertEquals(ddlStmts.get(i).getValue(), ddlStmtStr);
+        }
+        Assert.assertTrue(resultSet.next());
+        operationType = resultSet.getInt("operation_type");
+        Assert.assertEquals(1503, operationType);
+        ddlStmtStr = resultSet.getString("ddl_stmt_str");
+        Assert.assertEquals("", ddlStmtStr);
+        Assert.assertFalse(resultSet.next());
+    }
+
+    @Test
+    public void testDDLStmtStr() throws Exception {
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        byte[] tableName = Bytes.toBytes("test_ddl_stmt_str");
+        byte[] cf1 = Bytes.toBytes("cf1");
+        byte[] cf2 = Bytes.toBytes("cf2");
+
+        HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
+        HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
+
+        HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
+        htd.addFamily(hcd1);
+        htd.addFamily(hcd2);
+
+        try {
+            // 1. create hbase table
+            admin.createTable(htd);
+            List<Map.Entry<Integer, String>> expStmtStrs = new ArrayList<>();
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(4, "CREATE TABLE `test_ddl_stmt_str$cf1` (K varbinary(1024) NOT NULL, Q varbinary(256) NOT NULL, T bigint NOT NULL, V varbinary(1048576) NOT NULL, " +
+                    "PRIMARY KEY (K, Q, T)) TABLEGROUP = `test_ddl_stmt_str`  kv_attributes = '{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\"}}'"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(4, "CREATE TABLE `test_ddl_stmt_str$cf2` (K varbinary(1024) NOT NULL, Q varbinary(256) NOT NULL, T bigint NOT NULL, V varbinary(1048576) NOT NULL, " +
+                    "PRIMARY KEY (K, Q, T)) TABLEGROUP = `test_ddl_stmt_str`  kv_attributes = '{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\"}}'"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(302, "CREATE TABLEGROUP `test_ddl_stmt_str`"));
+            checkDDLStmtStr(expStmtStrs);
+
+            // 2. disable hbase table
+            admin.disableTable(TableName.valueOf(tableName));
+            expStmtStrs.clear();
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(3, "ALTER TABLE test_ddl_stmt_str$cf1 KV_ATTRIBUTES='{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"disable\"}}'"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(3, "ALTER TABLE test_ddl_stmt_str$cf2 KV_ATTRIBUTES='{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"disable\"}}'"));
+            checkDDLStmtStr(expStmtStrs);
+
+            // 3. enable hbase table
+            admin.enableTable(TableName.valueOf(tableName));
+            expStmtStrs.clear();
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(3, "ALTER TABLE test_ddl_stmt_str$cf1 KV_ATTRIBUTES='{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"enable\"}}'"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(3, "ALTER TABLE test_ddl_stmt_str$cf2 KV_ATTRIBUTES='{\"Hbase\": {\"MaxVersions\": 1, \"CreatedBy\": \"Admin\", \"State\": \"enable\"}}'"));
+            checkDDLStmtStr(expStmtStrs);
+
+            // 4. delete hbase table
+            admin.disableTable(TableName.valueOf(tableName));
+            admin.deleteTable(TableName.valueOf(tableName));
+            expStmtStrs.clear();
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(303, "DROP TABLEGROUP `test_ddl_stmt_str`"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(2, "DROP TABLE `test`.`test_ddl_stmt_str$cf1`"));
+            expStmtStrs.add(new AbstractMap.SimpleEntry<>(2, "DROP TABLE `test`.`test_ddl_stmt_str$cf2`"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            if (admin.tableExists(TableName.valueOf(tableName))) {
+                if (admin.isTableEnabled(TableName.valueOf(tableName))) {
+                    admin.disableTable(TableName.valueOf(tableName));
+                }
+                admin.deleteTable(TableName.valueOf(tableName));
+            }
+        }
     }
 }
