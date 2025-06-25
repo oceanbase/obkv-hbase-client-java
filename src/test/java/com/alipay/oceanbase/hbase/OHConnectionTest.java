@@ -20,9 +20,7 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Threads;
@@ -30,7 +28,9 @@ import org.junit.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.SOCKET_TIMEOUT;
@@ -81,7 +81,7 @@ public class OHConnectionTest {
 
     @After
     public void after() throws IOException {
-        hTable.close();
+        if (hTable != null) hTable.close();
     }
 
     @Test
@@ -840,6 +840,249 @@ public class OHConnectionTest {
             }
         }
     }
+
+
+    /*
+    CREATE TABLEGROUP test_region_locator SHARDING = 'ADAPTIVE';
+    CREATE TABLE `test_region_locator$family_region_locator` (
+        `K` varbinary(1024) NOT NULL,
+        `Q` varbinary(256) NOT NULL,
+        `T` bigint(20) NOT NULL,
+        `V` varbinary(1024) DEFAULT NULL,
+        PRIMARY KEY (`K`, `Q`, `T`)
+    ) TABLEGROUP = test_region_locator PARTITION BY RANGE COLUMNS(K) (
+        PARTITION p1 VALUES LESS THAN ('c'),
+        PARTITION p2 VALUES LESS THAN ('e'),
+        PARTITION p3 VALUES LESS THAN ('g'),
+        PARTITION p4 VALUES LESS THAN ('i'),
+        PARTITION p5 VALUES LESS THAN ('l'),
+        PARTITION p6 VALUES LESS THAN ('n'),
+        PARTITION p7 VALUES LESS THAN ('p'),
+        PARTITION p8 VALUES LESS THAN ('s'),
+        PARTITION p9 VALUES LESS THAN ('v'),
+        PARTITION p10 VALUES LESS THAN (MAXVALUE)
+    );
+    */
+    @Test
+    public void testRangePartitionWithRegionLocator() throws Exception {
+        final String tableNameStr = "test_region_locator";
+        final String family = "family_region_locator";
+        final int regionCount = 10;
+        final int rowsPerRegion = 5;
+
+        final byte[][] splitPoints = new byte[][] {
+                Bytes.toBytes("c"),  // p1: < 'c'
+                Bytes.toBytes("e"),  // p2: < 'e'
+                Bytes.toBytes("g"),  // p3: < 'g'
+                Bytes.toBytes("i"),  // p4: < 'i'
+                Bytes.toBytes("l"),  // p5: < 'l'
+                Bytes.toBytes("n"),  // p6: < 'n'
+                Bytes.toBytes("p"),  // p7: < 'p'
+                Bytes.toBytes("s"),  // p8: < 's'
+                Bytes.toBytes("v")   // p9: < 'v'
+        };
+
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+
+        try {
+            for (int i = 0; i < regionCount; i++) {
+                for (int j = 0; j < rowsPerRegion; j++) {
+                    String rowKey;
+                    if (i == 0) {
+                        rowKey = "a" + j;
+                    } else if (i == regionCount - 1) {
+                        rowKey = "v" + j;
+                    } else {
+                        String baseKey = Bytes.toString(splitPoints[i - 1]);
+                        rowKey = baseKey + j;
+                    }
+
+                    Put put = new Put(Bytes.toBytes(rowKey));
+                    String value = String.format("value_%d_%d", i, j);
+                    put.addColumn(
+                            Bytes.toBytes(family),
+                            Bytes.toBytes("q"),
+                            Bytes.toBytes(value)
+                    );
+                    hTable.put(put);
+                }
+            }
+
+            try (RegionLocator locator = connection.getRegionLocator(tableName)) {
+                byte[][] startKeys = locator.getStartKeys();
+                byte[][] endKeys = locator.getEndKeys();
+
+                Assert.assertEquals("Should have " + regionCount + " regions",
+                        regionCount, startKeys.length);
+
+                for (int i = 0; i < startKeys.length; i++) {
+                    String startKeyStr = startKeys[i].length == 0 ? "-∞" :
+                            Bytes.toString(startKeys[i]);
+                    String endKeyStr = endKeys[i].length == 0 ? "+∞" :
+                            Bytes.toString(endKeys[i]);
+                    // 验证region边界
+                    if (i > 0) {
+                        // 验证startKey与前一个endKey相同
+                        Assert.assertArrayEquals("Region " + i + " startKey should match previous endKey",
+                                endKeys[i-1], startKeys[i]);
+                    }
+                }
+
+                for (int i = 0; i < startKeys.length; i++) {
+                    Scan scan = new Scan();
+                    if (startKeys[i].length > 0) {
+                        scan.setStartRow(startKeys[i]);
+                    }
+                    if (endKeys[i].length > 0) {
+                        scan.setStopRow(endKeys[i]);
+                    }
+
+                    String startKeyStr = startKeys[i].length == 0 ? "-∞" :
+                            Bytes.toString(startKeys[i]);
+                    String endKeyStr = endKeys[i].length == 0 ? "+∞" :
+                            Bytes.toString(endKeys[i]);
+
+                    try (ResultScanner scanner = hTable.getScanner(scan)) {
+                        List<Result> results = new ArrayList<>();
+                        for (Result result : scanner) {
+                            results.add(result);
+                        }
+
+                        Assert.assertEquals("Region " + i + " should have " + rowsPerRegion + " rows",
+                                rowsPerRegion, results.size());
+
+                        for (Result result : results) {
+                            String rowKey = Bytes.toString(result.getRow());
+                            String value = Bytes.toString(result.getValue(
+                                    Bytes.toBytes(family), Bytes.toBytes("q")));
+                            if (startKeys[i].length > 0) {
+                                Assert.assertTrue("Row key " + rowKey + " should be >= " +
+                                                Bytes.toString(startKeys[i]),
+                                        rowKey.compareTo(Bytes.toString(startKeys[i])) >= 0);
+                            }
+                            if (endKeys[i].length > 0) {
+                                Assert.assertTrue("Row key " + rowKey + " should be < " +
+                                                Bytes.toString(endKeys[i]),
+                                        rowKey.compareTo(Bytes.toString(endKeys[i])) < 0);
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            Optional.ofNullable(hTable).ifPresent(table -> {
+                try {
+                    table.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            Optional.ofNullable(connection).ifPresent(conn -> {
+                try {
+                    conn.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+    
+    @Test
+    public void testHRegionLocation() throws IOException {
+        final String tableNameStr = "test_region_locator";
+
+        final byte[][] splitPoints = new byte[][] {
+                Bytes.toBytes("c"),  // p1: < 'c'
+                Bytes.toBytes("e"),  // p2: < 'e'
+                Bytes.toBytes("g"),  // p3: < 'g'
+                Bytes.toBytes("i"),  // p4: < 'i'
+                Bytes.toBytes("l"),  // p5: < 'l'
+                Bytes.toBytes("n"),  // p6: < 'n'
+                Bytes.toBytes("p"),  // p7: < 'p'
+                Bytes.toBytes("s"),  // p8: < 's'
+                Bytes.toBytes("v")   // p9: < 'v'
+        };
+
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        // (min, c), [c, e), [e, g), [g, i), [i, l), [l, n), [n, p), [p, s), [s, v), [v, max)
+        try (RegionLocator locator = connection.getRegionLocator(tableName)) {
+            Assert.assertEquals(locator.getStartKeys().length, locator.getEndKeys().length);
+            Assert.assertEquals(locator.getStartKeys().length, 10);
+            HRegionLocation loc = locator.getRegionLocation(HConstants.EMPTY_BYTE_ARRAY);
+            RegionInfo info = loc.getRegion();
+            Assert.assertEquals(Arrays.toString(locator.getStartKeys()[0]), Arrays.toString(info.getStartKey()));
+            Assert.assertEquals(Arrays.toString(locator.getEndKeys()[0]), Arrays.toString(info.getEndKey()));
+            for (int i = 1; i < locator.getStartKeys().length; i++) {
+                loc = locator.getRegionLocation(splitPoints[i - 1]);
+                info = loc.getRegion();
+                Assert.assertEquals(Arrays.toString(locator.getStartKeys()[i]), Arrays.toString(info.getStartKey()));
+                Assert.assertEquals(Arrays.toString(locator.getEndKeys()[i]), Arrays.toString(info.getEndKey()));
+            }
+        } finally {
+            Optional.ofNullable(hTable).ifPresent(table -> {
+                try {
+                    table.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+    
+    @Test
+    public void testKeyPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_multi_cf";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
+    }
+    
+    @Test
+    public void testRangeKeySecondaryPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_secondary_range_key";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
+    }
+
+    @Test
+    public void testKeyRangeSecondaryPartitionWithRegionLocator() throws IOException {
+        final String tableNameStr = "test_secondary_key_range";
+        final TableName tableName = TableName.valueOf(tableNameStr);
+        final Configuration conf = ObHTableTestUtil.newConfiguration();
+        connection = ConnectionFactory.createConnection(conf);
+        hTable = connection.getTable(tableName);
+        RegionLocator locator = connection.getRegionLocator(tableName);
+        byte[][] startKeys = locator.getStartKeys();
+        byte[][] endKeys = locator.getEndKeys();
+        Assert.assertEquals("Should have 1 region", 1, startKeys.length);
+        Assert.assertEquals("Should have 1 region", 1, endKeys.length);
+        Assert.assertEquals(startKeys[0], endKeys[0]);
+        Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
+    }
+
 
     @Test
     public void testBufferedMutatorPeriodicFlush() throws Exception {

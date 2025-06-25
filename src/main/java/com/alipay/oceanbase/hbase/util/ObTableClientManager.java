@@ -19,8 +19,10 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
+import com.alipay.oceanbase.hbase.OHTable;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.TableName;
 
 import java.io.IOException;
 import java.util.Map;
@@ -118,12 +120,28 @@ public class ObTableClientManager {
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
             } catch (Exception e) {
-                throw new IOException(e);
+                throw OHBaseExceptionUtil.convertTableException(e);
             } finally {
                 lock.unlock();
             }
         }
         return OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey);
+    }
+
+    public static ObTableClient getOrCreateObTableClientByTableName(TableName tableName, OHConnectionConfiguration connectionConfig) throws IllegalArgumentException,
+            IOException {
+        String tableNameString = tableName.getNameAsString();
+        ObTableClient obTableClient = getOrCreateObTableClient(
+                OHTable.setUserDefinedNamespace(tableNameString, connectionConfig));
+        ObTableClientManager.initTimeoutAndRetryTimes(obTableClient, connectionConfig);
+        return obTableClient;
+    }
+
+    private static void initTimeoutAndRetryTimes(ObTableClient obTableClient, OHConnectionConfiguration ohConnectionConf) {
+        obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+        obTableClient.setRuntimeRetryTimes(ohConnectionConf.getNumRetries());
+        obTableClient.setRuntimeMaxWait(ohConnectionConf.getOperationTimeout());
+        obTableClient.setRuntimeBatchMaxWait(ohConnectionConf.getOperationTimeout());
     }
 
     public static class ObTableClientKey {

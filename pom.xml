@@ -54,7 +54,7 @@
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.encoding>UTF-8</project.encoding>
         <slf4j.version>1.7.21</slf4j.version>
-        <table.client.version>2.0.0</table.client.version>
+        <table.client.version>2.0.1-SNAPSHOT</table.client.version>
     </properties>
 
     <dependencies>
@@ -166,6 +166,10 @@
                 <exclusion>
                     <artifactId>jersey-json</artifactId>
                     <groupId>com.sun.jersey</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jackson-databind</artifactId>
+                    <groupId>com.fasterxml.jackson.core</groupId>
                 </exclusion>
             </exclusions>
         </dependency>

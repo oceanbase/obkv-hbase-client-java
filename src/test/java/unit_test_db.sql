@@ -276,3 +276,109 @@ CREATE TABLE `n1:test$partitionFamily1` (
     `V` varbinary(1024) DEFAULT NULL,
     PRIMARY KEY (`K`, `Q`, `T`)
 ) partition by key(`K`) partitions 17;
+
+CREATE TABLEGROUP test_region_locator SHARDING = 'ADAPTIVE';
+CREATE TABLE `test_region_locator$family_region_locator` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_region_locator PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE TABLEGROUP test_desc SHARDING = 'ADAPTIVE';
+CREATE TABLE `test_desc$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_desc
+KV_ATTRIBUTES ='{"Hbase": {"TimeToLive": 3600, "MaxVersions": 3}}' 
+PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE TABLE `test_desc$family2` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_desc
+KV_ATTRIBUTES ='{"Hbase": {"TimeToLive": 7200, "MaxVersions": 3}}'
+PARTITION BY RANGE COLUMNS(K) (
+    PARTITION p1 VALUES LESS THAN ('c'),
+    PARTITION p2 VALUES LESS THAN ('e'),
+    PARTITION p3 VALUES LESS THAN ('g'),
+    PARTITION p4 VALUES LESS THAN ('i'),
+    PARTITION p5 VALUES LESS THAN ('l'),
+    PARTITION p6 VALUES LESS THAN ('n'),
+    PARTITION p7 VALUES LESS THAN ('p'),
+    PARTITION p8 VALUES LESS THAN ('s'),
+    PARTITION p9 VALUES LESS THAN ('v'),
+    PARTITION p10 VALUES LESS THAN (MAXVALUE)
+);
+
+CREATE TABLEGROUP test_secondary_key_range SHARDING = 'ADAPTIVE';
+CREATE TABLE IF NOT EXISTS `test_secondary_key_range$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `G` bigint(20) GENERATED ALWAYS AS (ABS(T)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_secondary_key_range PARTITION BY KEY(`K`) PARTITIONS 3
+SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (
+    SUBPARTITION `p1` VALUES LESS THAN (100),
+    SUBPARTITION `p2` VALUES LESS THAN (200),
+    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE
+);
+CREATE TABLE IF NOT EXISTS `test_secondary_key_range$family2` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `G` bigint(20) GENERATED ALWAYS AS (ABS(T)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_secondary_key_range PARTITION BY KEY(`K`) PARTITIONS 3
+SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (
+    SUBPARTITION `p1` VALUES LESS THAN (100),
+    SUBPARTITION `p2` VALUES LESS THAN (200),
+    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE
+);
+
+CREATE TABLEGROUP test_secondary_range_key SHARDING = 'ADAPTIVE';
+CREATE TABLE IF NOT EXISTS `test_secondary_range_key$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `G` bigint(20) GENERATED ALWAYS AS (ABS(T)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_secondary_range_key PARTITION BY RANGE COLUMNS(`G`)
+SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3
+(    PARTITION `p1` VALUES LESS THAN (100),
+    PARTITION `p2` VALUES LESS THAN (200),
+    PARTITION `p3` VALUES LESS THAN MAXVALUE
+);
