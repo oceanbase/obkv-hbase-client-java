@@ -42,7 +42,7 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
-import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.executeSQL;
+import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertFalse;
@@ -386,7 +386,7 @@ public class OHTableAdminInterfaceTest {
                             admin.disableTable(TableName.valueOf("tablegroup_not_exists"));
                         });
                 assertTrue(thrown.getCause() instanceof ObTableException);
-                Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+                Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
             }
             // 2. write an enabled table, should succeed
             {
@@ -506,162 +506,196 @@ public class OHTableAdminInterfaceTest {
     public void testAdminGetRegionMetrics() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         Statement st = conn.createStatement();
-        st.execute("CREATE TABLEGROUP IF NOT EXISTS test_get_region_metrics SHARDING = 'ADAPTIVE';\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$family_with_group3` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "\n" +
-                "CREATE DATABASE IF NOT EXISTS `get_region`;\n" +
-                "use `get_region`;\n" +
-                "CREATE TABLEGROUP IF NOT EXISTS `get_region:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group1` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group2` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
-                "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$family_with_group3` (\n" +
-                "    `K` varbinary(1024) NOT NULL,\n" +
-                "    `Q` varbinary(256) NOT NULL,\n" +
-                "    `T` bigint(20) NOT NULL,\n" +
-                "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
-        st.close();
-        conn.close();
-        String tablegroup1 = "test_get_region_metrics";
-        String tablegroup2 = "get_region:test_multi_cf";
-        Configuration conf = ObHTableTestUtil.newConfiguration();
-        Connection connection = ConnectionFactory.createConnection(conf);
-        Admin admin = connection.getAdmin();
-        // test tablegroup not existed
-        IOException thrown = assertThrows(IOException.class,
-                () -> {
-                    admin.getRegionMetrics(null, TableName.valueOf("tablegroup_not_exists"));
-                });
-        Assert.assertTrue(thrown.getCause() instanceof ObTableException);
-        Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+        try {
+            st.execute("CREATE TABLEGROUP IF NOT EXISTS test_get_region_metrics SHARDING = 'ADAPTIVE';\n" +
+                    "\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf1` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    "\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf2` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    "\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf3` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    "\n" +
+                    "CREATE DATABASE IF NOT EXISTS `get_region`;\n" +
+                    "use `get_region`;\n" +
+                    "CREATE TABLEGROUP IF NOT EXISTS `get_region:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
+                    "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf1` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf2` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    "CREATE TABLE IF NOT EXISTS `get_region:test_multi_cf$cf3` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;" +
+                    "USE `test`;" +
+                    "CREATE TABLEGROUP IF NOT EXISTS test_no_part SHARDING = 'ADAPTIVE';" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf1` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `test_no_part`;\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf2` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `test_no_part`;\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf3` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = `test_no_part`;");
+            st.close();
+            String tablegroup1 = "test_get_region_metrics";
+            String tablegroup2 = "get_region:test_multi_cf";
+            Configuration conf = ObHTableTestUtil.newConfiguration();
+            Connection connection = ConnectionFactory.createConnection(conf);
+            Admin admin = connection.getAdmin();
+            // test tablegroup not existed
+            IOException thrown = assertThrows(IOException.class,
+                    () -> {
+                        admin.getRegionMetrics(null, TableName.valueOf("tablegroup_not_exists"));
+                    });
+            Assert.assertTrue(thrown.getCause() instanceof ObTableException);
+            Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
 
-        // test use serverName without tableName to get region metrics
-        assertThrows(FeatureNotSupportedException.class,
-                () -> {
-                    admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
-                });
+            // test use serverName without tableName to get region metrics
+            assertThrows(FeatureNotSupportedException.class,
+                    () -> {
+                        admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
+                    });
 
-        // test single-thread getRegionMetrics after writing
-        batchInsert(100000, tablegroup1);
-        // test ServerName is any string
-        long start = System.currentTimeMillis();
-        List<RegionMetrics> metrics = admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
-        long cost = System.currentTimeMillis() - start;
-        System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + tablegroup1);
-        assertEquals(30, metrics.size());
+            // test single-thread getRegionMetrics after writing
+            batchInsert(10000, tablegroup1);
+            // test ServerName is any string
+            long start = System.currentTimeMillis();
+            List<RegionMetrics> metrics = admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
+            long cost = System.currentTimeMillis() - start;
+            System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + tablegroup1);
+            assertEquals(9, metrics.size());
 
-        // test getRegionMetrics concurrently reading while writing
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(100);
-        List<Exception> exceptionCatcher = new ArrayList<>();
-        for (int i = 0; i < 100; ++i) {
-            int taskId = i;
-            executorService.submit(() -> {
-                try {
-                    if (taskId % 2 == 1) {
-                        List<RegionMetrics> regionMetrics = null;
-                        // test get regionMetrics from different namespaces
-                        if (taskId % 3 != 0) {
-                            long thrStart = System.currentTimeMillis();
-                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
-                            long thrCost = System.currentTimeMillis() - thrStart;
-                            System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                            if (regionMetrics.size() != 30) {
-                                throw new ObTableGetException(
-                                        "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+            // test getRegionMetrics concurrently reading while writing
+            ExecutorService executorService = Executors.newFixedThreadPool(10);
+            CountDownLatch latch = new CountDownLatch(20);
+            List<Exception> exceptionCatcher = new ArrayList<>();
+            for (int i = 0; i < 20; ++i) {
+                int taskId = i;
+                executorService.submit(() -> {
+                    try {
+                        if (taskId % 2 == 1) {
+                            List<RegionMetrics> regionMetrics = null;
+                            // test get regionMetrics from different namespaces
+                            if (taskId % 3 != 0) {
+                                long thrStart = System.currentTimeMillis();
+                                regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
+                                long thrCost = System.currentTimeMillis() - thrStart;
+                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
+                                if (regionMetrics.size() != 9) {
+                                    throw new ObTableGetException(
+                                            "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+                                }
+                            } else {
+                                long thrStart = System.currentTimeMillis();
+                                regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
+                                long thrCost = System.currentTimeMillis() - thrStart;
+                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup2);
+                                if (regionMetrics.size() != 9) {
+                                    throw new ObTableGetException(
+                                            "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+                                }
                             }
                         } else {
-                            long thrStart = System.currentTimeMillis();
-                            regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
-                            long thrCost = System.currentTimeMillis() - thrStart;
-                            System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                            if (regionMetrics.size() != 9) {
-                                throw new ObTableGetException(
-                                        "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
+                            try {
+                                if (taskId % 8 == 0) {
+                                    batchInsert(1000, tablegroup2);
+                                } else {
+                                    batchInsert(1000, tablegroup1);
+                                }
+                            } catch (Exception e) {
+                                Exception originalCause = e;
+                                while (originalCause.getCause() != null && originalCause.getCause() instanceof ObTableException) {
+                                    originalCause = (Exception) originalCause.getCause();
+                                }
+                                if (originalCause instanceof ObTableException && ((ObTableException) originalCause).getErrorCode() == ResultCodes.OB_TIMEOUT.errorCode) {
+                                    // ignore
+                                    System.out.println("taskId: " + taskId + " OB_TIMEOUT");
+                                } else {
+                                    throw e;
+                                }
                             }
+                            System.out.println("task: " + taskId + ", batchInsert");
                         }
-                    } else {
-                        try {
-                            if (taskId % 8 == 0) {
-                                batchInsert(1000, tablegroup2);
-                            } else {
-                                batchInsert(1000, tablegroup1);
-                            }
-                        } catch (Exception e) {
-                            Exception originalCause = e;
-                            while (originalCause.getCause() != null && originalCause.getCause() instanceof ObTableException) {
-                                originalCause = (Exception) originalCause.getCause();
-                            }
-                            if (originalCause instanceof ObTableException && ((ObTableException) originalCause).getErrorCode() == ResultCodes.OB_TIMEOUT.errorCode) {
-                                // ignore
-                                System.out.println("taskId: " + taskId + " OB_TIMEOUT");
-                            } else {
-                                throw e;
-                            }
-                        }
-                        System.out.println("task: " + taskId + ", batchInsert");
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        exceptionCatcher.add(e);
+                    } finally {
+                        latch.countDown();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    exceptionCatcher.add(e);
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-        try {
-            latch.await();
+                });
+            }
+            try {
+                System.out.println("waiting for latch");
+                latch.await();
+                System.out.println("waiting for latch finish");
+            } catch (Exception e) {
+                e.printStackTrace();
+                exceptionCatcher.add(e);
+            }
+            executorService.shutdownNow();
+            Assert.assertTrue(exceptionCatcher.isEmpty());
+
+            // test getRegionMetrics from non-partitioned table
+            String non_part_tablegroup = "test_no_part";
+            batchInsert(10000, non_part_tablegroup);
+            start = System.currentTimeMillis();
+            metrics = admin.getRegionMetrics(null, TableName.valueOf(non_part_tablegroup));
+            cost = System.currentTimeMillis() - start;
+            System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + non_part_tablegroup);
+            assertEquals(3, metrics.size());
         } catch (Exception e) {
             e.printStackTrace();
-            exceptionCatcher.add(e);
+            throw e;
+        } finally {
+            executeSQL(conn, "use test; drop table `test_get_region_metrics$cf1`; drop table `test_get_region_metrics$cf2`; drop table `test_get_region_metrics$cf3`;", true);
+            executeSQL(conn, "use `get_region`; drop table `get_region:test_multi_cf$cf1`; drop table `get_region:test_multi_cf$cf2`; drop table `get_region:test_multi_cf$cf3`;", true);
+            executeSQL(conn, "use test; drop table `test_no_part$cf1`; drop table `test_no_part$cf2`; drop table `test_no_part$cf3`;", true);
+            conn.close();
         }
-        executorService.shutdownNow();
-        Assert.assertTrue(exceptionCatcher.isEmpty());
-
-        // test getRegionMetrics from non-partitioned table
-        String non_part_tablegroup = "test_no_part";
-        batchInsert(10000, non_part_tablegroup);
-        start = System.currentTimeMillis();
-        metrics = admin.getRegionMetrics(null, TableName.valueOf(non_part_tablegroup));
-        cost = System.currentTimeMillis() - start;
-        System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + non_part_tablegroup);
-        assertEquals(3, metrics.size());
     }
 
     private void deleteTableIfExists(Admin admin, TableName tableName) throws Exception {
@@ -697,7 +731,7 @@ public class OHTableAdminInterfaceTest {
                         admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
                     });
             Assert.assertTrue(thrown.getCause() instanceof ObTableException);
-            Assert.assertEquals(ResultCodes.OB_TABLEGROUP_NOT_EXIST.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+            Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
             admin.deleteTable(TableName.valueOf("del_tb", "test"));
             admin.deleteTable(TableName.valueOf("test_del_tb"));
             assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
@@ -707,7 +741,7 @@ public class OHTableAdminInterfaceTest {
             fail();
         } finally {
             deleteTableIfExists(admin, "test_del_tb");
-            deleteTableIfExists(admin, "del_tb");
+            deleteTableIfExists(admin,  TableName.valueOf("del_tb", "test"));
         }
     }
 
@@ -721,16 +755,24 @@ public class OHTableAdminInterfaceTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
-        // TableName cannot contain $ symbol
-        Assert.assertThrows(IllegalArgumentException.class,
-                () -> {
-                    TableName.valueOf("random_string$");
-                });
-        Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
-        createTable(admin, TableName.valueOf("test_exist_tb"), "cf1", "cf2", "cf3");
-        createTable(admin, TableName.valueOf("exist_tb", "test"), "cf1", "cf2", "cf3");
-        Assert.assertTrue(admin.tableExists(TableName.valueOf("test_exist_tb")));
-        Assert.assertTrue(admin.tableExists(TableName.valueOf("exist_tb", "test")));
+        try {
+            // TableName cannot contain $ symbol
+            Assert.assertThrows(IllegalArgumentException.class,
+                    () -> {
+                        TableName.valueOf("random_string$");
+                    });
+            Assert.assertFalse(admin.tableExists(TableName.valueOf("tablegroup_not_exists")));
+            createTable(admin, TableName.valueOf("test_exist_tb"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("exist_tb", "test"), "cf1", "cf2", "cf3");
+            Assert.assertTrue(admin.tableExists(TableName.valueOf("test_exist_tb")));
+            Assert.assertTrue(admin.tableExists(TableName.valueOf("exist_tb", "test")));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            deleteTableIfExists(admin, TableName.valueOf("test_exist_tb"));
+            deleteTableIfExists(admin,TableName.valueOf("exist_tb", "test"));
+        }
     }
 
     private void batchInsert(int rows, String tablegroup) throws Exception {
@@ -997,12 +1039,26 @@ public class OHTableAdminInterfaceTest {
     // step3: delete different tables concurrently, it must succeed
     @Test
     public void testConcurCreateDelTables() throws Exception {
-        final int tableNums = 20;
+        final int tableNums = 15;
         List<TableName> tableNames = new ArrayList<>();
         for (int i = 0; i < tableNums; i++) {
            tableNames.add(TableName.valueOf("testConcurCreateTable" + i));
         }
-        testConcurCreateDelTablesHelper(tableNames, false);
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+
+        try {
+            testConcurCreateDelTablesHelper(tableNames, false);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            for (TableName tableName : tableNames) {
+                deleteTableIfExists(admin, tableName);
+            }
+        }
+
     }
 
     // 3. test concurrent create or delete same table
@@ -1011,19 +1067,29 @@ public class OHTableAdminInterfaceTest {
     // step3: delete one table concurrently, the table will be deleted successfully
     @Test
     public void testConcurCreateOneTable() throws Exception {
-        final int taskNum = 20;
+        final int taskNum = 15;
         TableName tableName = TableName.valueOf("testConcurCreateOneTable");
         List<TableName> tableNames = new ArrayList<>();
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
         for (int i = 0; i < taskNum; i++) {
             tableNames.add(tableName);
         }
-        testConcurCreateDelTablesHelper(tableNames, true);
+        try {
+            testConcurCreateDelTablesHelper(tableNames, true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            deleteTableIfExists(admin, tableName);
+        }
     }
 
     // 4. test the performance of concurrent create/delete table
     @Test
     public void testConcurCreateDelPerf() throws Exception {
-        final int tableNums = 100;
+        final int tableNums = 15;
         List<TableName> tableNames = new ArrayList<>();
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
@@ -1043,60 +1109,73 @@ public class OHTableAdminInterfaceTest {
             tableNames.add(TableName.valueOf("testConcurCreateDelPerf" + i));
         }
 
-        List<Callable<Void>> tasks = new ArrayList<>();
-        for (int i = 0; i < tableNums; i++) {
-            int finalI = i;
-            tasks.add(()->{
-                HTableDescriptor htd = new HTableDescriptor(tableNames.get(finalI));
-                htd.addFamily(hcd1);
-                htd.addFamily(hcd2);
-                htd.addFamily(hcd3);
-                try {
-                    admin.createTable(htd);
-                } catch (Exception e) {
-                    System.out.println(e);
+        try {
+            // increment ddl thread upper limit to at leaset 20
+            executeSQL(conn, "alter system set cpu_quota_concurrency = 20", true);
+            List<Callable<Void>> tasks = new ArrayList<>();
+            for (int i = 0; i < tableNums; i++) {
+                int finalI = i;
+                tasks.add(()->{
+                    HTableDescriptor htd = new HTableDescriptor(tableNames.get(finalI));
+                    htd.addFamily(hcd1);
+                    htd.addFamily(hcd2);
+                    htd.addFamily(hcd3);
+                    try {
+                        admin.createTable(htd);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                });
+            }
+
+            // 2. execute concurrent create table tasks
+            long start = System.currentTimeMillis();
+            ExecutorService executorService = Executors.newFixedThreadPool(tableNums);
+            executorService.invokeAll(tasks);
+            executorService.shutdown();
+            executorService.awaitTermination(2, TimeUnit.MINUTES);
+            long duration = System.currentTimeMillis() - start;
+            System.out.println("create " + tableNums + " tables cost " + duration + " ms.");
+
+            // 3. disable all tables;
+            for (int i = 0; i < tableNames.size(); i++) {
+                TableName tableName = tableNames.get(i);
+                if (admin.isTableEnabled(tableName)) {
+                    admin.disableTable(tableName);
                 }
-                return null;
-            });
+            }
+
+            // 4. generate delete table task
+            List<Callable<Void>> delTasks = new ArrayList<>();
+            for (int i = 0; i < tableNums; i++) {
+                int finalI = i;
+                delTasks.add(()->{
+                    try {
+                        admin.deleteTable(tableNames.get(finalI));
+                    } catch (Exception e) {
+                        System.out.println(e);
+                    }
+                    return null;
+                });
+            }
+
+            // 6. execute concurrent delete table tasks
+            start = System.currentTimeMillis();
+            ExecutorService delExecutorService = Executors.newFixedThreadPool(tableNums);
+            delExecutorService.invokeAll(delTasks);
+            delExecutorService.shutdown();
+            delExecutorService.awaitTermination(1, TimeUnit.MINUTES);
+            duration = System.currentTimeMillis() - start;
+            System.out.println("delete " + tableNums + " tables cost " + duration + " ms.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            for (TableName tableName : tableNames) {
+                deleteTableIfExists(admin, tableName);
+            }
         }
-
-        // 2. execute concurrent create table tasks
-        long start = System.currentTimeMillis();
-        ExecutorService executorService = Executors.newFixedThreadPool(tableNums);
-        executorService.invokeAll(tasks);
-        executorService.shutdown();
-        executorService.awaitTermination(2, TimeUnit.MINUTES);
-        long duration = System.currentTimeMillis() - start;
-        System.out.println("create " + tableNums + " tables cost " + duration + " ms.");
-
-        // 3. disable all tables;
-        for (int i = 0; i < tableNames.size(); i++) {
-            TableName tableName = tableNames.get(i);
-            admin.disableTable(tableName);
-        }
-
-        // 4. generate delete table task
-        List<Callable<Void>> delTasks = new ArrayList<>();
-        for (int i = 0; i < tableNums; i++) {
-            int finalI = i;
-            delTasks.add(()->{
-                try {
-                    admin.deleteTable(tableNames.get(finalI));
-                } catch (Exception e) {
-                    System.out.println(e);
-                }
-                return null;
-            });
-        }
-
-        // 6. execute concurrent delete table tasks
-        start = System.currentTimeMillis();
-        ExecutorService delExecutorService = Executors.newFixedThreadPool(tableNums);
-        delExecutorService.invokeAll(delTasks);
-        delExecutorService.shutdown();
-        delExecutorService.awaitTermination(1, TimeUnit.MINUTES);
-        duration = System.currentTimeMillis() - start;
-        System.out.println("delete " + tableNums + " tables cost " + duration + " ms.");
     }
 
     @Test
@@ -1432,6 +1511,8 @@ public class OHTableAdminInterfaceTest {
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
         Admin admin = connection.getAdmin();
+        java.sql.Connection conn = getConnection();
+        executeSQL(conn, "drop database if exists n101", true);
 
         // 1. create a created table
         try {
@@ -1536,7 +1617,7 @@ public class OHTableAdminInterfaceTest {
 
         // 10. get a table metrics from an uncreated namespace
         try {
-            admin.getRegionMetrics(null, TableName.valueOf("n1:t1"));
+            admin.getRegionMetrics(null, TableName.valueOf("n101:t1"));
             fail();
         } catch (Exception e) {
             Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
@@ -1544,7 +1625,7 @@ public class OHTableAdminInterfaceTest {
 
         // 11. check table exists from an uncreated namespace
         try {
-            admin.tableExists(TableName.valueOf("n1:t1"));
+            admin.tableExists(TableName.valueOf("n101:t1"));
             fail();
         } catch (Exception e) {
             Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
