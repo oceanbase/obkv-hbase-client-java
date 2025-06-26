@@ -148,12 +148,11 @@ public class OHConnectionImpl implements Connection {
     }
 
     @Override
-    public RegionLocator getRegionLocator(TableName tableName) throws IOException {
-        // need to use new connection configuration
+    public RegionLocator getRegionLocator(TableName tableName) throws IOException {        // need to use new connection configuration
         // to avoid change the database in original param url by namespace in tableName
         OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
         ObTableClient obTableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(obTableClient);
+        OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableName.toString(), obTableClient);
         return executor.getRegionLocator(String.valueOf(tableName));
     }
 

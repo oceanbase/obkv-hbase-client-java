@@ -23,17 +23,17 @@ package com.alipay.oceanbase.hbase.constants;
 public final class OHConstants {
 
     /**
-     * ocenbase hbase root server http url
+     * oceanbase hbase root server http url
      */
     public static final String   HBASE_OCEANBASE_PARAM_URL                   = "hbase.oceanbase.paramURL";
 
     /**
-     * ocenbase hbase connect server username
+     * oceanbase hbase connect server username
      */
     public static final String   HBASE_OCEANBASE_FULL_USER_NAME              = "hbase.oceanbase.fullUserName";
 
     /**
-     * ocenbase hbase connect server password
+     * oceanbase hbase connect server password
      */
     public static final String   HBASE_OCEANBASE_PASSWORD                    = "hbase.oceanbase.password";
 
@@ -48,32 +48,32 @@ public final class OHConstants {
     public static final String   HBASE_OCEANBASE_SYS_PASSWORD                = "hbase.oceanbase.sysPassword";
 
     /**
-     * ocenbase hbase connect server password
+     * oceanbase hbase connect server password
      */
     public static final String   HBASE_OCEANBASE_BATCH_EXECUTOR              = "hbase.oceanbase.batch.executor";
 
     /**
-     * ocenbase hbase connect server ODP address
+     * oceanbase hbase connect server ODP address
      */
     public static final String   HBASE_OCEANBASE_ODP_ADDR                    = "hbase.oceanbase.odpAddr";
 
     /**
-     * ocenbase hbase connect server ODP port
+     * oceanbase hbase connect server ODP port
      */
     public static final String   HBASE_OCEANBASE_ODP_PORT                    = "hbase.oceanbase.odpPort";
 
     /**
-     * ocenbase hbase connect server ODP mode
+     * oceanbase hbase connect server ODP mode
      */
     public static final String   HBASE_OCEANBASE_ODP_MODE                    = "hbase.oceanbase.odpMode";
 
     /**
-     * ocenbase hbase connect server database
+     * oceanbase hbase connect server database
      */
     public static final String   HBASE_OCEANBASE_DATABASE                    = "hbase.oceanbase.database";
 
     /**
-     * ocenbase hbase model rowkey column is consist of following column
+     * oceanbase hbase model rowkey column is consist of following column
      * K, Q, T hbase value
      */
     public static final String[] ROW_KEY_COLUMNS                             = new String[] { "K",
@@ -109,6 +109,10 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_POOL_OPERATION_TIMEOUT         = "hbase.htable.pool.operation.timeout";
 
+    /**
+     * use to specify whether to query only the data in hot storage when performing a query.
+     */
+    public static final String   HBASE_HTABLE_QUERY_HOT_ONLY       = "hbase.htable.query.hot_only";
     /**
      * internal attribute of ohtable pool which enable the test load
      */

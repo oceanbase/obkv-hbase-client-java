@@ -3,7 +3,10 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.bolt.transport.TransportCodes;
+import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableTransportException;
+import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.Admin;
@@ -25,16 +28,18 @@ import org.apache.hadoop.hbase.snapshot.UnknownSnapshotException;
 import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class OHAdmin implements Admin {
-    private boolean                aborted = false;
-    private final OHConnectionImpl connection;
-    private final Configuration conf;
+    private boolean                 aborted = false;
+    private final OHConnectionImpl  connection;
+    private final Configuration     conf;
     OHAdmin(OHConnectionImpl connection) {
         this.connection = connection;
         this.conf = connection.getConfiguration();
@@ -64,10 +69,27 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean tableExists(TableName tableName) throws IOException {
-        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
-        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
-        OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
-        return executor.tableExists(tableName.getNameAsString());
+        try {
+            OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+            ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+            OHTableExistsExecutor executor = new OHTableExistsExecutor(tableClient);
+            return executor.tableExists(tableName.getNameAsString());
+        } catch (Exception e) {
+            // try to get the original cause
+            Throwable cause = e.getCause();
+            while(cause != null && cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            if (cause instanceof ObTableException) {
+                int errCode = ((ObTableException) cause).getErrorCode();
+                // if the original cause is database_not_exist, means namespace in tableName does not exist
+                // for HBase, namespace not exist will not throw exceptions but will return false
+                if (errCode == ResultCodes.OB_ERR_BAD_DATABASE.errorCode) {
+                    return false;
+                }
+            }
+            throw e;
+        }
     }
 
     @Override
@@ -122,16 +144,44 @@ public class OHAdmin implements Admin {
 
     @Override
     public HTableDescriptor getTableDescriptor(TableName tableName) throws TableNotFoundException, IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        try {
+            return executor.getTableDescriptor();
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
+                throw new TableNotFoundException(tableName);
+            } else {
+                throw e;
+            }
+        }     
     }
 
     @Override
-    public void createTable(HTableDescriptor hTableDescriptor) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+    public void createTable(HTableDescriptor tableDescriptor) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableDescriptor.getTableName(), connectionConf);
+        OHCreateTableExecutor executor = new OHCreateTableExecutor(tableClient);
+        try {
+            executor.createTable(tableDescriptor, null);
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("already exist")) {
+                throw new TableExistsException(e.getCause().getMessage());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
-    public void createTable(HTableDescriptor hTableDescriptor, byte[] bytes, byte[] bytes1, int i) throws IOException {
+    public void createTable(HTableDescriptor tableDescriptor, byte[] bytes, byte[] bytes1, int i) throws IOException {
         throw new FeatureNotSupportedException("does not support yet");
     }
 
@@ -156,8 +206,8 @@ public class OHAdmin implements Admin {
             if (e.getCause() instanceof ObTableTransportException
                 && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
                 throw new TimeoutIOException(e.getCause());
-            } else {
-                throw e;
+            } else if (e.getCause().getMessage().contains("not found")) {
+                throw new TableNotFoundException(tableName);
             }
         }
     }
@@ -179,7 +229,23 @@ public class OHAdmin implements Admin {
 
     @Override
     public void enableTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_ENABLE_TABLE);
+        try {
+            executor.enableTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("not exist")) {
+                throw new TableNotFoundException(tableName);
+            } else if (e.getCause().getMessage().contains("not enabled")) {
+                throw new TableNotDisabledException(e.getCause().getMessage());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -204,7 +270,23 @@ public class OHAdmin implements Admin {
 
     @Override
     public void disableTable(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableAccessControlExecutor executor = new OHTableAccessControlExecutor(tableClient, ObTableRpcMetaType.HTABLE_DISABLE_TABLE);
+        try {
+            executor.disableTable(tableName.getNameAsString());
+        } catch (IOException e) {
+            if (e.getCause() instanceof ObTableTransportException
+                    && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                throw new TimeoutIOException(e.getCause());
+            } else if (e.getCause().getMessage().contains("not exist")) {
+                throw new TableNotFoundException(tableName);
+            } else if (e.getCause().getMessage().contains("not disabled")) {
+                throw new TableNotEnabledException(e.getCause().getMessage());
+            } else {
+                throw e;
+            }
+        }
     }
 
     @Override
@@ -219,12 +301,19 @@ public class OHAdmin implements Admin {
 
     @Override
     public boolean isTableEnabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        return !isDisabled(tableName);
     }
 
     @Override
     public boolean isTableDisabled(TableName tableName) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+        return isDisabled(tableName);
+    }
+
+    private boolean isDisabled(TableName tableName) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+        OHTableDescriptorExecutor tableDescriptor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+        return tableDescriptor.isDisable();
     }
 
     @Override
@@ -513,13 +602,35 @@ public class OHAdmin implements Admin {
     }
 
     @Override
-    public HTableDescriptor[] getTableDescriptorsByTableName(List<TableName> list) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+    public HTableDescriptor[] getTableDescriptorsByTableName(List<TableName> tableNames) throws IOException {
+        OHConnectionConfiguration connectionConf = new OHConnectionConfiguration(conf);
+        List<HTableDescriptor> tableDescriptors = new ArrayList<>();
+        for (TableName tableName : tableNames) {
+            ObTableClient tableClient = ObTableClientManager.getOrCreateObTableClientByTableName(tableName, connectionConf);
+            OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableName.getNameAsString(), tableClient);
+            try {
+                tableDescriptors.add(executor.getTableDescriptor());
+            } catch (IOException e) {
+                if (e.getCause() instanceof ObTableTransportException
+                        && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+                    throw new TimeoutIOException(e.getCause());
+                } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
+                    throw new TableNotFoundException(tableName);
+                } else {
+                    throw e;
+                }
+            }
+        }
+        return tableDescriptors.toArray(new HTableDescriptor[0]);
     }
 
     @Override
-    public HTableDescriptor[] getTableDescriptors(List<String> list) throws IOException {
-        throw new FeatureNotSupportedException("does not support yet");
+    public HTableDescriptor[] getTableDescriptors(List<String> tableNames) throws IOException {
+        List<TableName> tableNameList = new ArrayList<>();
+        for (String tableName : tableNames) {
+            tableNameList.add(TableName.valueOf(tableName));
+        }
+        return getTableDescriptorsByTableName(tableNameList);
     }
 
     @Override
