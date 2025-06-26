@@ -230,10 +230,12 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             (int) hostInfo.get(1),
                             i
                     );
+                    long tabletId = (long) partition.get(1);
                     final HRegionInfo regionInfo = new HRegionInfo(
                             TableName.valueOf(tableName),
-                            startKeys[0],
-                            endKeys[0]
+                            null, null,
+                            false,
+                            tabletId
                     );
                     HRegionLocation location = new HRegionLocation(regionInfo, serverName, i);
                     Boolean role = (int) partition.get(4) == 1;

@@ -515,7 +515,7 @@ public class OHTableAdminInterfaceTest {
                     "    `T` bigint(20) NOT NULL,\n" +
                     "    `V` varbinary(1024) DEFAULT NULL,\n" +
                     "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
                     "\n" +
                     "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf2` (\n" +
                     "    `K` varbinary(1024) NOT NULL,\n" +
@@ -523,7 +523,7 @@ public class OHTableAdminInterfaceTest {
                     "    `T` bigint(20) NOT NULL,\n" +
                     "    `V` varbinary(1024) DEFAULT NULL,\n" +
                     "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
                     "\n" +
                     "CREATE TABLE IF NOT EXISTS `test_get_region_metrics$cf3` (\n" +
                     "    `K` varbinary(1024) NOT NULL,\n" +
@@ -531,8 +531,30 @@ public class OHTableAdminInterfaceTest {
                     "    `T` bigint(20) NOT NULL,\n" +
                     "    `V` varbinary(1024) DEFAULT NULL,\n" +
                     "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 3;\n" +
+                    ") TABLEGROUP = test_get_region_metrics PARTITION BY KEY(`K`) PARTITIONS 10;\n" +
                     "\n" +
+                    "CREATE TABLEGROUP IF NOT EXISTS test_no_part SHARDING = 'ADAPTIVE';\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf1` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_no_part;\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf2` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_no_part;\n" +
+                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf3` (\n" +
+                    "    `K` varbinary(1024) NOT NULL,\n" +
+                    "    `Q` varbinary(256) NOT NULL,\n" +
+                    "    `T` bigint(20) NOT NULL,\n" +
+                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
+                    ") TABLEGROUP = test_no_part;\n" +
                     "CREATE DATABASE IF NOT EXISTS `get_region`;\n" +
                     "use `get_region`;\n" +
                     "CREATE TABLEGROUP IF NOT EXISTS `get_region:test_multi_cf` SHARDING = 'ADAPTIVE';\n" +
@@ -556,31 +578,9 @@ public class OHTableAdminInterfaceTest {
                     "    `T` bigint(20) NOT NULL,\n" +
                     "    `V` varbinary(1024) DEFAULT NULL,\n" +
                     "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;" +
-                    "USE `test`;" +
-                    "CREATE TABLEGROUP IF NOT EXISTS test_no_part SHARDING = 'ADAPTIVE';" +
-                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf1` (\n" +
-                    "    `K` varbinary(1024) NOT NULL,\n" +
-                    "    `Q` varbinary(256) NOT NULL,\n" +
-                    "    `T` bigint(20) NOT NULL,\n" +
-                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                    "   PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = `test_no_part`;\n" +
-                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf2` (\n" +
-                    "    `K` varbinary(1024) NOT NULL,\n" +
-                    "    `Q` varbinary(256) NOT NULL,\n" +
-                    "    `T` bigint(20) NOT NULL,\n" +
-                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = `test_no_part`;\n" +
-                    "CREATE TABLE IF NOT EXISTS `test_no_part$cf3` (\n" +
-                    "    `K` varbinary(1024) NOT NULL,\n" +
-                    "    `Q` varbinary(256) NOT NULL,\n" +
-                    "    `T` bigint(20) NOT NULL,\n" +
-                    "    `V` varbinary(1024) DEFAULT NULL,\n" +
-                    "    PRIMARY KEY (`K`, `Q`, `T`)\n" +
-                    ") TABLEGROUP = `test_no_part`;");
+                    ") TABLEGROUP = `get_region:test_multi_cf` PARTITION BY KEY(`K`) PARTITIONS 3;");
             st.close();
+            conn.close();
             String tablegroup1 = "test_get_region_metrics";
             String tablegroup2 = "get_region:test_multi_cf";
             Configuration conf = ObHTableTestUtil.newConfiguration();
@@ -594,11 +594,11 @@ public class OHTableAdminInterfaceTest {
             Assert.assertTrue(thrown.getCause() instanceof ObTableException);
             Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
 
-            // test use serverName without tableName to get region metrics
-            assertThrows(FeatureNotSupportedException.class,
-                    () -> {
-                        admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
-                    });
+                // test use serverName without tableName to get region metrics
+                assertThrows(FeatureNotSupportedException.class,
+                        () -> {
+                            admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"));
+                        });
 
             // test single-thread getRegionMetrics after writing
             batchInsert(10000, tablegroup1);
@@ -607,7 +607,7 @@ public class OHTableAdminInterfaceTest {
             List<RegionMetrics> metrics = admin.getRegionMetrics(ServerName.valueOf("localhost,1,1"), TableName.valueOf(tablegroup1));
             long cost = System.currentTimeMillis() - start;
             System.out.println("get region metrics time usage: " + cost + "ms, tablegroup: " + tablegroup1);
-            assertEquals(9, metrics.size());
+            assertEquals(10, metrics.size());
 
             // test getRegionMetrics concurrently reading while writing
             ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -625,7 +625,7 @@ public class OHTableAdminInterfaceTest {
                                 regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup1));
                                 long thrCost = System.currentTimeMillis() - thrStart;
                                 System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
-                                if (regionMetrics.size() != 9) {
+                                if (regionMetrics.size() != 10) {
                                     throw new ObTableGetException(
                                             "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
                                 }
@@ -633,8 +633,8 @@ public class OHTableAdminInterfaceTest {
                                 long thrStart = System.currentTimeMillis();
                                 regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
                                 long thrCost = System.currentTimeMillis() - thrStart;
-                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup2);
-                                if (regionMetrics.size() != 9) {
+                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
+                                if (regionMetrics.size() != 3) {
                                     throw new ObTableGetException(
                                             "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
                                 }

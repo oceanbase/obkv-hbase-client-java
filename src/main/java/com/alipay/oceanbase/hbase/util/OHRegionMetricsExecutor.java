@@ -25,8 +25,11 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.RegionMetrics;
 import org.apache.hadoop.hbase.Size;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Table;
 
 import java.io.IOException;
 import java.util.*;
@@ -74,8 +77,12 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
             throw new IOException("size length has to be the same");
         }
         for (int i = 0; i < regions.size(); ++i) {
-            String name_str = Integer.toString(regions.get(i));
-            byte[] name = name_str.getBytes();
+            byte[] name = HRegionInfo.createRegionName(
+                    TableName.valueOf(tableGroupName),
+                    null,
+                    regions.get(i),
+                    HRegionInfo.DEFAULT_REPLICA_ID, true
+            );
             Size storeFileSize = new Size(((double) ssTableSizeList.get(i)) / (1024 * 1024) , Size.Unit.MEGABYTE); // The unit in original HBase is MEGABYTE, for us it is BYTE
             Size memStoreSize = new Size(((double) memTableSizeList.get(i)) / (1024 * 1024), Size.Unit.MEGABYTE); // The unit in original HBase is MEGABYTE, for us it is BYTE
             OHRegionMetrics ohRegionMetrics = new OHRegionMetrics(tableGroupName, name, storeFileSize, memStoreSize);
