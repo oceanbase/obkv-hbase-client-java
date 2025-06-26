@@ -75,7 +75,7 @@ public class OHTableTimeSeriesDeleteTest {
         
         for (int i = 0; i < values.length; i++) {
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), columns[i].getBytes(), ts[i], toBytes(values[i]));
+            put.addColumn(family.getBytes(), columns[i].getBytes(), ts[i], toBytes(values[i]));
             hTable.put(put);
         }
 
@@ -126,7 +126,7 @@ public class OHTableTimeSeriesDeleteTest {
 
         for (int i = 0; i < values.length; i++) {
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), columns[i].getBytes(), ts[i] + i, toBytes(values[i] + i));
+            put.addColumn(family.getBytes(), columns[i].getBytes(), ts[i] + i, toBytes(values[i] + i));
             hTable.put(put);
         }
 
@@ -177,7 +177,7 @@ public class OHTableTimeSeriesDeleteTest {
 
         for (int i = 0; i < values.length; i++) {
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), columns[i].getBytes(), ts[i] + i, toBytes(values[i] + i));
+            put.addColumn(family.getBytes(), columns[i].getBytes(), ts[i] + i, toBytes(values[i] + i));
             hTable.put(put);
         }
 
@@ -229,8 +229,8 @@ public class OHTableTimeSeriesDeleteTest {
 
         for (int i = 0; i < 3; i++) {
             Put put = new Put(toBytes(key));
-            put.add(family.getBytes(), columns[0].getBytes(), curTs + i, toBytes(value + i));
-            put.add(family.getBytes(), columns[1].getBytes(), curTs + i, toBytes(value + i));
+            put.addColumn(family.getBytes(), columns[0].getBytes(), curTs + i, toBytes(value + i));
+            put.addColumn(family.getBytes(), columns[1].getBytes(), curTs + i, toBytes(value + i));
             hTable.put(put);
         }
 

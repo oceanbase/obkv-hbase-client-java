@@ -23,37 +23,52 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
+import org.apache.hadoop.hbase.TableNotDisabledException;
+import org.apache.hadoop.hbase.TableNotEnabledException;
+import org.apache.hadoop.hbase.TableNotFoundException;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class OHDeleteTableExecutor extends AbstractObTableMetaExecutor<Void> {
-    private final ObTableClient tableClient;
+public class OHTableAccessControlExecutor extends AbstractObTableMetaExecutor<Void> {
+    private final ObTableClient      tableClient;
+    private final ObTableRpcMetaType type;
 
-    OHDeleteTableExecutor(ObTableClient tableClient) {
+    OHTableAccessControlExecutor(ObTableClient tableClient, ObTableRpcMetaType type) {
         this.tableClient = tableClient;
+        this.type = type;
     }
 
     @Override
-    public ObTableRpcMetaType getMetaType() {
-        return ObTableRpcMetaType.HTABLE_DELETE_TABLE;
+    public ObTableRpcMetaType getMetaType() throws IOException {
+        return this.type;
     }
 
     @Override
     public Void parse(ObTableMetaResponse response) throws IOException {
-        // do nothing, error will be thrown from table
         return null;
     }
 
-    public Void deleteTable(String tableName) throws IOException {
+    public void enableTable(String tableName) throws IOException, TableNotFoundException, TableNotEnabledException {
         ObTableMetaRequest request = new ObTableMetaRequest();
         request.setMetaType(getMetaType());
-        Map<String, Object> requestDataMap = new HashMap<>();
-        requestDataMap.put("table_name", tableName);
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("table_name", tableName);
         ObjectMapper objectMapper = new ObjectMapper();
-        String jsonData = objectMapper.writeValueAsString(requestDataMap);
+        String jsonData = objectMapper.writeValueAsString(requestData);
         request.setData(jsonData);
-        return execute(tableClient, request);
+        execute(tableClient, request);
+    }
+
+    public void disableTable(String tableName) throws IOException, TableNotFoundException, TableNotDisabledException {
+        ObTableMetaRequest request = new ObTableMetaRequest();
+        request.setMetaType(getMetaType());
+        Map<String, Object> requestData = new HashMap<>();
+        requestData.put("table_name", tableName);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String jsonData = objectMapper.writeValueAsString(requestData);
+        request.setData(jsonData);
+        execute(tableClient, request);
     }
 }

@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.util;
 
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -44,7 +45,7 @@ public class ObHTableSecondaryPartUtil {
 
     public static void createTables(TableTemplateManager.TableType type, List<String> tableNames,
                                     Map<String, List<String>> group2tableNames, boolean printSql)
-                                                                                                 throws Exception {
+            throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         // single cf table
         if (tableNames != null) {
@@ -53,6 +54,20 @@ public class ObHTableSecondaryPartUtil {
         // multi cf table
         if (group2tableNames != null) {
             createTables(conn, type, group2tableNames, printSql);
+        }
+    }
+
+    public static void alterTables(TableTemplateManager.TableType type, List<String> tableNames,
+                                   Map<String, List<String>> group2tableNames, boolean printSql)
+            throws Exception {
+        Connection conn = ObHTableTestUtil.getConnection();
+        // single cf table
+        if (tableNames != null) {
+            alterTables(conn, type, tableNames, printSql);
+        }
+        // multi cf table
+        if (group2tableNames != null) {
+            alterTables(conn, type, group2tableNames, printSql);
         }
     }
 
@@ -69,18 +84,43 @@ public class ObHTableSecondaryPartUtil {
             try {
                 conn.createStatement().execute(sql);
                 System.out.println("============= create table: " + tableName + "  table_group: "
-                                   + getTableName(tableName) + " =============\n"
-                                   + (printSql ? sql : "")
-                                   + " \n============= done =============\n");
+                        + getTableName(tableName) + " =============\n"
+                        + (printSql ? sql : "")
+                        + " \n============= done =============\n");
             } catch (SQLSyntaxErrorException e) {
                 if (!e.getMessage().contains("already exists")) {
                     throw e;
                 } else {
                     System.out.println("============= table: " + tableName + "  table_group: "
-                                       + getTableName(tableName) + " already exist =============");
+                            + getTableName(tableName) + " already exist =============");
                 }
             }
             tableNames.add(tableName);
+        }
+    }
+
+    public static void alterTables(Connection conn, TableTemplateManager.TableType type,
+                                   List<String> tableNames, boolean printSql) throws Exception {
+        // create single cf table
+        if (tableNames != null) {
+            String tableGroup = TableTemplateManager.getTableGroupName(type, false);
+            String tableName = TableTemplateManager.generateTableName(tableGroup, false, 1);
+            String sql = TableTemplateManager.getAlterTableSQL(type, tableName);
+            try {
+                System.out.println(sql);
+                conn.createStatement().execute(sql);
+                System.out.println("============= alter table: " + tableName + "  table_group: "
+                        + getTableName(tableName) + " =============\n"
+                        + (printSql ? sql : "")
+                        + " \n============= done =============\n");
+            } catch (SQLSyntaxErrorException e) {
+                if (!e.getMessage().contains("already exists")) {
+                    throw e;
+                } else {
+                    System.out.println("============= table: " + tableName + "  table_group: "
+                            + getTableName(tableName) + " alter failed =============");
+                }
+            }
         }
     }
 
@@ -120,6 +160,30 @@ public class ObHTableSecondaryPartUtil {
         }
     }
 
+    public static void alterTables(Connection conn, TableTemplateManager.TableType type, Map<String,
+            List<String>> group2tableNames, boolean printSql) throws Exception {
+        if (group2tableNames != null) {
+            String tableGroup = TableTemplateManager.getTableGroupName(type, true);
+            group2tableNames.put(tableGroup, new LinkedList<>());
+            for (int i = 1; i <= 3; ++i) {
+                String tableName = TableTemplateManager.generateTableName(tableGroup, true, i);
+                String sql = TableTemplateManager.getAlterTableSQL(type, tableName);
+                try {
+                    conn.createStatement().execute(sql);
+                    System.out.println("============= alter table: " + tableName
+                            + "  table_group: " + getTableName(tableName) + " =============\n"
+                            + (printSql ? sql : "") + " \n============= done =============\n");
+                } catch (SQLSyntaxErrorException e) {
+                    if (!e.getMessage().contains("already exists")) {
+                        throw e;
+                    } else {
+                        System.out.println("============= table: " + tableName + "  table_group: " + getTableName(tableName) + " alter failed =============");
+                    }
+                }
+            }
+        }
+    }
+
     public static void truncateTables(List<String> tableNames,
                                       Map<String, List<String>> group2tableNames) throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
@@ -135,20 +199,20 @@ public class ObHTableSecondaryPartUtil {
                 String stmt = "TRUNCATE TABLE " + tableNames.get(i) + ";";
                 conn.createStatement().execute(stmt);
                 System.out.println("============= truncate table " + tableNames.get(i)
-                                   + " done =============");
+                        + " done =============");
             }
         }
     }
 
     public static void truncateTables(Connection conn, Map<String, List<String>> group2tableNames)
-                                                                                                  throws Exception {
+            throws Exception {
         if (group2tableNames != null) {
             for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
                 for (String tableName : entry.getValue()) {
                     String stmt = "TRUNCATE TABLE " + tableName + ";";
                     conn.createStatement().execute(stmt);
                     System.out.println("============= truncate table " + tableName
-                                       + " done =============");
+                            + " done =============");
                 }
             }
         }
@@ -174,19 +238,19 @@ public class ObHTableSecondaryPartUtil {
     }
 
     public static void dropTables(Connection conn, Map<String, List<String>> group2tableNames)
-                                                                                              throws Exception {
+            throws Exception {
         if (group2tableNames != null) {
             for (Map.Entry<String, List<String>> entry : group2tableNames.entrySet()) {
                 for (String tableName : entry.getValue()) {
                     String stmt = "DROP TABLE IF EXISTS " + tableName + ";";
                     conn.createStatement().execute(stmt);
                     System.out.println("============= drop table " + tableName
-                                       + " done =============");
+                            + " done =============");
                 }
                 String stmt = "DROP TABLEGROUP IF EXISTS " + entry.getKey() + ";";
                 conn.createStatement().execute(stmt);
                 System.out.println("============= drop tablegroup " + entry.getKey()
-                                   + " done =============");
+                        + " done =============");
             }
         }
     }
@@ -223,17 +287,17 @@ public class ObHTableSecondaryPartUtil {
         if (tableNames != null) {
             for (String tableName : tableNames) {
                 String alterTableTTLSQL = "ALTER TABLE "
-                                          + tableName
-                                          + String
-                                              .format(
-                                                  " kv_attributes ='{\"Hbase\": {\"TimeToLive\": %d}}';",
-                                                  timeToLive);
+                        + tableName
+                        + String
+                        .format(
+                                " kv_attributes ='{\"Hbase\": {\"TimeToLive\": %d}}';",
+                                timeToLive);
                 try {
                     conn.createStatement().execute(alterTableTTLSQL);
                     System.out.println("============= alter table ttl: " + tableName
-                                       + " table_group: " + getTableName(tableName)
-                                       + " =============\n" + (printSql ? alterTableTTLSQL : "")
-                                       + " \n============= done =============\n");
+                            + " table_group: " + getTableName(tableName)
+                            + " =============\n" + (printSql ? alterTableTTLSQL : "")
+                            + " \n============= done =============\n");
                 } catch (SQLSyntaxErrorException e) {
                     throw e;
                 }
@@ -247,17 +311,17 @@ public class ObHTableSecondaryPartUtil {
         if (tableNames != null) {
             for (String tableName : tableNames) {
                 String alterTableTTLSQL = "ALTER TABLE "
-                                          + tableName
-                                          + String
-                                              .format(
-                                                  " kv_attributes ='{\"Hbase\": {\"MaxVersions\": %d}}';",
-                                                  maxVersion);
+                        + tableName
+                        + String
+                        .format(
+                                " kv_attributes ='{\"Hbase\": {\"MaxVersions\": %d}}';",
+                                maxVersion);
                 try {
                     conn.createStatement().execute(alterTableTTLSQL);
                     System.out.println("============= alter table ttl: " + tableName
-                                       + " table_group: " + getTableName(tableName)
-                                       + " =============\n" + (printSql ? alterTableTTLSQL : "")
-                                       + " \n============= done =============\n");
+                            + " table_group: " + getTableName(tableName)
+                            + " =============\n" + (printSql ? alterTableTTLSQL : "")
+                            + " \n============= done =============\n");
                 } catch (SQLSyntaxErrorException e) {
                     throw e;
                 }
@@ -280,7 +344,7 @@ public class ObHTableSecondaryPartUtil {
     public static int getRunningNormalTTLTaskCnt() throws Exception {
         Connection conn = ObHTableTestUtil.getConnection();
         String RowCountSQL = "SELECT COUNT(*) FROM "
-                             + "OCEANBASE.DBA_OB_KV_TTL_TASKS where TASK_TYPE = 'NORMAL'";
+                + "OCEANBASE.DBA_OB_KV_TTL_TASKS where TASK_TYPE = 'NORMAL'";
         ResultSet resultSet = conn.createStatement().executeQuery(RowCountSQL);
         int rowCnt = 0;
         if (resultSet.next()) {
@@ -309,25 +373,25 @@ public class ObHTableSecondaryPartUtil {
 
     public static void AssertKeyValue(String key, String qualifier, long timestamp, String value,
                                       Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
         Assert.assertEquals(timestamp, cell.getTimestamp());
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static void AssertKeyValue(String key, String qualifier, String value, Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static void AssertKeyValue(String key, String family, String qualifier, long timestamp,
                                       String value, Cell cell) {
-        Assert.assertEquals(key, Bytes.toString(cell.getRow()));
-        Assert.assertEquals(family, Bytes.toString(cell.getFamily()));
-        Assert.assertEquals(qualifier, Bytes.toString(cell.getQualifier()));
+        Assert.assertEquals(key, Bytes.toString(CellUtil.cloneRow(cell)));
+        Assert.assertEquals(family, Bytes.toString(CellUtil.cloneFamily(cell)));
+        Assert.assertEquals(qualifier, Bytes.toString(CellUtil.cloneQualifier(cell)));
         Assert.assertEquals(timestamp, cell.getTimestamp());
-        Assert.assertEquals(value, Bytes.toString(cell.getValue()));
+        Assert.assertEquals(value, Bytes.toString(CellUtil.cloneValue(cell)));
     }
 
     public static List<Cell> getCellsFromScanner(ResultScanner scanner) {
@@ -352,21 +416,31 @@ public class ObHTableSecondaryPartUtil {
     }
 
     public static void sortCells(Cell[] cells) {
-        if (cells == null || cells.length <= 1) { return; }
+        if (cells == null || cells.length <= 1) {
+            return;
+        }
 
         Arrays.sort(cells, new Comparator<Cell>() {
             @Override
             public int compare(Cell c1, Cell c2) {
-                if (c1 == null) return 1;
-                if (c2 == null) return -1;
-                int cmpRet = Bytes.compareTo(c1.getRow(), c2.getRow());
-                if (cmpRet != 0) { return cmpRet; }
+                if (c1 == null)
+                    return 1;
+                if (c2 == null)
+                    return -1;
+                int cmpRet = Bytes.compareTo(CellUtil.cloneRow(c1), CellUtil.cloneRow(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
-                cmpRet = Bytes.compareTo(c1.getFamily(), c2.getFamily());
-                if (cmpRet != 0) { return cmpRet; }
+                cmpRet = Bytes.compareTo(CellUtil.cloneFamily(c1), CellUtil.cloneFamily(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
-                cmpRet = Bytes.compareTo(c1.getQualifier(), c2.getQualifier());
-                if (cmpRet != 0) { return cmpRet; }
+                cmpRet = Bytes.compareTo(CellUtil.cloneQualifier(c1), CellUtil.cloneQualifier(c2));
+                if (cmpRet != 0) {
+                    return cmpRet;
+                }
 
                 cmpRet = Long.compare(c2.getTimestamp(), c1.getTimestamp());
                 return cmpRet;
