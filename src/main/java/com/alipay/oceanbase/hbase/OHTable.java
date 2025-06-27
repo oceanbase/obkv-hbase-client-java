@@ -927,6 +927,9 @@ public class OHTable implements Table {
     @Override
     public Result get(final Get get) throws IOException {
         if (get.getFamilyMap().keySet().isEmpty()) {
+            if (!FeatureSupport.isEmptyFamilySupported()) {
+                throw new FeatureNotSupportedException("empty family get not supported yet within observer version: " + ObGlobal.obVsnString());
+            }
             // check nothing, use table group;
         } else {
             checkFamilyViolation(get.getFamilyMap().keySet(), false);
@@ -1012,6 +1015,9 @@ public class OHTable implements Table {
     @Override
     public ResultScanner getScanner(final Scan scan) throws IOException {
         if (scan.getFamilyMap().keySet().isEmpty()) {
+            if (!FeatureSupport.isEmptyFamilySupported()) {
+                throw new FeatureNotSupportedException("empty family scan not supported yet within observer version: " + ObGlobal.obVsnString());
+            }
             // check nothing, use table group;
         } else {
             checkFamilyViolation(scan.getFamilyMap().keySet(), false);
