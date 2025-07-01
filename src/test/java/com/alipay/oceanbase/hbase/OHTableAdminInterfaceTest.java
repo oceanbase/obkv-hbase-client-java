@@ -633,7 +633,7 @@ public class OHTableAdminInterfaceTest {
                                 long thrStart = System.currentTimeMillis();
                                 regionMetrics = admin.getRegionMetrics(null, TableName.valueOf(tablegroup2));
                                 long thrCost = System.currentTimeMillis() - thrStart;
-                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup1);
+                                System.out.println("task: " + taskId + ", get region metrics time usage: " + thrCost + "ms, tablegroup: " + tablegroup2);
                                 if (regionMetrics.size() != 3) {
                                     throw new ObTableGetException(
                                             "the number of region metrics does not match the number of tablets, the number of region metrics: " + regionMetrics.size());
@@ -1624,12 +1624,7 @@ public class OHTableAdminInterfaceTest {
         }
 
         // 11. check table exists from an uncreated namespace
-        try {
-            admin.tableExists(TableName.valueOf("n101:t1"));
-            fail();
-        } catch (Exception e) {
-            Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
-        }
+        Assert.assertFalse(admin.tableExists(TableName.valueOf("n101:t1")));
 
     }
 
