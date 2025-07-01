@@ -1446,8 +1446,15 @@ public class OHTable implements Table {
     }
 
     @Override
-    public void mutateRow(RowMutations rm) {
-        throw new FeatureNotSupportedException("not supported yet.");
+    public void mutateRow(RowMutations rm) throws IOException {
+        List<Mutation> mutations = rm.getMutations();
+        for (Mutation mutation : mutations) {
+            if (!(mutation instanceof Delete ||mutation instanceof Put)) {
+                throw new FeatureNotSupportedException("only put and delete is supported in mutateRow");
+            }
+        }
+        Object[] results = new Object[mutations.size()];
+        batch(mutations, results);
     }
 
     /**
@@ -1964,6 +1971,14 @@ public class OHTable implements Table {
         ObTableQuery obTableQuery;
         ObHTableFilter filter = buildObHTableFilter(get.getFilter(), get.getTimeRange(),
             get.getMaxVersions(), columnQualifiers);
+
+        if (get.getMaxResultsPerColumnFamily() > 0) {
+            filter.setLimitPerRowPerCf(get.getMaxResultsPerColumnFamily());
+        }
+        if (get.getRowOffsetPerColumnFamily() > 0) {
+            filter.setOffsetPerRowPerCf(get.getRowOffsetPerColumnFamily());
+        }
+
         if (get.isClosestRowBefore()) {
             obTableQuery = buildObTableQuery(filter, HConstants.EMPTY_BYTE_ARRAY, true,
                 get.getRow(), true, true, get.getTimeRange());
