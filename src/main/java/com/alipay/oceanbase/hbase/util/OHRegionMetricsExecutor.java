@@ -17,6 +17,7 @@
 
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,8 +26,8 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
-import org.apache.hadoop.hbase.RegionMetrics;
-import org.apache.hadoop.hbase.Size;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.Table;
 
 import java.io.IOException;
 import java.util.*;
@@ -46,11 +47,10 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
     /*
     * {
         tableName: "tablegroup_name",
-        regionList:{
-                "regions": [200051, 200052, 200053, 200191, 200192, 200193, ...],
-                "memTableSize":[123, 321, 321, 123, 321, 321, ...],
-                "ssTableSize":[5122, 4111, 5661, 5122, 4111, 5661, ...]
-        }
+        "regions": [200051, 200052, 200053, 200191, 200192, 200193, ...],
+        "memTableSize":[123, 321, 321, 123, 321, 321, ...],
+        "ssTableSize":[5122, 4111, 5661, 5122, 4111, 5661, ...],
+        "boundary":["rowkey1", "rowkey2", "rowkey3", ..., "rowkey100", "rowkey101", "rowkey102", ...]
       }
     * */
     @Override
@@ -61,21 +61,56 @@ public class OHRegionMetricsExecutor extends AbstractObTableMetaExecutor<List<Re
         JsonNode tableGroupNameNode = Optional.<JsonNode>ofNullable(jsonMap.get("tableName"))
                 .orElseThrow(() -> new IOException("tableName is null"));
         String tableGroupName = tableGroupNameNode.asText();
-        JsonNode regionListNode = Optional.<JsonNode>ofNullable(jsonMap.get("regionList"))
-                .orElseThrow(() -> new IOException("regionList is null"));
-        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("regions"), new TypeReference<List<Integer>>() {}))
+        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(jsonMap.get("regions"), new TypeReference<List<Integer>>() {}))
                 .orElseThrow(() -> new IOException("regions is null"));
-        List<Integer> memTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("memTableSize"), new TypeReference<List<Integer>>() {}))
+        List<Long> memTableSizeList = Optional.<List<Long>>ofNullable(objectMapper.convertValue(jsonMap.get("memTableSize"), new TypeReference<List<Long>>() {}))
                 .orElseThrow(() -> new IOException("memTableSize is null"));
-        List<Integer> ssTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("ssTableSize"), new TypeReference<List<Integer>>() {}))
+        List<Long> ssTableSizeList = Optional.<List<Long>>ofNullable(objectMapper.convertValue(jsonMap.get("ssTableSize"), new TypeReference<List<Long>>() {}))
                 .orElseThrow(() -> new IOException("ssTableSize is null"));
+        List<String> boundaryList = Optional.<List<String>>ofNullable(objectMapper.convertValue(jsonMap.get("boundary"), new TypeReference<List<String>>() {}))
+                .orElseThrow(() -> new IOException("boundary is null"));
+        boolean isHashLikePartition = boundaryList.stream().allMatch(String::isEmpty);
+        boolean isRangeLikePartition = boundaryList.stream().noneMatch(String::isEmpty);
+        if (!isRangeLikePartition && !isHashLikePartition) {
+            // there are empty string and non-empty string in boundary, which is illegal for ADAPTIVE tablegroup
+            throw new ObTableUnexpectedException("tablegroup {" + tableGroupName + "} has tables with different partition types");
+        }
+        byte[][] startKeys = new byte[regions.size()][];
+        byte[][] endKeys = new byte[regions.size()][];
+        if (isHashLikePartition) {
+            startKeys[0] = HConstants.EMPTY_BYTE_ARRAY;
+            endKeys[0] = HConstants.EMPTY_BYTE_ARRAY;
+        } else {
+            final List<byte[]> startKeysList = new ArrayList<>();
+            final List<byte[]> endKeysList = new ArrayList<>();
+            for (int i = 0; i < boundaryList.size(); ++i) {
+                if (i == 0) {
+                    startKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
+                    endKeysList.add(boundaryList.get(i).getBytes());
+                } else if (i == boundaryList.size() - 1) {
+                    startKeysList.add(boundaryList.get(i - 1).getBytes());
+                    endKeysList.add(HConstants.EMPTY_BYTE_ARRAY);
+                } else {
+                    startKeysList.add(boundaryList.get(i - 1).getBytes());
+                    endKeysList.add(boundaryList.get(i).getBytes());
+                }
+            }
+            startKeys = startKeysList.toArray(new byte[0][]);
+        }
         List<RegionMetrics> metricsList = new ArrayList<>();
-        if (regions.isEmpty() || regions.size() != memTableSizeList.size() || memTableSizeList.size() != ssTableSizeList.size()) {
+        if (regions.isEmpty() || regions.size() != memTableSizeList.size()
+                || memTableSizeList.size() != ssTableSizeList.size()
+                || ssTableSizeList.size() != startKeys.length) {
             throw new IOException("size length has to be the same");
         }
         for (int i = 0; i < regions.size(); ++i) {
-            String name_str = Integer.toString(regions.get(i));
-            byte[] name = name_str.getBytes();
+            byte[] startKey = isHashLikePartition ? startKeys[0] : startKeys[i];
+            byte[] name = HRegionInfo.createRegionName(
+                    TableName.valueOf(tableGroupName),
+                    startKey,
+                    regions.get(i),
+                    HRegionInfo.DEFAULT_REPLICA_ID, true
+            );
             Size storeFileSize = new Size(((double) ssTableSizeList.get(i)) / (1024 * 1024) , Size.Unit.MEGABYTE); // The unit in original HBase is MEGABYTE, for us it is BYTE
             Size memStoreSize = new Size(((double) memTableSizeList.get(i)) / (1024 * 1024), Size.Unit.MEGABYTE); // The unit in original HBase is MEGABYTE, for us it is BYTE
             OHRegionMetrics ohRegionMetrics = new OHRegionMetrics(tableGroupName, name, storeFileSize, memStoreSize);
