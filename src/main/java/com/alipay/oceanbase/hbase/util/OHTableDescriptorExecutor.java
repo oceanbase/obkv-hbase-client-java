@@ -73,8 +73,7 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
             HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
             JsonNode cfDescsNode = Optional.<JsonNode>ofNullable(jsonMap.get("cfDescs"))
                     .orElseThrow(() -> new IOException("cfDesc is null"));
-            Stream<Map.Entry<String, JsonNode>> stream = cfDescsNode.propertyStream();
-            stream.forEach(entry -> {
+            cfDescsNode.fields().forEachRemaining((entry) -> {
                 String cfName = entry.getKey();
                 JsonNode value = entry.getValue();
                 int ttl = value.path("TTL").asInt();
@@ -143,10 +142,7 @@ public class OHTableDescriptorExecutor extends AbstractObTableMetaExecutor<HTabl
         ObTable table = client.getRandomTable();
         ObTableMetaResponse response;
         try {
-            response = (ObTableMetaResponse) client.executeWithRetry(
-                    table,
-                    request,
-                    null /*tableName*/
+            response = (ObTableMetaResponse) client.executeWithRetry(table, request, null /*tableName*/
             );
         } catch (Exception e) {
             throw new IOException("Failed to execute request", e);

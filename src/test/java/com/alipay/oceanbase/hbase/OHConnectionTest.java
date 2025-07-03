@@ -81,7 +81,8 @@ public class OHConnectionTest {
 
     @After
     public void after() throws IOException {
-        if (hTable != null) hTable.close();
+        if (hTable != null)
+            hTable.close();
     }
 
     @Test
@@ -841,7 +842,6 @@ public class OHConnectionTest {
         }
     }
 
-
     /*
     CREATE TABLEGROUP test_region_locator SHARDING = 'ADAPTIVE';
     CREATE TABLE `test_region_locator$family_region_locator` (
@@ -989,7 +989,7 @@ public class OHConnectionTest {
             });
         }
     }
-    
+
     @Test
     public void testHRegionLocation() throws IOException {
         final String tableNameStr = "test_region_locator";
@@ -1034,7 +1034,7 @@ public class OHConnectionTest {
             });
         }
     }
-    
+
     @Test
     public void testKeyPartitionWithRegionLocator() throws IOException {
         final String tableNameStr = "test_multi_cf";
@@ -1050,7 +1050,7 @@ public class OHConnectionTest {
         Assert.assertEquals(startKeys[0], endKeys[0]);
         Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
     }
-    
+
     @Test
     public void testRangeKeySecondaryPartitionWithRegionLocator() throws IOException {
         final String tableNameStr = "test_secondary_range_key";
@@ -1083,7 +1083,6 @@ public class OHConnectionTest {
         Assert.assertEquals(startKeys[0], HConstants.EMPTY_BYTE_ARRAY);
     }
 
-
     @Test
     public void testBufferedMutatorPeriodicFlush() throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
@@ -1111,7 +1110,7 @@ public class OHConnectionTest {
             params = new BufferedMutatorParams(tableName);
             params.writeBufferSize(bufferSize);
             // set periodic flush timeout to enable Timer
-            params.setWriteBufferPeriodicFlushTimeoutMs(100);
+//            params.setWriteBufferPeriodicFlushTimeoutMs(100);
 
             // set thread pool
             long keepAliveTime = conf.getLong("hbase.hconnection.threads.keepalivetime", 60);

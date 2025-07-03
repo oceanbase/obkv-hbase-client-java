@@ -29,7 +29,6 @@ import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.mortbay.util.SingletonList;
 import org.slf4j.Logger;
 import java.io.IOException;
 import java.nio.ByteBuffer;

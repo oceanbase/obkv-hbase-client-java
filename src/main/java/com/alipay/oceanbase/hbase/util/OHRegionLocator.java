@@ -31,16 +31,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class OHRegionLocator implements RegionLocator {
-    private byte[][]                    startKeys;
-    private byte[][]                    endKeys;
-    private final ObTableClient         tableClient;
-    private final TableName             tableName;
+    private byte[][]                             startKeys;
+    private byte[][]                             endKeys;
+    private final ObTableClient                  tableClient;
+    private final TableName                      tableName;
 
     private List<Pair<HRegionLocation, Boolean>> regionLocations;
 
     public OHRegionLocator(byte[][] startKeys, byte[][] endKeys,
-                           List<Pair<HRegionLocation, Boolean>> regionLocations, TableName tableName,
-                           ObTableClient tableClient) {
+                           List<Pair<HRegionLocation, Boolean>> regionLocations,
+                           TableName tableName, ObTableClient tableClient) {
         this.startKeys = startKeys;
         this.endKeys = endKeys;
         this.regionLocations = regionLocations;

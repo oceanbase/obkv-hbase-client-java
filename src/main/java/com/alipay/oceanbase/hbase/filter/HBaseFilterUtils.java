@@ -76,8 +76,6 @@ public class HBaseFilterUtils {
             toParseableByteArray(byteStream, (FuzzyRowFilter) filter);
         } else if (filter instanceof TimestampsFilter) {
             toParseableByteArray(byteStream, (TimestampsFilter) filter);
-        } else if (filter instanceof ColumnValueFilter) {
-            toParseableByteArray(byteStream, (ColumnValueFilter) filter);
         } else if (filter instanceof MultiRowRangeFilter) {
             toParseableByteArray(byteStream, (MultiRowRangeFilter) filter);
         } else if (filter instanceof InclusiveStopFilter) {
@@ -351,22 +349,6 @@ public class HBaseFilterUtils {
             byteStream.write(',');
         }
         byteStream.write(Boolean.toString(canHint).getBytes());
-        byteStream.write(')');
-    }
-
-    // ColumnValueFilter('cf','q')
-    private static void toParseableByteArray(ByteArrayOutputStream byteStream,
-                                             ColumnValueFilter filter) throws IOException {
-        byteStream.write(filter.getClass().getSimpleName().getBytes());
-        byteStream.write('(');
-        byteStream.write("'".getBytes());
-        writeBytesWithEscape(byteStream, filter.getFamily());
-        byteStream.write("','".getBytes());
-        writeBytesWithEscape(byteStream, filter.getQualifier());
-        byteStream.write("',".getBytes());
-        byteStream.write(toParseableByteArray(filter.getCompareOperator()));
-        byteStream.write(',');
-        toParseableByteArray(byteStream, filter.getComparator());
         byteStream.write(')');
     }
 
