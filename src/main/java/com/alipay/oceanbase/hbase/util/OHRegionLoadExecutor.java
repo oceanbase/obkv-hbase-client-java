@@ -19,12 +19,14 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.execute.AbstractObTableMetaExecutor;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.meta.ObTableRpcMetaType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.RegionLoad;
 
 import java.io.IOException;
@@ -54,22 +56,29 @@ public class OHRegionLoadExecutor extends AbstractObTableMetaExecutor<Map<byte[]
         JsonNode tableGroupNameNode = Optional.<JsonNode>ofNullable(jsonMap.get("tableName"))
                 .orElseThrow(() -> new IOException("tableName is null"));
         String tableGroupName = tableGroupNameNode.asText();
-        JsonNode regionListNode = Optional.<JsonNode>ofNullable(jsonMap.get("regionList"))
-                .orElseThrow(() -> new IOException("regionList is null"));
-        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("regions"), new TypeReference<List<Integer>>() {}))
+        List<Integer> regions = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(jsonMap.get("regions"), new TypeReference<List<Integer>>() {}))
                 .orElseThrow(() -> new IOException("regions is null"));
-        List<Integer> memTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("memTableSize"), new TypeReference<List<Integer>>() {}))
+        List<Long> memTableSizeList = Optional.<List<Long>>ofNullable(objectMapper.convertValue(jsonMap.get("memTableSize"), new TypeReference<List<Long>>() {}))
                 .orElseThrow(() -> new IOException("memTableSize is null"));
-        List<Integer> ssTableSizeList = Optional.<List<Integer>>ofNullable(objectMapper.convertValue(regionListNode.get("ssTableSize"), new TypeReference<List<Integer>>() {}))
+        List<Long> ssTableSizeList = Optional.<List<Long>>ofNullable(objectMapper.convertValue(jsonMap.get("ssTableSize"), new TypeReference<List<Long>>() {}))
                 .orElseThrow(() -> new IOException("ssTableSize is null"));
-        if (regions.isEmpty() || regions.size() != memTableSizeList.size() || memTableSizeList.size() != ssTableSizeList.size()) {
-            throw new IOException("size length has to be the same");
+        List<String> boundaryList = Optional.<List<String>>ofNullable(objectMapper.convertValue(jsonMap.get("boundary"), new TypeReference<List<String>>() {}))
+                .orElseThrow(() -> new IOException("boundary is null"));
+        boolean isHashLikePartition = boundaryList.stream().allMatch(String::isEmpty);
+        boolean isRangeLikePartition = boundaryList.stream().noneMatch(String::isEmpty);
+        if (!isRangeLikePartition && !isHashLikePartition) {
+            // there are empty string and non-empty string in boundary, which is illegal for ADAPTIVE tablegroup
+            throw new ObTableUnexpectedException("tablegroup {" + tableGroupName + "} has tables with different partition types");
         }
         Map<byte[], RegionLoad> regionLoadMap = new HashMap<>();
+        if (regions.isEmpty() || regions.size() != memTableSizeList.size()
+                || memTableSizeList.size() != ssTableSizeList.size()) {
+            throw new IOException("size length has to be the same");
+        }
         for (int i = 0; i < regions.size(); ++i) {
             String name_str = Integer.toString(regions.get(i));
             byte[] name = name_str.getBytes();
-            OHRegionLoad load = new OHRegionLoad(name, ssTableSizeList.get(i) / (1024 * 1024), memTableSizeList.get(i) / (1024 * 1024));
+            OHRegionLoad load = new OHRegionLoad(name, (int) (ssTableSizeList.get(i) / (1024 * 1024)), (int) (memTableSizeList.get(i) / (1024 * 1024)));
             regionLoadMap.put(name, load);
         }
         return regionLoadMap;
