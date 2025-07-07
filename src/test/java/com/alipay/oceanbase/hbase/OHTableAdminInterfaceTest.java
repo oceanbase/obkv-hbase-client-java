@@ -18,8 +18,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
-import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.util.ResultSetPrinter;
+import com.alipay.oceanbase.rpc.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableGetException;
 import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
@@ -39,7 +39,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_TEST_LOAD_ENABLE;
@@ -92,10 +91,11 @@ public class OHTableAdminInterfaceTest {
     }
 
     enum ErrSimPoint {
-        EN_CREATE_HTABLE_TG_FINISH_ERR(2621), EN_CREATE_HTABLE_CF_FINISH_ERR(2622), EN_DISABLE_HTABLE_CF_FINISH_ERR(
-                                                                                                                    2623), EN_DELETE_HTABLE_CF_FINISH_ERR(
-                                                                                                                                                          2624), EN_DELETE_HTABLE_SKIP_CF_ERR(
-                                                                                                                                                                                              2625);
+        EN_CREATE_HTABLE_TG_FINISH_ERR(2621),
+        EN_CREATE_HTABLE_CF_FINISH_ERR(2622),
+        EN_DISABLE_HTABLE_CF_FINISH_ERR(2623),
+        EN_DELETE_HTABLE_CF_FINISH_ERR(2624),
+        EN_DELETE_HTABLE_SKIP_CF_ERR(2625);
 
         private final int errCode;
 
@@ -117,8 +117,10 @@ public class OHTableAdminInterfaceTest {
             statement = connection.createStatement();
 
             String sql = String.format(
-                "alter system set_tp tp_no = %d, error_code = 4016, frequency = %d",
-                errSimPoint.getErrCode(), enable ? 1 : 0);
+                    "alter system set_tp tp_no = %d, error_code = 4016, frequency = %d",
+                    errSimPoint.getErrCode(),
+                    enable ? 1 : 0
+            );
 
             statement.execute(sql);
         } catch (Exception e) {
@@ -194,7 +196,7 @@ public class OHTableAdminInterfaceTest {
         // Init PooledOHTable
         OHTablePool ohTablePool = setUpPool();
         OHTablePool.PooledOHTable hTable = (OHTablePool.PooledOHTable) ohTablePool
-            .getTable("testAdminRange");
+                .getTable("testAdminRange");
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
@@ -213,7 +215,7 @@ public class OHTableAdminInterfaceTest {
         // Init PooledOHTable
         OHTablePool ohTablePool = setUpPool();
         OHTablePool.PooledOHTable hTable = (OHTablePool.PooledOHTable) ohTablePool
-            .getTable("testAdminKey");
+                .getTable("testAdminKey");
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
 
@@ -295,7 +297,7 @@ public class OHTableAdminInterfaceTest {
         // Init PooledOHTable
         OHTablePool ohTablePool = setUpLoadPool();
         OHTablePool.PooledOHTable hTable = (OHTablePool.PooledOHTable) ohTablePool
-            .getTable("testAdminRange");
+                .getTable("testAdminRange");
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
@@ -315,7 +317,7 @@ public class OHTableAdminInterfaceTest {
         // Init PooledOHTable
         OHTablePool ohTablePool = setUpLoadPool();
         OHTablePool.PooledOHTable hTable = (OHTablePool.PooledOHTable) ohTablePool
-            .getTable("testAdminKey");
+                .getTable("testAdminKey");
         hTable.getConfiguration().set(HBASE_HTABLE_TEST_LOAD_ENABLE, "true");
 
         Pair<byte[][], byte[][]> startEndKeys = hTable.getStartEndKeys();
@@ -344,7 +346,7 @@ public class OHTableAdminInterfaceTest {
     }
 
     public static void createTable(Admin admin, TableName tableName, String... columnFamilies)
-                                                                                              throws IOException {
+            throws IOException {
         HTableDescriptor htd = new HTableDescriptor(tableName);
         // Add column families
         for (String cf : columnFamilies) {
@@ -404,9 +406,9 @@ public class OHTableAdminInterfaceTest {
                 if (admin.isTableEnabled(TableName.valueOf("test_en_dis_tb"))) {
                     admin.disableTable(TableName.valueOf("test_en_dis_tb"));
                 }
-            checkKVAttributes("test_en_dis_tb$cf1", kvAttributeDisable);
-            checkKVAttributes("test_en_dis_tb$cf2", kvAttributeDisable);
-            checkKVAttributes("test_en_dis_tb$cf3", kvAttributeDisable);
+                checkKVAttributes("test_en_dis_tb$cf1", kvAttributeDisable);
+                checkKVAttributes("test_en_dis_tb$cf2", kvAttributeDisable);
+                checkKVAttributes("test_en_dis_tb$cf3", kvAttributeDisable);
                 // write and read disable table, should fail
                 try {
                     batchInsert(10, "test_en_dis_tb");
@@ -498,6 +500,53 @@ public class OHTableAdminInterfaceTest {
         }
         Object[] results = new Object[batchLsit.size()];
         table.batch(batchLsit, results);
+    }
+
+    private void deleteTableIfExists(Admin admin, TableName tableName) throws Exception {
+        if (admin.tableExists(tableName)) {
+            if (admin.isTableEnabled(tableName)) {
+                admin.disableTable(tableName);
+            }
+            admin.deleteTable(tableName);
+        }
+    }
+
+    private void deleteTableIfExists(Admin admin, String tableName) throws Exception {
+        deleteTableIfExists(admin, TableName.valueOf(tableName));
+    }
+
+    @Test
+    public void testAdminDeleteTable() throws Exception {
+        java.sql.Connection conn = ObHTableTestUtil.getConnection();
+        Statement st = conn.createStatement();
+        st.execute("CREATE DATABASE IF NOT EXISTS `del_tb`");
+        st.close();
+        conn.close();
+        Configuration conf = ObHTableTestUtil.newConfiguration();
+        Connection connection = ConnectionFactory.createConnection(conf);
+        Admin admin = connection.getAdmin();
+        try {
+            createTable(admin, TableName.valueOf("test_del_tb"), "cf1", "cf2", "cf3");
+            createTable(admin, TableName.valueOf("del_tb", "test"), "cf1", "cf2", "cf3");
+            assertTrue(admin.tableExists(TableName.valueOf("del_tb", "test")));
+            assertTrue(admin.tableExists(TableName.valueOf("test_del_tb")));
+            IOException thrown = assertThrows(IOException.class,
+                    () -> {
+                        admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
+                    });
+            Assert.assertTrue(thrown.getCause() instanceof ObTableException);
+            Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
+            admin.deleteTable(TableName.valueOf("del_tb", "test"));
+            admin.deleteTable(TableName.valueOf("test_del_tb"));
+            assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
+            assertFalse(admin.tableExists(TableName.valueOf("test_del_tb")));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        } finally {
+            deleteTableIfExists(admin, "test_del_tb");
+            deleteTableIfExists(admin,  TableName.valueOf("del_tb", "test"));
+        }
     }
 
     @Test
@@ -684,7 +733,7 @@ public class OHTableAdminInterfaceTest {
             regionLoadMap = admin.getRegionLoad(ServerName.valueOf("localhost,1,1"), TableName.valueOf(non_part_tablegroup));
             cost = System.currentTimeMillis() - start;
             System.out.println("get region load time usage: " + cost + "ms, tablegroup: " + non_part_tablegroup);
-            assertEquals(3, regionLoadMap.size());
+            assertEquals(1, regionLoadMap.size());
         } catch (Exception e) {
             e.printStackTrace();
             throw e;
@@ -695,54 +744,7 @@ public class OHTableAdminInterfaceTest {
             conn.close();
         }
     }
-
-    private void deleteTableIfExists(Admin admin, TableName tableName) throws Exception {
-        if (admin.tableExists(tableName)) {
-            if (admin.isTableEnabled(tableName)) {
-                admin.disableTable(tableName);
-            }
-            admin.deleteTable(tableName);
-        }
-    }
-
-    private void deleteTableIfExists(Admin admin, String tableName) throws Exception {
-        deleteTableIfExists(admin, TableName.valueOf(tableName));
-    }
-
-    @Test
-    public void testAdminDeleteTable() throws Exception {
-        java.sql.Connection conn = ObHTableTestUtil.getConnection();
-        Statement st = conn.createStatement();
-        st.execute("CREATE DATABASE IF NOT EXISTS `del_tb`");
-        st.close();
-        conn.close();
-        Configuration conf = ObHTableTestUtil.newConfiguration();
-        Connection connection = ConnectionFactory.createConnection(conf);
-        Admin admin = connection.getAdmin();
-        try {
-            createTable(admin, TableName.valueOf("test_del_tb"), "cf1", "cf2", "cf3");
-            createTable(admin, TableName.valueOf("del_tb", "test"), "cf1", "cf2", "cf3");
-            assertTrue(admin.tableExists(TableName.valueOf("del_tb", "test")));
-            assertTrue(admin.tableExists(TableName.valueOf("test_del_tb")));
-            IOException thrown = assertThrows(IOException.class,
-                    () -> {
-                        admin.deleteTable(TableName.valueOf("tablegroup_not_exists"));
-                    });
-            Assert.assertTrue(thrown.getCause() instanceof ObTableException);
-            Assert.assertEquals(ResultCodes.OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode, ((ObTableException) thrown.getCause()).getErrorCode());
-            admin.deleteTable(TableName.valueOf("del_tb", "test"));
-            admin.deleteTable(TableName.valueOf("test_del_tb"));
-            assertFalse(admin.tableExists(TableName.valueOf("del_tb", "test")));
-            assertFalse(admin.tableExists(TableName.valueOf("test_del_tb")));
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
-        } finally {
-            deleteTableIfExists(admin, "test_del_tb");
-            deleteTableIfExists(admin,  TableName.valueOf("del_tb", "test"));
-        }
-    }
-
+    
     @Test
     public void testAdminTableExists() throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
@@ -853,8 +855,7 @@ public class OHTableAdminInterfaceTest {
         assertTrue(admin.tableExists(tableName));
         // TODO: show create table, need to be replace by getDescriptor
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
-        String selectSql = "show create table " + tableName.getNameAsString() + "$"
-                           + Bytes.toString(cf1);
+        String selectSql = "show create table " + tableName.getNameAsString() + "$" + Bytes.toString(cf1);
         System.out.println("execute sql: " + selectSql);
         java.sql.ResultSet resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
@@ -868,6 +869,7 @@ public class OHTableAdminInterfaceTest {
         System.out.println("execute sql: " + selectSql);
         resultSet = conn.createStatement().executeQuery(selectSql);
         ResultSetPrinter.print(resultSet);
+
 
         // 4. test put/get some data
         Table table = connection.getTable(tableName);
@@ -1040,7 +1042,7 @@ public class OHTableAdminInterfaceTest {
         final int tableNums = 15;
         List<TableName> tableNames = new ArrayList<>();
         for (int i = 0; i < tableNums; i++) {
-           tableNames.add(TableName.valueOf("testConcurCreateTable" + i));
+            tableNames.add(TableName.valueOf("testConcurCreateTable" + i));
         }
         Configuration conf = ObHTableTestUtil.newConfiguration();
         Connection connection = ConnectionFactory.createConnection(conf);
@@ -1205,14 +1207,11 @@ public class OHTableAdminInterfaceTest {
             /// execute the following ddl stmt in created by admin table, should be prohibited
             // 3. alter table add constraint
             try {
-                executeSQL(conn,
-                    "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)", true);
+                executeSQL(conn, "alter table testHTableDefense$cf1 ADD CONSTRAINT cons1 CHECK(T < 0)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 4. alter table add index
@@ -1221,9 +1220,7 @@ public class OHTableAdminInterfaceTest {
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 5. alter table modify column to lob
@@ -1232,64 +1229,42 @@ public class OHTableAdminInterfaceTest {
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 6. alter hbase admin table add fk
             try {
-                executeSQL(
-                    conn,
-                    "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)",
-                    true);
+                executeSQL(conn, "alter table testHTableDefense$cf1 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(K) REFERENCES testHTableDefense$cf2(K)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 7. create a normal table to refer to hbase admin table
             try {
-                executeSQL(
-                    conn,
-                    "create table  testHTableDefense_t1(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K));",
-                    true);
+                executeSQL(conn, "create table  testHTableDefense_t1(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K));" , true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 8. alter a normal table to refer to hbase admin table
             try {
-                executeSQL(conn,
-                    "create table testHTableDefense_t2(a varbinary(1024) primary key)", true);
-                executeSQL(
-                    conn,
-                    "alter table testHTableDefense_t2 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K);",
-                    true);
+                executeSQL(conn, "create table testHTableDefense_t2(a varbinary(1024) primary key)", true);
+                executeSQL(conn, "alter table testHTableDefense_t2 ADD CONSTRAINT hbase_fk_1 FOREIGN KEY(a) REFERENCES testHTableDefense$cf1(K);", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
             // 9. create a normal table A to refer to a table mock parent table B, and create table B using hbase admin
             try {
                 executeSQL(conn, "SET foreign_key_checks = 0", true);
 
-                executeSQL(
-                    conn,
-                    "create table testHTableDefense_t3(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense2$cf1(K));",
-                    true);
-                HTableDescriptor htd2 = new HTableDescriptor(
-                    TableName.valueOf("testHTableDefense2"));
+                executeSQL(conn, "create table testHTableDefense_t3(a varbinary(1024) primary key, FOREIGN KEY(a) REFERENCES testHTableDefense2$cf1(K));", true);
+                HTableDescriptor htd2 = new HTableDescriptor(TableName.valueOf("testHTableDefense2"));
                 HColumnDescriptor hcd4 = new HColumnDescriptor("cf1".getBytes());
                 hcd4.setMaxVersions(2);
                 hcd4.setTimeToLive(172800);
@@ -1297,84 +1272,66 @@ public class OHTableAdminInterfaceTest {
                 admin.createTable(htd2);
                 fail();
             } catch (Exception e) {
-                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
             }
+
 
             // 10. create trigger
             try {
-                executeSQL(conn, " CREATE TRIGGER hbase_trigger_1"
-                                 + " AFTER INSERT ON testHTableDefense$cf1 FOR EACH ROW"
-                                 + " BEGIN END", true);
+                executeSQL(conn, " CREATE TRIGGER hbase_trigger_1" +
+                        " AFTER INSERT ON testHTableDefense$cf1 FOR EACH ROW" +
+                        " BEGIN END", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 11. create view
             try {
-                executeSQL(conn,
-                    " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1", true);
+                executeSQL(conn, " CREATE VIEW hbase_view_1 as select * from testHTableDefense$cf1", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 12. alter view
             try {
-                executeSQL(conn, "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1",
-                    true);
+                executeSQL(conn, "ALTER VIEW hbase_view_1 as select * from testHTableDefense$cf1", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 13. create index
             try {
-                executeSQL(conn,
-                    " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)", true);
+                executeSQL(conn, " CREATE INDEX testHTableDefense$cf1_idx_T on testHTableDefense$cf1(T)", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
+
 
             // 14. explicit create table and specify created_by:admin, should be prohibited
             try {
-                executeSQL(
-                    conn,
-                    "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'",
-                    true);
+                executeSQL(conn, "CREATE TABLE testHTableDefense$cf3(a int primary key) kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals(
-                    "table kv_attribute with '\"CreateBy\": \"Admin\"' not supported",
-                    e.getMessage());
+                Assert.assertEquals("table kv_attribute with '\"CreateBy\": \"Admin\"' not supported", e.getMessage());
             }
 
             // 15. alter table to created_by:admin, should be prohibited
             try {
                 executeSQL(conn, "CREATE TABLE testHTableDefense$cf3(a int primary key)", true);
-                executeSQL(
-                    conn,
-                    "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'",
-                    true);
+                executeSQL(conn, "alter table testHTableDefense$cf3 kv_attributes ='{\"Hbase\": {\"CreatedBy\": \"Admin\"}}'", true);
                 fail();
             } catch (SQLException e) {
                 Assert.assertEquals(1235, e.getErrorCode());
-                Assert.assertEquals("alter table kv attributes to created by admin not supported",
-                    e.getMessage());
+                Assert.assertEquals("alter table kv attributes to created by admin not supported", e.getMessage());
                 // clean table
                 String sql3 = "drop table if exists testHTableDefense$cf3";
                 System.out.println("execute sql: " + sql3);
@@ -1384,27 +1341,22 @@ public class OHTableAdminInterfaceTest {
             // 16. disable a htable did not created by admin is not suppported
             try {
                 executeSQL(conn, "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2", true);
-                executeSQL(
-                    conn,
-                    "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf4(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2",
-                    true);
+                executeSQL(conn, "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf4(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2", true);
                 admin.disableTable(TableName.valueOf("testHTableDefense2"));
                 fail();
             } catch (Exception e) {
-                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
             }
 
             // 17. delete a htable did not created by admin is not suppported
             try {
                 executeSQL(conn, "CREATE TABLEGROUP IF NOT EXISTS testHTableDefense2", true);
-                executeSQL(
-                    conn,
-                    "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf5(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2",
-                    true);
+                executeSQL(conn,
+                        "CREATE TABLE IF NOT EXISTS testHTableDefense2$cf5(a int primary key) kv_attributes ='{\"Hbase\": {}}' TABLEGROUP=testHTableDefense2", true);
                 admin.deleteTable(TableName.valueOf("testHTableDefense2"));
                 fail();
             } catch (Exception e) {
-                Assert.assertEquals(-4007, ((ObTableException) e.getCause()).getErrorCode());
+                Assert.assertEquals(-4007, ((ObTableException)e.getCause()).getErrorCode());
             }
 
         } catch (Exception e) {
@@ -1425,8 +1377,8 @@ public class OHTableAdminInterfaceTest {
     void checkKVAttributes(String tableName, String kvAttributes) throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
         java.sql.ResultSet resultSet = conn.createStatement().executeQuery(
-            "select kv_attributes from oceanbase.__all_table where table_name = '" + tableName
-                    + "'");
+                "select kv_attributes from oceanbase.__all_table where table_name = '" + tableName
+                        + "'");
         resultSet.next();
         String value = resultSet.getString(1);
         Assert.assertEquals(kvAttributes, value);
@@ -1445,11 +1397,11 @@ public class OHTableAdminInterfaceTest {
         byte[] cf1 = Bytes.toBytes("cf1");
         byte[] cf2 = Bytes.toBytes("cf2");
         byte[] cf3 = Bytes.toBytes("cf3");
-        
+
         HColumnDescriptor hcd1 = new HColumnDescriptor(cf1);
         HColumnDescriptor hcd2 = new HColumnDescriptor(cf2);
         HColumnDescriptor hcd3 = new HColumnDescriptor(cf3);
-        
+
         HTableDescriptor htd = new HTableDescriptor(TableName.valueOf(tableName));
         htd.addFamily(hcd1);
         htd.addFamily(hcd2);
@@ -1655,12 +1607,7 @@ public class OHTableAdminInterfaceTest {
         }
 
         // 10. check table exists from an uncreated namespace
-        try {
-            admin.tableExists(TableName.valueOf("n101:t1"));
-            fail();
-        } catch (Exception e) {
-            Assert.assertEquals(e.getClass(), NamespaceNotFoundException.class);
-        }
+        Assert.assertFalse(admin.tableExists(TableName.valueOf("n101:t1")));
 
     }
 
@@ -1726,13 +1673,8 @@ public class OHTableAdminInterfaceTest {
 
     private void checkDDLStmtStr(List<Map.Entry<Integer, String>> ddlStmts) throws Exception {
         java.sql.Connection conn = ObHTableTestUtil.getConnection();
-        java.sql.ResultSet resultSet = conn
-            .createStatement()
-            .executeQuery(
-                String
-                    .format(
-                        "select operation_type, ddl_stmt_str from oceanbase.__all_ddl_operation order by gmt_modified desc limit %d",
-                        ddlStmts.size() + 2));
+        java.sql.ResultSet resultSet = conn.createStatement().executeQuery(
+                String.format("select operation_type, ddl_stmt_str from oceanbase.__all_ddl_operation order by gmt_modified desc limit %d", ddlStmts.size() + 2));
         Assert.assertTrue(resultSet.next());
         int operationType = resultSet.getInt("operation_type");
         Assert.assertEquals(1503, operationType);

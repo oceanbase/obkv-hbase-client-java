@@ -152,7 +152,7 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
         // Similarly, for OBKV-HBase, multiple CFs corresponding to related tablets also reside on the same machine.
         // Therefore, here we maintain the same behavior by returning all partitions from just one table.
         final int regionCountPerTable = partitions.size() / tableIdDict.size();
-        
+
         List<Object> oneTableLeaders = new ArrayList<>();
         for (int i = 0; i < regionCountPerTable; ++i) {
             boolean isLeader = ((int) ((List<Object>) partitions.get(i)).get(4) == 1);
@@ -188,10 +188,13 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             i
                     );
                     int boundIndex = i / replicaDict.size();
+                    long tabletId = Integer.toUnsignedLong((Integer) partition.get(1));
                     final HRegionInfo regionInfo = new HRegionInfo(
                             TableName.valueOf(tableName),
                             startKeys[boundIndex],
-                            endKeys[boundIndex]
+                            endKeys[boundIndex],
+                            false,
+                            tabletId
                     );
                     HRegionLocation location = new HRegionLocation(regionInfo, serverName, i);
                     Boolean role = (int) partition.get(4) == 1;
@@ -230,17 +233,20 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
                             (int) hostInfo.get(1),
                             i
                     );
+                    long tabletId = Integer.toUnsignedLong((Integer) partition.get(1));
                     final HRegionInfo regionInfo = new HRegionInfo(
                             TableName.valueOf(tableName),
                             startKeys[0],
-                            endKeys[0]
+                            endKeys[0],
+                            false,
+                            tabletId
                     );
                     HRegionLocation location = new HRegionLocation(regionInfo, serverName, i);
                     Boolean role = (int) partition.get(4) == 1;
                     return new Pair(location, role);
                 })
                 .collect(Collectors.toList());
-        
+
         return new OHRegionLocator(startKeys, endKeys, regionLocations, TableName.valueOf(tableName), client);
     }
 
