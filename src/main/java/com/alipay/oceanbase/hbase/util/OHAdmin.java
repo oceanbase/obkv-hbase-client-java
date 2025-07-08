@@ -99,7 +99,7 @@ public class OHAdmin implements Admin {
                 int errCode = ((ObTableException) cause).getErrorCode();
                 // if the original cause is database_not_exist, means namespace in tableName does not exist
                 // for HBase, namespace not exist will not throw exceptions but will return false
-                if (errCode == ResultCodes.OB_ERR_BAD_DATABASE.errorCode) {
+                if (errCode == ResultCodes.OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
                     return false;
                 }
             }
