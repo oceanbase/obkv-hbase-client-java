@@ -49,10 +49,55 @@ import java.util.*;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
+import static com.alipay.oceanbase.rpc.protocol.payload.ResultCodes.*;
+
 public class OHAdmin implements Admin {
     private boolean                aborted = false;
     private final OHConnectionImpl connection;
     private final Configuration    conf;
+
+    @FunctionalInterface
+    private interface ExceptionHandler {
+        void handle(int errorCode, TableName tableName) throws IOException;
+    }
+
+    private Throwable getRootCause(Throwable e) {
+        Throwable cause = e.getCause();
+        while(cause != null && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause;
+    }
+
+    private void handleTimeoutException(Exception e) throws TimeoutIOException {
+        if (e.getCause() instanceof ObTableTransportException
+                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
+            throw new TimeoutIOException(e.getCause());
+        }
+    }
+
+    private void handleObTableException(Exception e, TableName tableName, ExceptionHandler exceptionHandler) throws IOException {
+        if (e instanceof IOException) {
+            handleTimeoutException(e);
+        }
+
+        Throwable cause = getRootCause(e);
+
+        if (cause instanceof ObTableException) {
+            int errCode = ((ObTableException) cause).getErrorCode();
+            try {
+                exceptionHandler.handle(errCode, tableName);
+            } catch (RuntimeException re) {
+                throw re;
+            }
+        }
+
+        if (e instanceof IOException) {
+            throw (IOException) e;
+        } else {
+            throw new IOException(e);
+        }
+    }
 
     OHAdmin(OHConnectionImpl connection) {
         this.connection = connection;
@@ -91,10 +136,7 @@ public class OHAdmin implements Admin {
             return executor.tableExists(tableName.getNameAsString());
         } catch (Exception e) {
             // try to get the original cause
-            Throwable cause = e.getCause();
-            while (cause != null && cause.getCause() != null) {
-                cause = cause.getCause();
-            }
+            Throwable cause = getRootCause(e);
             if (cause instanceof ObTableException) {
                 int errCode = ((ObTableException) cause).getErrorCode();
                 // if the original cause is database_not_exist, means namespace in tableName does not exist
@@ -103,7 +145,11 @@ public class OHAdmin implements Admin {
                     return false;
                 }
             }
-            throw e;
+            if (e instanceof IOException) {
+                throw (IOException) e;
+            } else {
+                throw new IOException(e);
+            }
         }
     }
 
@@ -184,14 +230,14 @@ public class OHAdmin implements Admin {
         try {
             return executor.getTableDescriptor();
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
-                throw new TableNotFoundException(tableName);
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName);
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                }
+            });
+            throw e; // should never reach
         }
     }
 
@@ -205,14 +251,14 @@ public class OHAdmin implements Admin {
         try {
             return executor.getTableDescriptor();
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else if (e.getCause().getMessage().contains("OB_TABLEGROUP_NOT_EXIST")) {
-                throw new TableNotFoundException(tableName);
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName);
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                }
+            });
+            throw e; // should never reach
         }
     }
 
@@ -225,12 +271,13 @@ public class OHAdmin implements Admin {
         try {
             executor.createTable(tableDescriptor, null);
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableDescriptor.getTableName(), (errCode, tableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_EXISTS.errorCode) {
+                    throw new TableExistsException(tableName.getNameAsString());
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(tableName.getNameAsString());
+                }
+            });
         }
     }
 
@@ -260,12 +307,15 @@ public class OHAdmin implements Admin {
         try {
             executor.deleteTable(tableName.getNameAsString());
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName);
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                } else if (errCode == OB_KV_TABLE_NOT_DISABLED.errorCode) {
+                    throw new TableNotDisabledException(argTableName);
+                }
+            });
         }
     }
 
@@ -304,12 +354,13 @@ public class OHAdmin implements Admin {
         try {
             executor.enableTable(tableName.getNameAsString());
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName);
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                }
+            });
         }
     }
 
@@ -343,12 +394,13 @@ public class OHAdmin implements Admin {
         try {
             executor.disableTable(tableName.getNameAsString());
         } catch (IOException e) {
-            if (e.getCause() instanceof ObTableTransportException
-                && ((ObTableTransportException) e.getCause()).getErrorCode() == TransportCodes.BOLT_TIMEOUT) {
-                throw new TimeoutIOException(e.getCause());
-            } else {
-                throw e;
-            }
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName);
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                }
+            });
         }
     }
 
@@ -747,7 +799,18 @@ public class OHAdmin implements Admin {
             tableName, connectionConf);
         OHRegionLoadExecutor executor = new OHRegionLoadExecutor(tableName.getNameAsString(),
             tableClient);
-        return executor.getRegionLoad();
+        try {
+            return executor.getRegionLoad();
+        } catch (Exception e) {
+            handleObTableException(e, tableName, (errCode, argTableName) -> {
+                if (errCode == OB_KV_HBASE_TABLE_NOT_EXISTS.errorCode) {
+                    throw new TableNotFoundException(argTableName.getNameAsString());
+                } else if (errCode == OB_KV_HBASE_NAMESPACE_NOT_FOUND.errorCode) {
+                    throw new NamespaceNotFoundException(argTableName.getNamespaceAsString());
+                }
+            });
+            throw e; // should never reach
+        }
     }
 
     @Override
