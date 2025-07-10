@@ -39,7 +39,7 @@ public class OHRegionLocatorExecutor extends AbstractObTableMetaExecutor<OHRegio
     private final String        tableName;
     private final ObTableClient client;
 
-    OHRegionLocatorExecutor(String tableName, ObTableClient client) {
+    public OHRegionLocatorExecutor(String tableName, ObTableClient client) {
         this.tableName = tableName;
         this.client = client;
     }

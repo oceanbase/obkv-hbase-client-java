@@ -482,7 +482,23 @@ public class OHTableSecondaryPartDeleteTest {
             get.addColumn(toBytes(family), toBytes(column + family));
         }
         Result result = hTable.get(get);
-        Assert(entry.getValue(), ()->Assert.assertEquals(6, result.size()));
+        // (ts1, ts3, ts4) * 3
+        Result finalResult = result;
+        Assert(entry.getValue(), ()->Assert.assertEquals(3 * entry.getValue().size(), finalResult.size()));
+        
+        put = new Put(toBytes(key));
+        delete = new Delete(toBytes(key));
+        for (String tableName : entry.getValue()) {
+            String family = getColumnFamilyName(tableName);
+            Long ts = Long.MAX_VALUE;
+            put.addColumn(toBytes(family), toBytes(column + family), ts, toBytes(value + ts));
+            delete.addFamilyVersion(family.getBytes(), Long.MAX_VALUE); // do nothing
+        }
+        hTable.put(put);
+        hTable.delete(delete);
+        result = hTable.get(get);
+        Result finalResult1 = result;
+        Assert(entry.getValue(), ()->Assert.assertEquals(4 * entry.getValue().size(), finalResult1.size()));
         hTable.close();
     }
 
