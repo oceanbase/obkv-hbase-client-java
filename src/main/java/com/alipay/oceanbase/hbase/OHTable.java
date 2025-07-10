@@ -62,6 +62,7 @@ import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.slf4j.Logger;
 
+import javax.swing.plaf.synth.Region;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
@@ -169,6 +170,8 @@ public class OHTable implements HTableInterface {
      * the bufferedMutator to execute Puts
      */
     private OHBufferedMutatorImpl mutator;
+    
+    private RegionLocator          regionLocator;
 
     /**
      * flag for whether closed
@@ -2020,7 +2023,7 @@ public class OHTable implements HTableInterface {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
@@ -2042,19 +2045,21 @@ public class OHTable implements HTableInterface {
                         ObObj.getMin()));
                     range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
                         ObObj.getMax()));
-                    filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
+                    // [MAX_VALUE, MAX_VALUE), delete nothing
+                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE), Integer.MAX_VALUE);
                 } else {
+                    TimeRange timeRange = new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1);
                     range.setStartKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMin(),
                         ObObj.getMin()));
                     range.setEndKey(ObRowKey.getInstance(kv.getRow(), ObObj.getMax(),
                         ObObj.getMax()));
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                                timeRange,
                             Integer.MAX_VALUE);
                     } else {
                         filter = buildObHTableFilter(null,
-                            new TimeRange(0, kv.getTimestamp() + 1),
+                                timeRange,
                             Integer.MAX_VALUE, kv.getQualifier());
                     }
                 }
@@ -2384,27 +2389,27 @@ public class OHTable implements HTableInterface {
     }
 
     public byte[][] getStartKeys() throws IOException {
-        byte[][] startKeys = new byte[0][];
-        try {
-            startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
-        } catch (Exception e) {
-            throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+        if (regionLocator == null) {
+            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+            regionLocator = executor.getRegionLocator(tableNameString);
         }
-        return startKeys;
+        return regionLocator.getStartKeys();
     }
 
     public byte[][] getEndKeys() throws IOException {
-        byte[][] endKeys = new byte[0][];
-        try {
-            endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
-        } catch (Exception e) {
-            throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+        if (regionLocator == null) {
+            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+            regionLocator = executor.getRegionLocator(tableNameString);
         }
-        return endKeys;
+        return regionLocator.getEndKeys();
     }
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
-        return new Pair<>(getStartKeys(), getEndKeys());
+        if (regionLocator == null) {
+            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+            regionLocator = executor.getRegionLocator(tableNameString);
+        }
+        return regionLocator.getStartEndKeys();
     }
 
     private BufferedMutator getBufferedMutator() throws IOException {
