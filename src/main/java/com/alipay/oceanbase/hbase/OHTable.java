@@ -1231,11 +1231,11 @@ public class OHTable implements Table {
             // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
             n++;
             if (n % putWriteBufferCheck == 0 && currentWriteBufferSize > writeBufferSize) {
-                flushCommits();
+                flushCommitsV2();
             }
         }
         if (autoFlush || currentWriteBufferSize > writeBufferSize) {
-            flushCommits();
+            flushCommitsV2();
         }
     }
 
@@ -1647,6 +1647,40 @@ public class OHTable implements Table {
                         logger.error(LCD.convert("01-00008"), entry.getValue(), tableNameString,
                             autoFlush, writeBuffer.size(), entry.getKey());
                     }
+                }
+            }
+        } finally {
+            if (clearBufferOnFail) {
+                writeBuffer.clear();
+                currentWriteBufferSize = 0;
+            } else {
+                // the write buffer was adjusted by processBatchOfPuts
+                currentWriteBufferSize = 0;
+                for (Put aPut : writeBuffer) {
+                    currentWriteBufferSize += aPut.heapSize();
+                }
+            }
+        }
+    }
+
+    public void flushCommitsV2() throws IOException {
+        try {
+            if (writeBuffer.isEmpty()) {
+                return;
+            }
+            try {
+                String realTableName = getTargetTableName(writeBuffer);
+                ObHbaseRequest request = buildHbaseRequest(realTableName, writeBuffer);
+                try {
+                    obTableClient.execute(request);
+                } catch (Exception e) {
+                    throw new IOException(tableNameString + " table occurred unexpected error." , e);
+                }
+            } catch (Exception e) {
+                logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
+                    writeBuffer.size(), e);
+                if (e instanceof IOException) {
+                    throw (IOException) e;
                 }
             }
         } finally {
@@ -2313,6 +2347,46 @@ public class OHTable implements Table {
         }
         batch.setEntityType(ObTableEntityType.HKV);
         return batch;
+    }
+
+    private ObHbaseRequest buildHbaseRequest(String tableName, List<? extends Row> actions)
+                                                                    throws FeatureNotSupportedException,
+                                                                    IllegalArgumentException,
+                                                                    IOException {
+        ObHbaseRequest request = new ObHbaseRequest();
+        request.setTableName(tableName);
+        List<ObObj>             keys = new ArrayList<>();
+        List<Integer>           cellNumArray = new ArrayList<>();
+        List<ObHbaseQTV>        cells = new ArrayList<>();
+        for (Row row : actions) {
+            if (row instanceof Put) {
+                Put put = (Put) row;
+                if (put.isEmpty()) {
+                    throw new IllegalArgumentException("No columns to put for item");
+                }
+                keys.add(ObObj.getInstance(put.getRow()));
+                int cellCount = 0;
+                for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
+                    List<Cell> keyValueList = entry.getValue();
+                    for (Cell kv : keyValueList) {
+                        cellCount++;
+                        ObHbaseQTV cell = new ObHbaseQTV();
+                        cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
+                        cell.setT(ObObj.getInstance(kv.getTimestamp()));
+                        cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
+                        cells.add(cell);
+                    }
+                }
+                cellNumArray.add(cellCount);
+            } else {
+                throw new FeatureNotSupportedException(
+                    "not supported other type in batch yet,only support get, put and delete");
+            }
+        }
+        request.setKeys(keys);
+        request.setCellNumArray(cellNumArray);
+        request.setCells(cells);
+        return request;
     }
 
     public static ObTableOperation buildObTableOperation(Cell kv,
