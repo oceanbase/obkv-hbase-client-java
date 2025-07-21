@@ -254,7 +254,6 @@ public class OHTableSecondaryPartPutTest {
         threadPoolExecutor.shutdown();
         
         // 验证结果
-        System.out.println("Mixed operations completed. Put success: " + putSuccessCount.get() + ", Get success: " + getSuccessCount.get());
         Assert.assertTrue("At least some put operations should succeed", putSuccessCount.get() > 0);
         
         // 验证最终数据一致性
