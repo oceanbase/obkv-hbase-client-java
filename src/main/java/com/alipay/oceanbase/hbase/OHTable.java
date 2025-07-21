@@ -65,7 +65,6 @@ import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.VersionInfo;
 import org.slf4j.Logger;
 
-import javax.swing.plaf.synth.Region;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
@@ -2114,7 +2113,7 @@ public class OHTable implements Table {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, kv.getQualifier());
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2465,27 +2464,65 @@ public class OHTable implements Table {
     }
 
     public byte[][] getStartKeys() throws IOException {
-        if (regionLocator == null) {
-            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
-            regionLocator = executor.getRegionLocator(tableNameString);
+        byte[][] startKeys = new byte[0][];
+        if (ObGlobal.isHBaseAdminSupport()) {
+            // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getStartKeys
+            if (regionLocator == null) {
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                regionLocator = executor.getRegionLocator(tableNameString);
+            }
+            startKeys = regionLocator.getStartKeys();
+        } else if (!obTableClient.isOdpMode()) {
+            // before 4.3.5.3 only support in OCP mode
+            try {
+                startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
+            } catch (Exception e) {
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+            }
+        } else {
+            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
-        return regionLocator.getStartKeys();
+
+        return startKeys;
     }
 
     public byte[][] getEndKeys() throws IOException {
-        if (regionLocator == null) {
-            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
-            regionLocator = executor.getRegionLocator(tableNameString);
+        byte[][] endKeys = new byte[0][];
+        if (ObGlobal.isHBaseAdminSupport()) {
+            // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getEndKeys
+            if (regionLocator == null) {
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                regionLocator = executor.getRegionLocator(tableNameString);
+            }
+            endKeys = regionLocator.getEndKeys();
+        } else if (!obTableClient.isOdpMode()) {
+            // before 4.3.5.3 only support in OCP mode
+            try {
+                endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
+            } catch (Exception e) {
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+            }
+        } else {
+            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
-        return regionLocator.getEndKeys();
+
+        return endKeys;
     }
 
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
-        if (regionLocator == null) {
-            OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
-            regionLocator = executor.getRegionLocator(tableNameString);
+        if (ObGlobal.isHBaseAdminSupport()) {
+            // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getStartEndKeys
+            if (regionLocator == null) {
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                regionLocator = executor.getRegionLocator(tableNameString);
+            }
+            return regionLocator.getStartEndKeys();
+        } else if (!obTableClient.isOdpMode()) {
+            // before 4.3.5.3 only support in OCP mode
+            return new Pair<>(getStartKeys(), getEndKeys());
+        } else {
+            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
-        return regionLocator.getStartEndKeys();
     }
 
     public static CompareFilter.CompareOp getCompareOp(CompareOperator cmpOp) {
