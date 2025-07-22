@@ -4,7 +4,7 @@
 
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OceanBase JavaClient for HBaseApi</description>
@@ -478,7 +478,7 @@
                         </goals>
                         <configuration>
                             <rules>
-                                <DependencyConvergence></DependencyConvergence>
+                                <DependencyConvergence />
                             </rules>
                         </configuration>
                     </execution>
@@ -486,5 +486,5 @@
             </plugin>
         </plugins>
     </build>
-    <profiles></profiles>
+    <profiles />
 </project>
