@@ -24,7 +24,7 @@ Import the dependency for your maven project:
 <dependency>
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 **Note:**
