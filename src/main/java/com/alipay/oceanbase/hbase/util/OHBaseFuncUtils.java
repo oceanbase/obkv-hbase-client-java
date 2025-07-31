@@ -17,9 +17,15 @@
 
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.rpc.ObGlobal;
+import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.exception.FeatureNotSupportedException;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Row;
 
 import java.util.Arrays;
+import java.util.List;
 
 @InterfaceAudience.Private
 public class OHBaseFuncUtils {
@@ -41,5 +47,25 @@ public class OHBaseFuncUtils {
         }
         byte[] newQualifier = Arrays.copyOfRange(qualifier, familyLen + 1, qualifier.length);
         return new byte[][] { family, newQualifier };
+    }
+
+    public static boolean isHBasePutPefSupport(ObTableClient tableClient) {
+        if (tableClient.isOdpMode()) {
+            throw new FeatureNotSupportedException("not supported yet");
+        } else {
+            // server version support and distributed capacity is enabled
+            return ObGlobal.isHBasePutPerfSupport() && tableClient.getServerCapacity().isSupportDistributedExecute();
+        }
+    }
+
+    public static boolean isAllPut(List<? extends Row> actions) {
+        boolean isAllPut = true;
+        for (Row action : actions) {
+            if (!(action instanceof Put)) {
+                isAllPut = false;
+                break;
+            }
+        }
+        return isAllPut;
     }
 }
