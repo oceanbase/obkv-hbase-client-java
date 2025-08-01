@@ -19,7 +19,6 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.exception.FeatureNotSupportedException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Row;
@@ -51,10 +50,14 @@ public class OHBaseFuncUtils {
 
     public static boolean isHBasePutPefSupport(ObTableClient tableClient) {
         if (tableClient.isOdpMode()) {
-            throw new FeatureNotSupportedException("not supported yet");
+            // server version support and distributed capacity is enabled and odp version support
+            return ObGlobal.isHBasePutPerfSupport()
+                    && tableClient.getServerCapacity().isSupportDistributedExecute()
+                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
         } else {
             // server version support and distributed capacity is enabled
-            return ObGlobal.isHBasePutPerfSupport() && tableClient.getServerCapacity().isSupportDistributedExecute();
+            return ObGlobal.isHBasePutPerfSupport()
+                    && tableClient.getServerCapacity().isSupportDistributedExecute();
         }
     }
 
