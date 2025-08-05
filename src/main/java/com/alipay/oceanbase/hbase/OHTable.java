@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put>  writeBuffer            = new ArrayList<Put>();
+    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -195,7 +195,8 @@ public class OHTable implements Table {
 
     private int                  scannerTimeout;
 
-    private RegionLocator          regionLocator;
+    private RegionLocator        regionLocator;
+
     /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
@@ -460,8 +461,8 @@ public class OHTable implements Table {
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
-                                                              OHConnectionConfiguration ohConnectionConf)
-                                                                                                         throws IllegalArgumentException {
+                                                                    OHConnectionConfiguration ohConnectionConf)
+                                                                                                               throws IllegalArgumentException {
         if (tableNameString.indexOf(':') != -1) {
             String[] params = tableNameString.split(":");
             if (params.length != 2) {
@@ -501,13 +502,15 @@ public class OHTable implements Table {
 
     @Override
     public HTableDescriptor getTableDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
     @Override
     public TableDescriptor getDescriptor() throws IOException {
-        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString, obTableClient);
+        OHTableDescriptorExecutor executor = new OHTableDescriptorExecutor(tableNameString,
+            obTableClient);
         return executor.getTableDescriptor();
     }
 
@@ -923,10 +926,12 @@ public class OHTable implements Table {
             byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                                   + columnName.length];
                     System.arraycopy(family, 0, newQualifier, 0, family.length);
                     newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1,
+                        columnName.length);
                     columnFilters.add(newQualifier);
                 }
             } else {
@@ -1007,6 +1012,8 @@ public class OHTable implements Table {
                 if (get.isCheckExistenceOnly()) {
                     return Result.create(null, !keyValueList.isEmpty());
                 }
+                // sort keyValues
+                OHBaseFuncUtils.sortHBaseResult(keyValueList);
                 return Result.create(keyValueList);
             }
         };
@@ -1695,7 +1702,7 @@ public class OHTable implements Table {
                 try {
                     ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
                 } catch (Exception e) {
-                    throw new IOException(tableNameString + " table occurred unexpected error." , e);
+                    throw new IOException(tableNameString + " table occurred unexpected error.", e);
                 }
             } catch (Exception e) {
                 logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
@@ -1938,7 +1945,7 @@ public class OHTable implements Table {
                 if (columnQualifier == null) {
                     obHTableFilter.addSelectColumnQualifier(new byte[0]);
                 } else {
-                   obHTableFilter.addSelectColumnQualifier(columnQualifier);
+                    obHTableFilter.addSelectColumnQualifier(columnQualifier);
                 }
             }
         }
@@ -1996,11 +2003,11 @@ public class OHTable implements Table {
             filter.setOffsetPerRowPerCf(scan.getRowOffsetPerColumnFamily());
         }
         if (scan.isReversed()) {
-            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(), scan.getStartRow(),
-                    scan.includeStartRow(), true, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStopRow(), scan.includeStopRow(),
+                scan.getStartRow(), scan.includeStartRow(), true, ts);
         } else {
-            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(), scan.getStopRow(),
-                    scan.includeStopRow(), false, ts);
+            obTableQuery = buildObTableQuery(filter, scan.getStartRow(), scan.includeStartRow(),
+                scan.getStopRow(), scan.includeStopRow(), false, ts);
         }
         obTableQuery.setBatchSize(scan.getBatch());
         obTableQuery.setLimit(scan.getLimit());
@@ -2080,10 +2087,11 @@ public class OHTable implements Table {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType().getCode());
         com.alipay.oceanbase.rpc.mutation.Mutation tableMutation = buildMutation(kv, operationType,
             isTableGroup, family, TTL);
-        if(isTableGroup) {
+        if (isTableGroup) {
             // construct new_kv otherwise filter will fail to match targeted columns
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2137,7 +2145,8 @@ public class OHTable implements Table {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
+                            CellUtil.cloneQualifier(kv));
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2160,7 +2169,8 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     // [MAX_VALUE, MAX_VALUE), delete nothing
-                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE), Integer.MAX_VALUE);
+                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE),
+                        Integer.MAX_VALUE);
                 } else {
                     TimeRange timeRange = new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1);
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2168,13 +2178,10 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     if (!isTableGroup) {
-                        filter = buildObHTableFilter(null,
-                                timeRange,
-                            Integer.MAX_VALUE);
+                        filter = buildObHTableFilter(null, timeRange, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null,
-                                timeRange,
-                            Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
+                        filter = buildObHTableFilter(null, timeRange, Integer.MAX_VALUE,
+                            CellUtil.cloneQualifier(kv));
                     }
                 }
                 break;
@@ -2193,7 +2200,8 @@ public class OHTable implements Table {
         Cell newCell = kv;
         if (isTableGroup && family != null) {
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2553,7 +2561,8 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getStartKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
+                    obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             startKeys = regionLocator.getStartKeys();
@@ -2562,10 +2571,12 @@ public class OHTable implements Table {
             try {
                 startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
+                    e);
             }
         } else {
-            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException(
+                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return startKeys;
@@ -2576,7 +2587,8 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getEndKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
+                    obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             endKeys = regionLocator.getEndKeys();
@@ -2585,10 +2597,12 @@ public class OHTable implements Table {
             try {
                 endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
+                    e);
             }
         } else {
-            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException(
+                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return endKeys;
