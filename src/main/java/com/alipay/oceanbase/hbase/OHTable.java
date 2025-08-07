@@ -625,7 +625,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
-        if (actions == null) {
+        if (actions == null || actions.isEmpty()) {
             return;
         }
         if (results != null) {
@@ -725,7 +725,7 @@ public class OHTable implements HTableInterface {
             if (action instanceof RowMutations || action instanceof RegionCoprocessorServiceExec) {
                 throw new FeatureNotSupportedException("not supported yet'");
             } else {
-                Set<byte[]> familySet;
+                Set<byte[]> familySet = null;
                 if (action instanceof Get) {
                     Get get = (Get) action;
                     familySet = get.familySet();
