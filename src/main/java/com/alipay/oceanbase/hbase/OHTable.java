@@ -642,7 +642,22 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else {
+        }
+//        else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+//            // only support Put now
+//            ObHbaseRequest request = buildHbaseRequest(actions);
+//            try {
+//                ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
+//                if (results != null) {
+//                    for (int i = 0; i < results.length; ++i) {
+//                        results[i] = new Result();
+//                    }
+//                }
+//            } catch (Exception e) {
+//                throw new IOException(tableNameString + " table occurred unexpected error." , e);
+//            }
+//        }
+        else {
             String realTableName = getTargetTableName(actions);
             BatchOperation batch = buildBatchOperation(realTableName, actions,
                     tableNameString.equals(realTableName), resultMapSingleOp);
@@ -935,6 +950,8 @@ public class OHTable implements HTableInterface {
                 if (get.isCheckExistenceOnly()) {
                     return Result.create(null, !keyValueList.isEmpty());
                 }
+                // sort keyValues
+                OHBaseFuncUtils.sortHBaseResult(keyValueList);
                 return new Result(keyValueList);
             }
         };
@@ -2269,6 +2286,66 @@ public class OHTable implements HTableInterface {
         }
         batch.setEntityType(ObTableEntityType.HKV);
         return batch;
+    }
+
+    private ObHbaseRequest buildHbaseRequest(List<? extends Row> actions)
+            throws FeatureNotSupportedException,
+            IllegalArgumentException,
+            IOException {
+        ObHbaseRequest request = new ObHbaseRequest();
+        ObTableOperationType opType = null;
+        List<ObObj> keys = new ArrayList<>();
+        List<ObHbaseCfRows> cfRowsArray = new ArrayList<>();
+        Map<String, ObHbaseCfRows> cfRowsMap = new HashMap<>();
+        int keyIndex = 0;
+        for (Row row : actions) {
+            if (row instanceof Put) {
+                opType = INSERT_OR_UPDATE;
+                Put put = (Put) row;
+                if (put.isEmpty()) {
+                    throw new IllegalArgumentException("No columns to put for item");
+                }
+                boolean isCellTTL = false;
+                long ttl = put.getTTL();
+                if (ttl != Long.MAX_VALUE) {
+                    isCellTTL = true;
+                }
+                keys.add(ObObj.getInstance(put.getRow()));
+                for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
+                    String family = Bytes.toString(entry.getKey());
+                    ObHbaseCfRows sameCfRows = cfRowsMap.get(family);
+                    if (sameCfRows == null) {
+                        sameCfRows = new ObHbaseCfRows();
+                        String realTableName = getTargetTableName(tableNameString, family, configuration);
+                        sameCfRows.setRealTableName(realTableName);
+                        cfRowsMap.put(family, sameCfRows);
+                        cfRowsArray.add(sameCfRows);
+                    }
+                    List<Cell> keyValueList = entry.getValue();
+                    List<ObHbaseCell> cells = new ArrayList<>();
+                    for (Cell kv : keyValueList) {
+                        ObHbaseCell cell = new ObHbaseCell(isCellTTL);
+                        cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
+                        cell.setT(ObObj.getInstance(-kv.getTimestamp())); // set timestamp as negative
+                        cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
+                        if (isCellTTL) {
+                            cell.setTTL(ObObj.getInstance(ttl));
+                        }
+                        cells.add(cell);
+                    }
+                    sameCfRows.add(keyIndex, cells.size(), cells);
+                }
+            } else {
+                throw new FeatureNotSupportedException(
+                        "not supported other type in batch yet,only support get, put and delete");
+            }
+            ++keyIndex;
+        }
+        request.setTableName(tableNameString);
+        request.setKeys(keys);
+        request.setOpType(opType);
+        request.setCfRows(cfRowsArray);
+        return request;
     }
 
     public static ObTableOperation buildObTableOperation(KeyValue kv,
