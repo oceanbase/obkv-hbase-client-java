@@ -32,6 +32,7 @@ import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.ObPayload;
+import com.alipay.oceanbase.rpc.protocol.payload.ResultCodes;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObRowKey;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.*;
@@ -1456,7 +1457,13 @@ public class OHTable implements HTableInterface {
             return new Result(keyValues);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00007"), tableNameString, e);
-            throw new IOException("increment table " + tableNameString + " error.", e);
+            if (e instanceof ObTableException &&
+                    ((ObTableException) e).getErrorCode() == ResultCodes.OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG.errorCode) {
+                String errMsg = OHBaseFuncUtils.generateIncrFieldErrMsg(e.getMessage());
+                throw new DoNotRetryIOException(errMsg, e);
+            } else {
+                throw new IOException("increment table " + tableNameString + " error.", e);
+            }
         }
     }
 
@@ -1501,7 +1508,13 @@ public class OHTable implements HTableInterface {
             return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3).getValue());
         } catch (Exception e) {
             logger.error(LCD.convert("01-00007"), tableNameString, e);
-            throw new IOException("increment table " + tableNameString + " error.", e);
+            if (e instanceof ObTableException
+                && ((ObTableException) e).getErrorCode() == ResultCodes.OB_KV_HBASE_INCR_FIELD_IS_NOT_LONG.errorCode) {
+                String errMsg = OHBaseFuncUtils.generateIncrFieldErrMsg(e.getMessage());
+                throw new DoNotRetryIOException(errMsg, e);
+            } else {
+                throw new IOException("increment table " + tableNameString + " error.", e);
+            }
         }
     }
 
