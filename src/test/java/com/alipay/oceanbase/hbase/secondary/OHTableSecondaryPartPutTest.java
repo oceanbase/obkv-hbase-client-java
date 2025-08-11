@@ -19,17 +19,13 @@ package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTableClient;
-import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
-import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.*;
-import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -43,8 +39,6 @@ import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartPutTest {
-    private static final Logger logger                 = TableHBaseLoggerFactory
-            .getLogger(OHTableSecondaryPartPutTest.class);
     private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
