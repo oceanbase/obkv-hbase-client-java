@@ -66,6 +66,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
@@ -165,12 +167,13 @@ public class OHTable implements HTableInterface {
 
     private int                   scannerTimeout;
 
+    private final Lock            mutatorCreateLock = new ReentrantLock();
     /**
      * the bufferedMutator to execute Puts
      */
     private OHBufferedMutatorImpl mutator;
     
-    private RegionLocator          regionLocator;
+    private RegionLocator         regionLocator;
 
     /**
      * flag for whether closed
@@ -642,22 +645,20 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        }
-//        else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
-//            // only support Put now
-//            ObHbaseRequest request = buildHbaseRequest(actions);
-//            try {
-//                ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
-//                if (results != null) {
-//                    for (int i = 0; i < results.length; ++i) {
-//                        results[i] = new Result();
-//                    }
-//                }
-//            } catch (Exception e) {
-//                throw new IOException(tableNameString + " table occurred unexpected error." , e);
-//            }
-//        }
-        else {
+        } else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+            // only support Put now
+            ObHbaseRequest request = buildHbaseRequest(actions);
+            try {
+                ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
+                if (results != null) {
+                    for (int i = 0; i < results.length; ++i) {
+                        results[i] = new Result();
+                    }
+                }
+            } catch (Exception e) {
+                throw new IOException(tableNameString + " table occurred unexpected error." , e);
+            }
+        } else {
             String realTableName = getTargetTableName(actions);
             BatchOperation batch = buildBatchOperation(realTableName, actions,
                     tableNameString.equals(realTableName), resultMapSingleOp);
@@ -2528,9 +2529,21 @@ public class OHTable implements HTableInterface {
 
     private BufferedMutator getBufferedMutator() throws IOException {
         if (this.mutator == null) {
-            this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
-                TableName.valueOf(this.tableNameString)).pool(this.executePool)
-                .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
+            boolean acquired = false;
+            try {
+                acquired = mutatorCreateLock.tryLock(1, SECONDS);
+                if (this.mutator == null) {
+                    this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
+                            TableName.valueOf(this.tableNameString)).pool(this.executePool)
+                            .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
+                }
+            } catch (Exception e) {
+                throw new IOException("meet exception when creating bufferedMutator", e);
+            } finally {
+                if (acquired) {
+                    mutatorCreateLock.unlock();
+                }
+            }
         }
         return this.mutator;
     }

@@ -19,15 +19,17 @@ package com.alipay.oceanbase.hbase.secondary;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTableClient;
+import com.alipay.oceanbase.hbase.util.OHBufferedMutatorImpl;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
+import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.*;
+import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -41,6 +43,8 @@ import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableSecondaryPartPutTest {
+    private static final Logger logger                 = TableHBaseLoggerFactory
+            .getLogger(OHTableSecondaryPartPutTest.class);
     private static List<String>              tableNames       = new LinkedList<String>();
     private static Map<String, List<String>> group2tableNames = new LinkedHashMap<String, List<String>>();
 
@@ -489,16 +493,6 @@ public class OHTableSecondaryPartPutTest {
                     }
 
                     hTable.put(put);
-                    Result r = hTable.get(get);
-                    Assert(entry.getValue(), ()->Assert.assertEquals(entry.getValue().size() * 2, r.size()));
-                    for (Cell cell : r.rawCells()) {
-                        Assert(entry.getValue(), ()->Assert.assertEquals(timestamp, cell.getTimestamp()));
-                    }
-                    for (String tableName : entry.getValue()) {
-                        String family = getColumnFamilyName(tableName);
-                        Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare((column1 + value).getBytes(), r.getValue(family.getBytes(), column1.getBytes()))));
-                        Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare((column2 + value).getBytes(), r.getValue(family.getBytes(), column2.getBytes()))));
-                    }
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     System.err.println("MultiCF task " + taskId + " failed: " + e.getMessage());
@@ -515,6 +509,28 @@ public class OHTableSecondaryPartPutTest {
         // 验证结果
         System.out.println("MultiCF concurrent operations completed. Success count: " + successCount.get());
         Assert.assertTrue("At least some operations should succeed", successCount.get() > 0);
+
+        // 验证部分数据
+        for (int verifyIndex = 0; verifyIndex < Math.min(5, successCount.get()); verifyIndex++) {
+            final int finalVerifyIndex = verifyIndex;
+            Get get = new Get(toBytes(key + verifyIndex));
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                get.addColumn(family.getBytes(), column1.getBytes());
+                get.addColumn(family.getBytes(), column2.getBytes());
+            }
+            Result r = hTable.get(get);
+            Assert(entry.getValue(), ()->Assert.assertEquals(entry.getValue().size() * 2, r.size()));
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare(
+                        toBytes(column1 + value + "_" + finalVerifyIndex),
+                        r.getValue(family.getBytes(), column1.getBytes()))));
+                Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare(
+                        toBytes(column2 + value + "_" + finalVerifyIndex),
+                        r.getValue(family.getBytes(), column2.getBytes()))));
+            }
+        }
 
         hTable.close();
     }

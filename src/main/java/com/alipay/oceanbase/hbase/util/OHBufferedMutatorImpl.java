@@ -19,10 +19,8 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
-import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableBatchOperation;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.slf4j.Logger;
@@ -34,7 +32,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.rpc.ObGlobal.*;
 
 @InterfaceAudience.Private
@@ -215,8 +212,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
             }
             Object[] results = new Object[execBuffer.size()];
             ohTable.batch(execBuffer, results);
-            // if commit all successfully, clean execBuffer
-            execBuffer.clear();
         } catch (Exception ex) {
             // do not recollect error operations, notify outside
             LOGGER.error("error happens, table name: {}", tableName.getNameAsString(), ex);
@@ -236,7 +231,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (closed) {
             return;
         }
