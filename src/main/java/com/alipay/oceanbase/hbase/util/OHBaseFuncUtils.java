@@ -17,9 +17,17 @@
 
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.rpc.ObGlobal;
+import com.alipay.oceanbase.rpc.ObTableClient;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Row;
+import org.apache.hadoop.hbase.util.Bytes;
 
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 
 @InterfaceAudience.Private
 public class OHBaseFuncUtils {
@@ -37,5 +45,56 @@ public class OHBaseFuncUtils {
         byte[] family = Arrays.copyOfRange(qualifier, 0, familyLen);
         byte[] newQualifier = Arrays.copyOfRange(qualifier, familyLen + 1, qualifier.length);
         return new byte[][] { family, newQualifier };
+    }
+
+    public static boolean isHBasePutPefSupport(ObTableClient tableClient) {
+        if (tableClient.isOdpMode()) {
+            // server version support and distributed capacity is enabled and odp version support
+            return ObGlobal.isHBasePutPerfSupport()
+                    && tableClient.getServerCapacity().isSupportDistributedExecute()
+                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
+        } else {
+            // server version support and distributed capacity is enabled
+            return ObGlobal.isHBasePutPerfSupport()
+                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+        }
+    }
+
+    public static boolean isAllPut(List<? extends Row> actions) {
+        boolean isAllPut = true;
+        for (Row action : actions) {
+            if (!(action instanceof Put)) {
+                isAllPut = false;
+                break;
+            }
+        }
+        return isAllPut;
+    }
+
+    public static void sortHBaseResult(List<KeyValue> cells) {
+        cells.sort(new Comparator<KeyValue>() {
+            @Override
+            public int compare(KeyValue kv1, KeyValue kv2) {
+                // 1. sort family in lexicographical order
+                int familyComparison = Bytes.compareTo(kv1.getFamilyArray(),
+                        kv1.getFamilyOffset(), kv1.getFamilyLength(), kv2.getFamilyArray(),
+                        kv2.getFamilyOffset(), kv2.getFamilyLength());
+                if (familyComparison != 0) {
+                    return familyComparison;
+                }
+
+                // 2: sort qualifier in lexicographical order
+                int qualifierComparison = Bytes.compareTo(kv1.getQualifierArray(),
+                        kv1.getQualifierOffset(), kv1.getQualifierLength(),
+                        kv2.getQualifierArray(), kv2.getQualifierOffset(),
+                        kv2.getQualifierLength());
+                if (qualifierComparison != 0) {
+                    return qualifierComparison;
+                }
+
+                // 3: sort timestamp in descend order
+                return Long.compare(kv2.getTimestamp(), kv1.getTimestamp());
+            }
+        });
     }
 }

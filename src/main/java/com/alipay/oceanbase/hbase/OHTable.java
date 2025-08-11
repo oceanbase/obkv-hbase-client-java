@@ -66,6 +66,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
@@ -165,12 +167,13 @@ public class OHTable implements HTableInterface {
 
     private int                   scannerTimeout;
 
+    private final Lock            mutatorCreateLock = new ReentrantLock();
     /**
      * the bufferedMutator to execute Puts
      */
     private OHBufferedMutatorImpl mutator;
     
-    private RegionLocator          regionLocator;
+    private RegionLocator         regionLocator;
 
     /**
      * flag for whether closed
@@ -625,7 +628,7 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
-        if (actions == null) {
+        if (actions == null || actions.isEmpty()) {
             return;
         }
         if (results != null) {
@@ -639,6 +642,19 @@ public class OHTable implements HTableInterface {
         if (!ObGlobal.isHBaseBatchSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
+            } catch (Exception e) {
+                throw new IOException(tableNameString + " table occurred unexpected error." , e);
+            }
+        } else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+            // only support Put now
+            ObHbaseRequest request = buildHbaseRequest(actions);
+            try {
+                ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
+                if (results != null) {
+                    for (int i = 0; i < results.length; ++i) {
+                        results[i] = new Result();
+                    }
+                }
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
@@ -725,7 +741,7 @@ public class OHTable implements HTableInterface {
             if (action instanceof RowMutations || action instanceof RegionCoprocessorServiceExec) {
                 throw new FeatureNotSupportedException("not supported yet'");
             } else {
-                Set<byte[]> familySet;
+                Set<byte[]> familySet = null;
                 if (action instanceof Get) {
                     Get get = (Get) action;
                     familySet = get.familySet();
@@ -935,6 +951,8 @@ public class OHTable implements HTableInterface {
                 if (get.isCheckExistenceOnly()) {
                     return Result.create(null, !keyValueList.isEmpty());
                 }
+                // sort keyValues
+                OHBaseFuncUtils.sortHBaseResult(keyValueList);
                 return new Result(keyValueList);
             }
         };
@@ -2271,6 +2289,66 @@ public class OHTable implements HTableInterface {
         return batch;
     }
 
+    private ObHbaseRequest buildHbaseRequest(List<? extends Row> actions)
+            throws FeatureNotSupportedException,
+            IllegalArgumentException,
+            IOException {
+        ObHbaseRequest request = new ObHbaseRequest();
+        ObTableOperationType opType = null;
+        List<ObObj> keys = new ArrayList<>();
+        List<ObHbaseCfRows> cfRowsArray = new ArrayList<>();
+        Map<String, ObHbaseCfRows> cfRowsMap = new HashMap<>();
+        int keyIndex = 0;
+        for (Row row : actions) {
+            if (row instanceof Put) {
+                opType = INSERT_OR_UPDATE;
+                Put put = (Put) row;
+                if (put.isEmpty()) {
+                    throw new IllegalArgumentException("No columns to put for item");
+                }
+                boolean isCellTTL = false;
+                long ttl = put.getTTL();
+                if (ttl != Long.MAX_VALUE) {
+                    isCellTTL = true;
+                }
+                keys.add(ObObj.getInstance(put.getRow()));
+                for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
+                    String family = Bytes.toString(entry.getKey());
+                    ObHbaseCfRows sameCfRows = cfRowsMap.get(family);
+                    if (sameCfRows == null) {
+                        sameCfRows = new ObHbaseCfRows();
+                        String realTableName = getTargetTableName(tableNameString, family, configuration);
+                        sameCfRows.setRealTableName(realTableName);
+                        cfRowsMap.put(family, sameCfRows);
+                        cfRowsArray.add(sameCfRows);
+                    }
+                    List<Cell> keyValueList = entry.getValue();
+                    List<ObHbaseCell> cells = new ArrayList<>();
+                    for (Cell kv : keyValueList) {
+                        ObHbaseCell cell = new ObHbaseCell(isCellTTL);
+                        cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
+                        cell.setT(ObObj.getInstance(-kv.getTimestamp())); // set timestamp as negative
+                        cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
+                        if (isCellTTL) {
+                            cell.setTTL(ObObj.getInstance(ttl));
+                        }
+                        cells.add(cell);
+                    }
+                    sameCfRows.add(keyIndex, cells.size(), cells);
+                }
+            } else {
+                throw new FeatureNotSupportedException(
+                        "not supported other type in batch yet,only support get, put and delete");
+            }
+            ++keyIndex;
+        }
+        request.setTableName(tableNameString);
+        request.setKeys(keys);
+        request.setOpType(opType);
+        request.setCfRows(cfRowsArray);
+        return request;
+    }
+
     public static ObTableOperation buildObTableOperation(KeyValue kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
@@ -2451,9 +2529,21 @@ public class OHTable implements HTableInterface {
 
     private BufferedMutator getBufferedMutator() throws IOException {
         if (this.mutator == null) {
-            this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
-                TableName.valueOf(this.tableNameString)).pool(this.executePool)
-                .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
+            boolean acquired = false;
+            try {
+                acquired = mutatorCreateLock.tryLock(1, SECONDS);
+                if (this.mutator == null) {
+                    this.mutator = new OHBufferedMutatorImpl(this.configuration, new BufferedMutatorParams(
+                            TableName.valueOf(this.tableNameString)).pool(this.executePool)
+                            .writeBufferSize(this.writeBufferSize).maxKeyValueSize(this.maxKeyValueSize), this);
+                }
+            } catch (Exception e) {
+                throw new IOException("meet exception when creating bufferedMutator", e);
+            } finally {
+                if (acquired) {
+                    mutatorCreateLock.unlock();
+                }
+            }
         }
         return this.mutator;
     }
