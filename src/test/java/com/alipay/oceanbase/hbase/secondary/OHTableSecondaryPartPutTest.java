@@ -45,9 +45,6 @@ public class OHTableSecondaryPartPutTest {
     public static void before() throws Exception {
         openDistributedExecute();
         for (TableTemplateManager.TableType type : TableTemplateManager.NORMAL_TABLES) {
-            if (type != TableTemplateManager.TableType.SECONDARY_PARTITIONED_RANGE_KEY_GEN) {
-                continue;
-            }
             createTables(type, tableNames, group2tableNames, true);
         }
     }
@@ -171,12 +168,13 @@ public class OHTableSecondaryPartPutTest {
         String value = "value";
         
         // 创建线程池
+        int taskCount = 50;
         ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(1, 20, 100, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
         AtomicInteger successCount = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(50);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
         
         // 并发执行50个任务
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < taskCount; i++) {
             final int taskId = i;
             threadPoolExecutor.submit(() -> {
                 try {
@@ -204,7 +202,7 @@ public class OHTableSecondaryPartPutTest {
         
         // 等待所有任务完成
         countDownLatch.await(30, TimeUnit.SECONDS);
-        threadPoolExecutor.shutdown();
+        threadPoolExecutor.shutdownNow();
         
         // 验证结果
         System.out.println("Concurrent batch put completed. Success count: " + successCount.get());
@@ -221,12 +219,13 @@ public class OHTableSecondaryPartPutTest {
         String value = "mixedValue";
         
         // 创建线程池
-        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, 30, 100);
+        int taskCount = 50;
+        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, taskCount, 100);
         AtomicInteger putSuccessCount = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(100);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
         
         // 并发执行混合操作：50个put任务
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < taskCount; i++) {
             final int taskId = i;
             // Put任务
             threadPoolExecutor.submit(() -> {
@@ -251,7 +250,7 @@ public class OHTableSecondaryPartPutTest {
         
         // 等待所有任务完成
         countDownLatch.await(60, TimeUnit.SECONDS);
-        threadPoolExecutor.shutdown();
+        threadPoolExecutor.shutdownNow();
         
         // 验证结果
         System.out.println("Mixed operations completed. Put success: " + putSuccessCount.get());
@@ -311,12 +310,13 @@ public class OHTableSecondaryPartPutTest {
         hTable.init();
         
         // 创建线程池
-        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, 25, 100);
+        int taskCount = 40;
+        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, taskCount, 100);
         AtomicInteger successCount = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(40);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
         
         // 并发执行多列族操作
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < taskCount; i++) {
             final int taskId = i;
             threadPoolExecutor.submit(() -> {
                 try {

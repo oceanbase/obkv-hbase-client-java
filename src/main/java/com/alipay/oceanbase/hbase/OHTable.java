@@ -69,6 +69,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
@@ -84,7 +85,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static com.alipay.oceanbase.hbase.filter.HBaseFilterUtils.writeBytesWithEscape;
-import static org.apache.hadoop.hbase.KeyValue.Type.*;
 
 public class OHTable implements Table {
 
@@ -154,7 +154,7 @@ public class OHTable implements Table {
     /**
      * the buffer of put request
      */
-    private final ArrayList<Put> writeBuffer            = new ArrayList<Put>();
+    private final List<Put>      writeBuffer            = new CopyOnWriteArrayList<>();
     /**
      * when the put request reach the write buffer size the do put will
      * flush commits automatically
@@ -179,7 +179,7 @@ public class OHTable implements Table {
     /**
      * current buffer size
      */
-    private long                 currentWriteBufferSize;
+    private AtomicLong           currentWriteBufferSize = new AtomicLong(0);
 
     /**
      * the max size of put key value
@@ -704,7 +704,7 @@ public class OHTable implements Table {
 
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
-        if (actions == null) {
+        if (actions == null || actions.isEmpty()) {
             return;
         }
         if (results != null) {
@@ -926,12 +926,10 @@ public class OHTable implements Table {
             byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    byte[] newQualifier = new byte[family.length + 1/* length of "." */
-                                                   + columnName.length];
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
                     System.arraycopy(family, 0, newQualifier, 0, family.length);
                     newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                    System.arraycopy(columnName, 0, newQualifier, family.length + 1,
-                        columnName.length);
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
                     columnFilters.add(newQualifier);
                 }
             } else {
@@ -1247,11 +1245,11 @@ public class OHTable implements Table {
             validatePut(put);
             checkFamilyViolation(put.getFamilyCellMap().keySet(), true);
             writeBuffer.add(put);
-            currentWriteBufferSize += put.heapSize();
+            currentWriteBufferSize.addAndGet(put.heapSize());
 
             // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
             n++;
-            if (n % putWriteBufferCheck == 0 && currentWriteBufferSize > writeBufferSize) {
+            if (n % putWriteBufferCheck == 0 && currentWriteBufferSize.get() > writeBufferSize) {
                 if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
                     flushCommitsV2();
                 } else {
@@ -1259,7 +1257,7 @@ public class OHTable implements Table {
                 }
             }
         }
-        if (autoFlush || currentWriteBufferSize > writeBufferSize) {
+        if (autoFlush || currentWriteBufferSize.get() > writeBufferSize) {
             if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
                 flushCommitsV2();
             } else {
@@ -1681,12 +1679,12 @@ public class OHTable implements Table {
         } finally {
             if (clearBufferOnFail) {
                 writeBuffer.clear();
-                currentWriteBufferSize = 0;
+                currentWriteBufferSize.set(0);
             } else {
                 // the write buffer was adjusted by processBatchOfPuts
-                currentWriteBufferSize = 0;
+                currentWriteBufferSize.set(0);
                 for (Put aPut : writeBuffer) {
-                    currentWriteBufferSize += aPut.heapSize();
+                    currentWriteBufferSize.addAndGet(aPut.heapSize());
                 }
             }
         }
@@ -1714,12 +1712,12 @@ public class OHTable implements Table {
         } finally {
             if (clearBufferOnFail) {
                 writeBuffer.clear();
-                currentWriteBufferSize = 0;
+                currentWriteBufferSize.set(0);
             } else {
                 // the write buffer was adjusted by processBatchOfPuts
-                currentWriteBufferSize = 0;
+                currentWriteBufferSize.set(0);
                 for (Put aPut : writeBuffer) {
-                    currentWriteBufferSize += aPut.heapSize();
+                    currentWriteBufferSize.addAndGet(aPut.heapSize());
                 }
             }
         }
@@ -2090,8 +2088,7 @@ public class OHTable implements Table {
         if (isTableGroup) {
             // construct new_kv otherwise filter will fail to match targeted columns
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */
-                                           + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2145,8 +2142,7 @@ public class OHTable implements Table {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
-                            CellUtil.cloneQualifier(kv));
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2169,8 +2165,7 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     // [MAX_VALUE, MAX_VALUE), delete nothing
-                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE),
-                        Integer.MAX_VALUE);
+                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE), Integer.MAX_VALUE);
                 } else {
                     TimeRange timeRange = new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1);
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2200,8 +2195,7 @@ public class OHTable implements Table {
         Cell newCell = kv;
         if (isTableGroup && family != null) {
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */
-                                           + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2561,8 +2555,7 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getStartKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
-                    obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             startKeys = regionLocator.getStartKeys();
@@ -2571,12 +2564,10 @@ public class OHTable implements Table {
             try {
                 startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
-                    e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
             }
         } else {
-            throw new IOException(
-                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return startKeys;
@@ -2587,8 +2578,7 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getEndKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
-                    obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             endKeys = regionLocator.getEndKeys();
@@ -2597,12 +2587,10 @@ public class OHTable implements Table {
             try {
                 endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
-                    e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
             }
         } else {
-            throw new IOException(
-                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return endKeys;
