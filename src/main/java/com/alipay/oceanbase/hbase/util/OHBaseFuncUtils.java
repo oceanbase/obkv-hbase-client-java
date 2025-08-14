@@ -101,4 +101,14 @@ public class OHBaseFuncUtils {
             }
         });
     }
+
+    public static boolean serverCanRetry(ObTableClient tableClient) {
+        if (tableClient.isOdpMode()) {
+            // ODP mode needs to check proxy version
+            return ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
+        } else {
+            // OCP mode directly return true, server will do the check
+            return true;
+        }
+    }
 }

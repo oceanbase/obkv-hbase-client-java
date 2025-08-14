@@ -39,7 +39,7 @@ abstract public class ObTableBuilderBase implements TableBuilder {
         }
         this.tableName = tableName;
         this.operationTimeout = tableName.isSystemTable() ? ohConnConf.getMetaOperationTimeout()
-            : ohConnConf.getOperationTimeout();
+            : ohConnConf.getClientOperationTimeout();
         this.rpcTimeout = ohConnConf.getRpcTimeout();
         this.readRpcTimeout = ohConnConf.getReadRpcTimeout();
         this.writeRpcTimeout = ohConnConf.getWriteRpcTimeout();
