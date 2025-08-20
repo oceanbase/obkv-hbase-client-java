@@ -89,7 +89,7 @@ public class OHAdmin implements Admin {
 
     @Override
     public int getOperationTimeout() {
-        return connection.getOHConnectionConfiguration().getOperationTimeout();
+        return connection.getOHConnectionConfiguration().getClientOperationTimeout();
     }
 
     @Override

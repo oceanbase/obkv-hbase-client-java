@@ -46,7 +46,8 @@ public class OHConnectionConfiguration {
     private final int        odpPort;
     private final boolean    odpMode;
     private final long       writeBufferSize;
-    private final int        operationTimeout;
+    private final int        clientOperationTimeout;
+    private final int        serverOperationTimeout;
     private final int        metaOperationTimeout;
     private final int        scannerCaching;
     private final long       scannerMaxResultSize;
@@ -76,8 +77,10 @@ public class OHConnectionConfiguration {
         this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
         this.metaOperationTimeout = conf.getInt(HConstants.HBASE_CLIENT_META_OPERATION_TIMEOUT,
             HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
-        this.operationTimeout = conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
+        this.clientOperationTimeout = conf.getInt(HConstants.HBASE_CLIENT_OPERATION_TIMEOUT,
             HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT);
+        this.serverOperationTimeout = conf.getInt(HConstants.HBASE_RPC_SHORTOPERATION_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_SHORTOPERATION_TIMEOUT);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         this.readRpcTimeout = conf.getInt(HConstants.HBASE_RPC_READ_TIMEOUT_KEY,
@@ -133,8 +136,12 @@ public class OHConnectionConfiguration {
         return this.metaOperationTimeout;
     }
 
-    public int getOperationTimeout() {
-        return this.operationTimeout;
+    public int getClientOperationTimeout() {
+        return this.clientOperationTimeout;
+    }
+
+    public int getServerOperationTimeout() {
+        return this.serverOperationTimeout;
     }
 
     public int getScannerCaching() {

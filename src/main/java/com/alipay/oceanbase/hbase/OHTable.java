@@ -78,6 +78,7 @@ import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.TABLE_HBASE_LOGGER_SPACE;
 import static com.alipay.oceanbase.rpc.mutation.MutationFactory.colVal;
 import static com.alipay.oceanbase.rpc.mutation.MutationFactory.row;
+import static com.alipay.oceanbase.rpc.property.Property.RPC_OPERATION_TIMEOUT;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType.*;
 import static com.alipay.sofa.common.thread.SofaThreadPoolConstants.SOFA_THREAD_POOL_LOGGING_CAPABILITY;
@@ -227,7 +228,7 @@ public class OHTable implements Table {
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+        setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
 
         finishSetUp();
     }
@@ -279,7 +280,7 @@ public class OHTable implements Table {
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+        setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
 
         finishSetUp();
     }
@@ -336,7 +337,7 @@ public class OHTable implements Table {
         this.rpcTimeout = connectionConfig.getRpcTimeout();
         this.readRpcTimeout = connectionConfig.getReadRpcTimeout();
         this.writeRpcTimeout = connectionConfig.getWriteRpcTimeout();
-        this.operationTimeout = connectionConfig.getOperationTimeout();
+        this.operationTimeout = connectionConfig.getClientOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -2371,6 +2372,7 @@ public class OHTable implements Table {
             resultMapSingleOp.add(singleOpResultNum);
         }
         batch.setEntityType(ObTableEntityType.HKV);
+        batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return batch;
     }
 
@@ -2431,6 +2433,7 @@ public class OHTable implements Table {
         request.setKeys(keys);
         request.setOpType(opType);
         request.setCfRows(cfRowsArray);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 
@@ -2474,6 +2477,7 @@ public class OHTable implements Table {
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 
@@ -2487,6 +2491,7 @@ public class OHTable implements Table {
         asyncRequest.setEntityType(ObTableEntityType.HKV);
         asyncRequest.setTableName(targetTableName);
         asyncRequest.setObTableQueryRequest(request);
+        asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return asyncRequest;
     }
 
@@ -2501,6 +2506,7 @@ public class OHTable implements Table {
         request.setTableQueryAndMutate(queryAndMutate);
         request.setEntityType(ObTableEntityType.HKV);
         request.setReturningAffectedEntity(true);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 
