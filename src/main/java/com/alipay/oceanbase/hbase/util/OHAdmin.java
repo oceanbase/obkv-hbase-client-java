@@ -29,12 +29,10 @@ import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static com.alipay.oceanbase.rpc.protocol.payload.ResultCodes.*;
 
@@ -92,7 +90,7 @@ public class OHAdmin implements Admin {
 
     @Override
     public int getOperationTimeout() {
-        return connection.getOHConnectionConfiguration().getOperationTimeout();
+        return connection.getOHConnectionConfiguration().getClientOperationTimeout();
     }
 
     @Override
