@@ -210,7 +210,7 @@ public class OHTable implements HTableInterface {
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+        setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
 
         finishSetUp();
     }
@@ -262,7 +262,7 @@ public class OHTable implements HTableInterface {
             this.tableNameString, ohConnectionConf));
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+        setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
 
         finishSetUp();
     }
@@ -318,7 +318,7 @@ public class OHTable implements HTableInterface {
         }
 
         this.rpcTimeout = connectionConfig.getRpcTimeout();
-        this.operationTimeout = connectionConfig.getOperationTimeout();
+        this.operationTimeout = connectionConfig.getClientOperationTimeout();
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -2286,6 +2286,7 @@ public class OHTable implements HTableInterface {
             resultMapSingleOp.add(singleOpResultNum);
         }
         batch.setEntityType(ObTableEntityType.HKV);
+        batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return batch;
     }
 
@@ -2346,6 +2347,7 @@ public class OHTable implements HTableInterface {
         request.setKeys(keys);
         request.setOpType(opType);
         request.setCfRows(cfRowsArray);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 
@@ -2389,6 +2391,7 @@ public class OHTable implements HTableInterface {
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 
@@ -2402,6 +2405,7 @@ public class OHTable implements HTableInterface {
         asyncRequest.setEntityType(ObTableEntityType.HKV);
         asyncRequest.setTableName(targetTableName);
         asyncRequest.setObTableQueryRequest(request);
+        asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return asyncRequest;
     }
 
@@ -2416,6 +2420,7 @@ public class OHTable implements HTableInterface {
         request.setTableQueryAndMutate(queryAndMutate);
         request.setEntityType(ObTableEntityType.HKV);
         request.setReturningAffectedEntity(true);
+        request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         return request;
     }
 

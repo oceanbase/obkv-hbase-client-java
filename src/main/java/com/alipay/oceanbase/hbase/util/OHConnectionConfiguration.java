@@ -42,7 +42,8 @@ public class OHConnectionConfiguration {
     private final int        odpPort;
     private final boolean    odpMode;
     private final long       writeBufferSize;
-    private final int        operationTimeout;
+    private final int        clientOperationTimeout;
+    private final int        serverOperationTimeout;
     private final int        scannerCaching;
     private final long       scannerMaxResultSize;
     private final int        maxKeyValueSize;
@@ -65,7 +66,9 @@ public class OHConnectionConfiguration {
         }
         this.database = database;
         this.writeBufferSize = conf.getLong(WRITE_BUFFER_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
-        this.operationTimeout = conf.getInt("hbase.client.operation.timeout", 1200000);
+        this.clientOperationTimeout = conf.getInt("hbase.client.operation.timeout", 1200000);
+        this.serverOperationTimeout = conf.getInt(HConstants.HBASE_RPC_SHORTOPERATION_TIMEOUT_KEY,
+                HConstants.DEFAULT_HBASE_RPC_SHORTOPERATION_TIMEOUT);
         this.rpcTimeout = conf.getInt(HConstants.HBASE_RPC_TIMEOUT_KEY,
             HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
         int rpcConnectTimeout = -1;
@@ -107,8 +110,12 @@ public class OHConnectionConfiguration {
         return this.writeBufferSize;
     }
 
-    public int getOperationTimeout() {
-        return this.operationTimeout;
+    public int getClientOperationTimeout() {
+        return this.clientOperationTimeout;
+    }
+
+    public int getServerOperationTimeout() {
+        return this.serverOperationTimeout;
     }
 
     public int getScannerCaching() {

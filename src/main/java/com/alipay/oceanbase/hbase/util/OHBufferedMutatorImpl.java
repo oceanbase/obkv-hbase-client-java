@@ -70,7 +70,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         OHConnectionConfiguration connectionConfig = ohConnection.getOHConnectionConfiguration();
         this.pool = params.getPool();
         this.rpcTimeout = connectionConfig.getRpcTimeout();
-        this.operationTimeout = connectionConfig.getOperationTimeout();
+        this.operationTimeout = connectionConfig.getClientOperationTimeout();
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
@@ -103,7 +103,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         OHConnectionConfiguration connectionConfig = new OHConnectionConfiguration(conf);
         this.pool = params.getPool();
         this.rpcTimeout = connectionConfig.getRpcTimeout();
-        this.operationTimeout = connectionConfig.getOperationTimeout();
+        this.operationTimeout = connectionConfig.getClientOperationTimeout();
 
         this.writeBufferSize = params.getWriteBufferSize() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferSize() : connectionConfig.getWriteBufferSize();
