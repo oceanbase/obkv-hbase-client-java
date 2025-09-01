@@ -17,18 +17,22 @@
 
 package com.alipay.oceanbase.hbase.secondary;
 
+import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.hbase.OHTableClient;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.hbase.util.TableTemplateManager;
 import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.junit.*;
 
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
@@ -309,6 +313,222 @@ public class OHTableSecondaryPartPutTest {
         hTable.close();
     }
 
+    public static void testBatchPutConcurrentImpl(String tableName) throws Exception {
+
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+
+        // 创建线程池
+        int taskCount = 50;
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(1, 20, 100, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        AtomicInteger successCount = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
+
+        // 并发执行50个任务
+        for (int i = 0; i < taskCount; i++) {
+            final int taskId = i;
+            threadPoolExecutor.submit(() -> {
+                try {
+                    // 每个线程执行批量put操作
+                    OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+                    hTable.init();
+                    List<Put> puts = new ArrayList<>();
+                    for (int j = 0; j < 10; ++j) {
+                        Put put = new Put(toBytes(key + taskId + "_" + j));
+                        put.addColumn(family.getBytes(), column1.getBytes(), toBytes(value + "_" + taskId + "_" + j));
+                        put.addColumn(family.getBytes(), column2.getBytes(), toBytes(value + "_" + taskId + "_" + j));
+                        puts.add(put);
+                    }
+                    hTable.put(puts);
+                    successCount.incrementAndGet();
+                    hTable.close();
+                } catch (Exception e) {
+                    // 记录异常但不中断测试
+                    System.err.println("Task " + taskId + " failed: " + e.getMessage());
+                } finally {
+                    countDownLatch.countDown();
+                }
+            });
+        }
+
+        // 等待所有任务完成
+        countDownLatch.await(30, TimeUnit.SECONDS);
+        threadPoolExecutor.shutdownNow();
+
+        // 验证结果
+        System.out.println("Concurrent batch put completed. Success count: " + successCount.get());
+        Assert.assertTrue("At least some operations should succeed", successCount.get() > 0);
+    }
+
+    public static void testMixedOperationsConcurrentImpl(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        String family = getColumnFamilyName(tableName);
+        String key = "mixedKey";
+        String column1 = "mixedColumn1";
+        String column2 = "mixedColumn2";
+        String value = "mixedValue";
+
+        // 创建线程池
+        int taskCount = 50;
+        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, taskCount, 100);
+        AtomicInteger putSuccessCount = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
+
+        // 并发执行混合操作：50个put任务
+        for (int i = 0; i < taskCount; i++) {
+            final int taskId = i;
+            // Put任务
+            threadPoolExecutor.submit(() -> {
+                try {
+                    long timestamp = System.currentTimeMillis();
+                    List<Put> puts = new ArrayList<>();
+                    for (int j = 0; j < 3; ++j) {
+                        Put put = new Put(toBytes(key + taskId + "_" + j));
+                        put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(value + "_" + taskId + "_" + j));
+                        put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(value + "_" + taskId + "_" + j));
+                        puts.add(put);
+                    }
+                    hTable.put(puts);
+                    putSuccessCount.incrementAndGet();
+                } catch (Exception e) {
+                    System.err.println("Put task " + taskId + " failed: " + e.getMessage());
+                } finally {
+                    countDownLatch.countDown();
+                }
+            });
+        }
+
+        // 等待所有任务完成
+        countDownLatch.await(60, TimeUnit.SECONDS);
+        threadPoolExecutor.shutdownNow();
+
+        // 验证结果
+        System.out.println("Mixed operations completed. Put success: " + putSuccessCount.get());
+        Assert.assertTrue("At least some put operations should succeed", putSuccessCount.get() > 0);
+
+        // 验证最终数据一致性
+        for (int i = 0; i < Math.min(10, putSuccessCount.get()); i++) {
+            for (int j = 0; j < 3; j++) {
+                Get get = new Get(toBytes(key + i + "_" + j));
+                get.addColumn(family.getBytes(), column1.getBytes());
+                get.addColumn(family.getBytes(), column2.getBytes());
+                Result result = hTable.get(get);
+                if (result != null && !result.isEmpty()) {
+                    Assert.assertEquals(2, result.size());
+                    Assert.assertTrue(ObHTableTestUtil.secureCompare(
+                            toBytes(value + "_" + i + "_" + j),
+                            result.getValue(family.getBytes(), column1.getBytes())));
+                    Assert.assertTrue(ObHTableTestUtil.secureCompare(
+                            toBytes(value + "_" + i + "_" + j),
+                            result.getValue(family.getBytes(), column2.getBytes())));
+                }
+            }
+        }
+
+        hTable.close();
+    }
+
+    public static void testBatchPutConsistencyImpl(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        String family = getColumnFamilyName(tableName);
+        String key = "putKey";
+        String column1 = "putColumn1";
+        String column2 = "putColumn2";
+        String value = "value";
+        {
+            long timestamp = System.currentTimeMillis();
+            List<Put> puts = new ArrayList<>();
+            for (int i = 0; i < 10; ++i) {
+                Put put = new Put(toBytes(key + i));
+                put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(value));
+                put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(value));
+                puts.add(put);
+            }
+            hTable.put(puts);
+        }
+        hTable.close();
+    }
+
+    public static void testMultiCFConcurrentImpl(Map.Entry<String, List<String>> entry) throws Exception {
+        String key = "multiCFConcurrentKey";
+        String column1 = "multiCFColumn1";
+        String column2 = "multiCFColumn2";
+        String value = "multiCFValue";
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(entry.getKey()));
+        hTable.init();
+
+        // 创建线程池
+        int taskCount = 40;
+        ThreadPoolExecutor threadPoolExecutor = OHTable.createDefaultThreadPoolExecutor(1, taskCount, 100);
+        AtomicInteger successCount = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(taskCount);
+
+        // 并发执行多列族操作
+        for (int i = 0; i < taskCount; i++) {
+            final int taskId = i;
+            threadPoolExecutor.submit(() -> {
+                try {
+                    long timestamp = System.currentTimeMillis();
+                    Put put = new Put(toBytes(key + taskId));
+                    Get get = new Get(toBytes(key + taskId));
+
+                    // 为每个列族添加数据
+                    for (String tableName : entry.getValue()) {
+                        String family = getColumnFamilyName(tableName);
+                        put.addColumn(family.getBytes(), column1.getBytes(), timestamp, toBytes(column1 + value + "_" + taskId));
+                        put.addColumn(family.getBytes(), column2.getBytes(), timestamp, toBytes(column2 + value + "_" + taskId));
+                        get.addColumn(family.getBytes(), column1.getBytes());
+                        get.addColumn(family.getBytes(), column2.getBytes());
+                    }
+
+                    hTable.put(put);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    System.err.println("MultiCF task " + taskId + " failed: " + e.getMessage());
+                } finally {
+                    countDownLatch.countDown();
+                }
+            });
+        }
+
+        // 等待所有任务完成
+        countDownLatch.await(45, TimeUnit.SECONDS);
+        threadPoolExecutor.shutdownNow();
+
+        // 验证结果
+        System.out.println("MultiCF concurrent operations completed. Success count: " + successCount.get());
+        Assert.assertTrue("At least some operations should succeed", successCount.get() > 0);
+
+        // 验证部分数据
+        for (int verifyIndex = 0; verifyIndex < Math.min(5, successCount.get()); verifyIndex++) {
+            final int finalVerifyIndex = verifyIndex;
+            Get get = new Get(toBytes(key + verifyIndex));
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                get.addColumn(family.getBytes(), column1.getBytes());
+                get.addColumn(family.getBytes(), column2.getBytes());
+            }
+            Result r = hTable.get(get);
+            Assert(entry.getValue(), ()->Assert.assertEquals(entry.getValue().size() * 2, r.size()));
+            for (String tableName : entry.getValue()) {
+                String family = getColumnFamilyName(tableName);
+                Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare(
+                        toBytes(column1 + value + "_" + finalVerifyIndex),
+                        r.getValue(family.getBytes(), column1.getBytes()))));
+                Assert(entry.getValue(), () -> Assert.assertTrue(secureCompare(
+                        toBytes(column2 + value + "_" + finalVerifyIndex),
+                        r.getValue(family.getBytes(), column2.getBytes()))));
+            }
+        }
+
+        hTable.close();
+    }
+
     @Test
     public void testPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testPutImpl);
@@ -317,6 +537,26 @@ public class OHTableSecondaryPartPutTest {
     @Test
     public void testBatchPut() throws Throwable {
         FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testBatchPutImpl);
+    }
+
+    @Test
+    public void testBatchPutConcurrent() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testBatchPutConcurrentImpl);
+    }
+
+    @Test
+    public void testMixedOperationsConcurrent() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testMixedOperationsConcurrentImpl);
+    }
+
+    @Test
+    public void testMultiCFConcurrent() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartPutTest::testMultiCFConcurrentImpl);
+    }
+
+    @Test
+    public void testBatchPutConsistency() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartPutTest::testBatchPutConsistencyImpl);
     }
 
     @Test

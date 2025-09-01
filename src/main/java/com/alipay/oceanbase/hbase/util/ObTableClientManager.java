@@ -22,8 +22,6 @@ import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.TableName;
 
 import java.io.IOException;
@@ -34,6 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
+import static com.alipay.oceanbase.rpc.property.Property.RPC_OPERATION_TIMEOUT;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 
 @InterfaceAudience.Private
@@ -88,11 +87,11 @@ public class ObTableClientManager {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
         
-        return getOrCreateObTableClient(obTableClientKey, connectionConfig.getRpcConnectTimeout());
+        return getOrCreateObTableClient(obTableClientKey, connectionConfig);
     }
 
     public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey,
-                                                         int rpcConnectTimeout) throws IOException {
+                                                         OHConnectionConfiguration connectionConfig) throws IOException {
         if (OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey) == null) {
             ReentrantLock tmp = new ReentrantLock();
             ReentrantLock lock = OB_TABLE_CLIENT_LOCK.putIfAbsent(obTableClientKey, tmp);
@@ -117,7 +116,8 @@ public class ObTableClientManager {
                     }
                     obTableClient.setFullUserName(obTableClientKey.getFullUserName());
                     obTableClient.setPassword(obTableClientKey.getPassword());
-                    obTableClient.setRpcConnectTimeout(rpcConnectTimeout);
+                    obTableClient.setRpcConnectTimeout(connectionConfig.getRpcConnectTimeout());
+                    obTableClient.addProperty(RPC_OPERATION_TIMEOUT.getKey(), Integer.toString(connectionConfig.getServerOperationTimeout()));
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
@@ -142,8 +142,8 @@ public class ObTableClientManager {
     private static void initTimeoutAndRetryTimes(ObTableClient obTableClient, OHConnectionConfiguration ohConnectionConf) {
         obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         obTableClient.setRuntimeRetryTimes(ohConnectionConf.getNumRetries());
-        obTableClient.setRuntimeMaxWait(ohConnectionConf.getOperationTimeout());
-        obTableClient.setRuntimeBatchMaxWait(ohConnectionConf.getOperationTimeout());
+        obTableClient.setRuntimeMaxWait(ohConnectionConf.getClientOperationTimeout());
+        obTableClient.setRuntimeBatchMaxWait(ohConnectionConf.getClientOperationTimeout());
     }
 
     public static class ObTableClientKey {
