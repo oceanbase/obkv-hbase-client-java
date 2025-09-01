@@ -127,6 +127,8 @@ public class ClientStreamScanner extends AbstractClientScanner {
                     break;
                 }
             }
+            // sort keyValues
+            OHBaseFuncUtils.sortHBaseResult(keyValues);
             return Result.create(keyValues);
         } catch (Exception e) {
             logger.error(LCD.convert("01-00000"), streamResult.getTableName(), e);

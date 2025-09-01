@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import static com.alipay.oceanbase.rpc.util.TableClientLoggerFactory.LCD;
 
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
@@ -94,7 +93,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 .getRpcTimeout() : connectionConfig.getRpcTimeout());
         this.operationTimeout = new AtomicInteger(
             params.getOperationTimeout() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
-                .getOperationTimeout() : connectionConfig.getOperationTimeout());
+                .getOperationTimeout() : connectionConfig.getClientOperationTimeout());
 
         long newPeriodicFlushTimeoutMs = params.getWriteBufferPeriodicFlushTimeoutMs() != OHConnectionImpl.BUFFERED_PARAM_UNSET ? params
             .getWriteBufferPeriodicFlushTimeoutMs() : connectionConfig
@@ -301,7 +300,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         if (closed) {
             return;
         }
