@@ -2287,6 +2287,7 @@ public class OHTable implements HTableInterface {
         }
         batch.setEntityType(ObTableEntityType.HKV);
         batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        batch.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return batch;
     }
 
@@ -2392,6 +2393,7 @@ public class OHTable implements HTableInterface {
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return request;
     }
 
@@ -2406,6 +2408,7 @@ public class OHTable implements HTableInterface {
         asyncRequest.setTableName(targetTableName);
         asyncRequest.setObTableQueryRequest(request);
         asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return asyncRequest;
     }
 
@@ -2421,6 +2424,7 @@ public class OHTable implements HTableInterface {
         request.setEntityType(ObTableEntityType.HKV);
         request.setReturningAffectedEntity(true);
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return request;
     }
 
