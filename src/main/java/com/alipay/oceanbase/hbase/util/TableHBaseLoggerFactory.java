@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.sofa.common.code.LogCode2Description;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.slf4j.helpers.NOPLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,8 @@ public class TableHBaseLoggerFactory {
     public static final String        TABLE_HBASE_LOGGER_SPACE = "oceanbase-table-hbase";
     public static LogCode2Description LCD                      = LogCode2Description
                                                                    .create(TABLE_HBASE_LOGGER_SPACE);
+    public static Logger              MONITOR                  = NOPLogger.NOP_LOGGER;
+    public static Logger              logger                   = NOPLogger.NOP_LOGGER;
 
     public static Logger getLogger(String name) {
         if (name == null || name.isEmpty()) {

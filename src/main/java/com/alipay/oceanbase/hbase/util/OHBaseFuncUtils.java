@@ -19,6 +19,8 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.OperationExecuteAble;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Put;
@@ -47,16 +49,16 @@ public class OHBaseFuncUtils {
         return new byte[][] { family, newQualifier };
     }
 
-    public static boolean isHBasePutPefSupport(ObTableClient tableClient) {
-        if (tableClient.isOdpMode()) {
+    public static boolean isHBasePutPefSupport(OperationExecuteAble tableClient) {
+        if (tableClient instanceof ObTableClient && ((ObTableClient) tableClient).isOdpMode()) {
             // server version support and distributed capacity is enabled and odp version support
             return ObGlobal.isHBasePutPerfSupport()
-                    && tableClient.getServerCapacity().isSupportDistributedExecute()
-                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
+                   && tableClient.getServerCapacity().isSupportDistributedExecute()
+                   && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
         } else {
             // server version support and distributed capacity is enabled
             return ObGlobal.isHBasePutPerfSupport()
-                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+                   && tableClient.getServerCapacity().isSupportDistributedExecute();
         }
     }
 
@@ -76,18 +78,17 @@ public class OHBaseFuncUtils {
             @Override
             public int compare(KeyValue kv1, KeyValue kv2) {
                 // 1. sort family in lexicographical order
-                int familyComparison = Bytes.compareTo(kv1.getFamilyArray(),
-                        kv1.getFamilyOffset(), kv1.getFamilyLength(), kv2.getFamilyArray(),
-                        kv2.getFamilyOffset(), kv2.getFamilyLength());
+                int familyComparison = Bytes.compareTo(kv1.getFamilyArray(), kv1.getFamilyOffset(),
+                    kv1.getFamilyLength(), kv2.getFamilyArray(), kv2.getFamilyOffset(),
+                    kv2.getFamilyLength());
                 if (familyComparison != 0) {
                     return familyComparison;
                 }
 
                 // 2: sort qualifier in lexicographical order
                 int qualifierComparison = Bytes.compareTo(kv1.getQualifierArray(),
-                        kv1.getQualifierOffset(), kv1.getQualifierLength(),
-                        kv2.getQualifierArray(), kv2.getQualifierOffset(),
-                        kv2.getQualifierLength());
+                    kv1.getQualifierOffset(), kv1.getQualifierLength(), kv2.getQualifierArray(),
+                    kv2.getQualifierOffset(), kv2.getQualifierLength());
                 if (qualifierComparison != 0) {
                     return qualifierComparison;
                 }

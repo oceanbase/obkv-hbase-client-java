@@ -86,6 +86,15 @@ public final class OHConstants {
     public static final String[] V_COLUMNS                                   = new String[] { "V" };
     public static final String[] PROPERTY_COLUMNS                            = new String[] { "V",
             "TTL"                                                           };
+    /**
+     * ocenbase hbase model is consist of following columns
+     * K hbase row key
+     * Q hbase qualifier
+     * T hbase timeStamp
+     * V hbase value
+     */
+    public static final String[] ALL_COLUMNS                                 = new String[] { "K",
+            "Q", "T", "V"                                                   };
 
     public static final String   HBASE_HTABLE_POOL_SEPERATOR                 = "$";
 
@@ -155,4 +164,18 @@ public final class OHConstants {
 
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
 
+    /**
+     * DDS (Data Distribution Service) related constants
+     */
+    public static final String   HBASE_OCEANBASE_DDS_APP_NAME                = "hbase.oceanbase.dds.app.name";
+    public static final String   HBASE_OCEANBASE_DDS_APP_DS_NAME             = "hbase.oceanbase.dds.app.ds.name";
+    public static final String   HBASE_OCEANBASE_DDS_VERSION                 = "hbase.oceanbase.dds.version";
+    public static final String   HBASE_HTABLE_CLIENT_WRITE_BUFFER            = "hbase.client.write.buffer";
+    public static final String   HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK         = "hbase.htable.put.write.buffer.check";
+
+    public static final long     DEFAULT_HBASE_HTABLE_CLIENT_WRITE_BUFFER    = 2097152;
+    public static final int      DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK = 10;
+
+    public static final char     CH_SINGLE_QUOTA                             = '\'';
+    public static final char     CH_SPLITE_TYPE                              = '|';
 }
