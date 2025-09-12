@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase.execute;
 
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.OperationExecuteAble;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.client.ConnectionUtils;
@@ -34,6 +35,7 @@ public abstract class ServerCallable<T> implements Callable<T> {
 
     protected final Configuration conf;
     protected final ObTableClient obTableClient;
+    protected final OperationExecuteAble executeAble;
     protected final String        tableNameString;
     protected int                 callTimeout;
     protected long                globalStartTime, endTime;
@@ -52,6 +54,27 @@ public abstract class ServerCallable<T> implements Callable<T> {
                           byte[] startRow, byte[] endRow, int callTimeout) {
         this.conf = conf;
         this.obTableClient = obTableClient;
+        this.executeAble = null;
+        this.tableNameString = tableNameString;
+        this.callTimeout = callTimeout;
+        this.startRow = startRow;
+        this.endRow = endRow;
+    }
+
+    /**
+     * ServerCallable
+     * @param conf the conf to use
+     * @param executeAble executeAble to use
+     * @param tableNameString Table name to which <code>tableNameString</code> belongs.
+     * @param startRow start row
+     * @param endRow end row
+     * @param callTimeout timeout
+     */
+    public ServerCallable(Configuration conf, OperationExecuteAble executeAble, String tableNameString,
+                          byte[] startRow, byte[] endRow, int callTimeout) {
+        this.conf = conf;
+        this.obTableClient = null;
+        this.executeAble = executeAble;
         this.tableNameString = tableNameString;
         this.callTimeout = callTimeout;
         this.startRow = startRow;

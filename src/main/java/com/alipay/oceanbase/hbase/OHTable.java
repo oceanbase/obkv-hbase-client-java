@@ -25,6 +25,9 @@ import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.hbase.util.ExecuteAbleManager;
+import com.alipay.oceanbase.rpc.OperationExecuteAble;
+import com.alipay.oceanbase.rpc.exception.ExceptionUtil;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.location.model.partition.Partition;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
@@ -67,6 +70,7 @@ import org.slf4j.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -92,6 +96,24 @@ public class OHTable implements HTableInterface {
      */
     private final ObTableClient  obTableClient;
 
+
+    /**
+     * === the operation executable for DDS support ===
+     */
+    private OperationExecuteAble  executeAble;
+    private List<String>           qualifierWithNum = new ArrayList<>();
+
+    private String                 familyString;
+
+    private String                 currentTableFamily;
+
+    private boolean                hTableQueryOptimize      = false;
+    private boolean                localHTableQueryOptimize = false;
+    private boolean                localGetByBatch          = false;
+    /**
+     * === the operation executable for DDS support end ===
+     */
+    
     /**
      * the ohTable name in byte array
      */
@@ -206,14 +228,29 @@ public class OHTable implements HTableInterface {
         long keepAliveTime = configuration.getLong(HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME,
             DEFAULT_HBASE_HTABLE_THREAD_KEEP_ALIVE_TIME);
         this.executePool = createDefaultThreadPoolExecutor(1, maxThreads, keepAliveTime);
-        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
-        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
-            this.tableNameString, ohConnectionConf));
-        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
-        this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+
+        // Check if DDS configuration is present
+        String ddsAppName = configuration.get(HBASE_OCEANBASE_DDS_APP_NAME);
+        String ddsAppDsName = configuration.get(HBASE_OCEANBASE_DDS_APP_DS_NAME);
+        String ddsVersion = configuration.get(HBASE_OCEANBASE_DDS_VERSION);
+
+        if (isNotBlank(ddsAppName) && isNotBlank(ddsAppDsName) && isNotBlank(ddsVersion)) {
+            // Use DDS mode with ExecuteAbleManager
+            this.obTableClient = null; // Not used in DDS mode
+            this.executeAble = ExecuteAbleManager.getOrCreateExecuteAble(configuration);
+        } else {
+            OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(
+                    configuration);
+            int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                    HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            this.obTableClient = ObTableClientManager
+                    .getOrCreateObTableClient(setUserDefinedNamespace(this.tableNameString,
+                            ohConnectionConf));
+            this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+            this.obTableClient.setRuntimeRetryTimes(numRetries);
+            setOperationTimeout(ohConnectionConf.getOperationTimeout());
+            this.executeAble = null;
+        }
 
         finishSetUp();
     }
@@ -259,15 +296,28 @@ public class OHTable implements HTableInterface {
         this.tableNameString = Bytes.toString(tableName);
         this.executePool = executePool;
         this.cleanupPoolOnClose = false;
-        OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
-        int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
-            HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
-        this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
-            this.tableNameString, ohConnectionConf));
-        this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
-        this.obTableClient.setRuntimeRetryTimes(numRetries);
-        setOperationTimeout(ohConnectionConf.getOperationTimeout());
+        // Check if DDS configuration is present
+        if (configuration == null) {
+            throw new IllegalArgumentException("configuration is null.");
+        }
+        String ddsAppName = configuration.get(HBASE_OCEANBASE_DDS_APP_NAME);
+        String ddsAppDsName = configuration.get(HBASE_OCEANBASE_DDS_APP_DS_NAME);
+        String ddsVersion = configuration.get(HBASE_OCEANBASE_DDS_VERSION);
 
+        if (isNotBlank(ddsAppName) && isNotBlank(ddsAppDsName) && isNotBlank(ddsVersion)) {
+            this.executeAble = ExecuteAbleManager.getOrCreateExecuteAble(configuration);
+            this.obTableClient = null; // Not used in DDS mode
+        } else {
+            OHConnectionConfiguration ohConnectionConf = new OHConnectionConfiguration(configuration);
+            int numRetries = configuration.getInt(HConstants.HBASE_CLIENT_RETRIES_NUMBER,
+                    HConstants.DEFAULT_HBASE_CLIENT_RETRIES_NUMBER);
+            this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
+                    this.tableNameString, ohConnectionConf));
+            this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
+            this.obTableClient.setRuntimeRetryTimes(numRetries);
+            setOperationTimeout(ohConnectionConf.getOperationTimeout());
+            this.executeAble = null;
+        }
         finishSetUp();
     }
 
@@ -295,6 +345,7 @@ public class OHTable implements HTableInterface {
         this.closeClientOnClose = false;
         this.executePool = executePool;
         this.obTableClient = obTableClient;
+        this.executeAble = null;
         this.configuration = new Configuration();
         finishSetUp();
     }
@@ -338,7 +389,8 @@ public class OHTable implements HTableInterface {
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(operationTimeout);
-
+        this.executeAble = this.obTableClient;
+        
         finishSetUp();
     }
 
@@ -493,6 +545,52 @@ public class OHTable implements HTableInterface {
         return objectResults;
     }
 
+    /**
+     * 将batch请求下所有请求的放在familyMap中。其中key为family，value是一个Pair类型：包含操作的索引值，以及操作内容
+     * @param index 请求的索引值
+     * @param innerFamilyMap 请求的一个pair容器
+     * @param familyMap batch请求的容器
+     */
+    private void geneInnerFamilyMap(int index, Map<byte[], List<KeyValue>> innerFamilyMap,
+                                    Map<String, Pair<List<Integer>, List<KeyValue>>> familyMap) {
+
+        for (Map.Entry<byte[], List<KeyValue>> entry : innerFamilyMap.entrySet()) {
+            String family = Bytes.toString(entry.getKey());
+            Pair<List<Integer>, List<KeyValue>> keyValueWithIndex = familyMap.get(family);
+            if (keyValueWithIndex == null) {
+                keyValueWithIndex = new Pair<List<Integer>, List<KeyValue>>(
+                        new ArrayList<Integer>(), new ArrayList<KeyValue>());
+                familyMap.put(family, keyValueWithIndex);
+            }
+            keyValueWithIndex.getFirst().add(index);
+            keyValueWithIndex.getSecond().addAll(entry.getValue());
+        }
+    }
+    /**
+     * 将batch请求下的get请求放在getFamilyMap中
+     * @param index
+     * @param get
+     * @param getFamilyMap
+     */
+    private void geneGetInnerFamilyMap(int index, Get get, Map<String, Pair<List<Integer>, List<Get>>> getFamilyMap) {
+        int count = 0;
+        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap().entrySet()) {
+            count++;
+            if (count > 1) {
+                throw new FeatureNotSupportedException("do not support multi family");
+            }
+            String family = Bytes.toString(entry.getKey());
+            Pair<List<Integer>, List<Get>> getsWithIndex = getFamilyMap.get(family);
+            if (getsWithIndex == null) {
+                getsWithIndex = new Pair<List<Integer>, List<Get>>(new ArrayList<Integer>(), new ArrayList<Get>());
+                getFamilyMap.put(family, getsWithIndex);
+            }
+            getsWithIndex.getFirst().add(index);
+            getsWithIndex.getSecond().add(get);
+        }
+    }
+
+
     private BatchOperation compatOldServerPut(final List<? extends Row> actions, final Object[] results, BatchError batchError, int i, List<Row> puts)
             throws Exception {
         BatchOperationResult tmpResults;
@@ -646,14 +744,19 @@ public class OHTable implements HTableInterface {
             }
         }
         BatchError batchError = new BatchError();
-        obTableClient.setRuntimeBatchExecutor(executePool);
+        if (obTableClient != null) {
+            obTableClient.setRuntimeBatchExecutor(executePool);
+        }
+        OperationExecuteAble executeAble = obTableClient == null ? this.executeAble : obTableClient;
         List<Integer> resultMapSingleOp = new LinkedList<>();
-        if (!ObGlobal.isHBaseBatchSupport()) {
+        if (executeAble instanceof ObTableClient && !ObGlobal.isHBaseBatchSupport()) {
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
                 throw new IOException(e);
             }
+        } else if (obTableClient == null) {
+            batchForDDS(actions);
         } else {
             String realTableName = getTargetTableName(actions);
             BatchOperation batch = buildBatchOperation(realTableName, actions,
@@ -701,6 +804,91 @@ public class OHTable implements HTableInterface {
         }
     }
 
+    /**
+     * Check if current table is in DDS mode
+     * @return true if in DDS mode (obTableClient is null and executeAble is not null)
+     */
+    private boolean isDDSMode() {
+        return obTableClient == null && executeAble != null;
+    }
+    
+    /**
+     * 当batch请求中至少包含写入/删除/get中的2种类型的请求时，说明时混合的batch请求，返回true
+     * @param write 写入请求的数量
+     * @param delete 删除请求的数量
+     * @param get get请求的数量
+     * @return
+     */
+    private boolean isMix(int write, int delete, int get) {
+        int typeCount = (write > 0 ? 1 : 0) + (delete > 0 ? 1 : 0) + (get > 0 ? 1 : 0);
+        return typeCount >= 2;
+    }
+
+    /**
+     * 批量的batch请求，目前支持put和delete以及get。 不支持复杂的get请求，即设置maxVersion、filter等限制，只可以获取最新的版本
+     * @param actions
+     * @return
+     * @throws IOException
+     */
+    public Object[] batchForDDS(List<? extends Row> actions) throws IOException {
+        Map<String, Pair<List<Integer>, List<KeyValue>>> familyMap = new HashMap<>();
+        Map<String, Pair<List<Integer>, List<Get>>> getsFamilyMap = new HashMap<>();
+        ArrayList<Put> writeBuffer = new ArrayList<>();
+        ArrayList<Delete> deleteBuffer = new ArrayList<>();
+        ArrayList<Get> getBuffer = new ArrayList<>();
+        int idx = -1;
+        for (Row action : actions) {
+            idx++;
+            if (action instanceof Put) {
+                Put aPut = (Put) action;
+                validatePut(aPut);
+                checkFamilyViolation(aPut.getFamilyMap().keySet());
+                writeBuffer.add((Put) action);
+                currentWriteBufferSize += aPut.heapSize();
+                geneInnerFamilyMap(idx, aPut.getFamilyMap(), familyMap);
+            } else if (action instanceof Delete) {
+                Delete aDelete = (Delete) action;
+                checkFamilyViolation(aDelete.getFamilyMap().keySet());
+                deleteBuffer.add((Delete) action);
+                geneInnerFamilyMap(idx, aDelete.getFamilyMap(), familyMap);
+            } else if (action instanceof Get) {
+                Get aGet = (Get) action;
+                checkFamilyViolation(aGet.getFamilyMap().keySet());
+                getBuffer.add((Get) action);
+                geneGetInnerFamilyMap(idx, aGet, getsFamilyMap);
+            } else {
+                throw new FeatureNotSupportedException("only support put, delete or get in a batch");
+            }
+        }
+
+        boolean[] resultSuccess = new boolean[actions.size()];
+        Object[] getsResults = new Object[actions.size()];
+
+        // 先执行gets，再执行mutate，否则可能get的结果不一致
+        for (Map.Entry<String, Pair<List<Integer>, List<Get>>> entry : getsFamilyMap.entrySet()) {
+            Result[] tmpRes = get(entry.getValue().getSecond());
+            int pos = 0;
+            for (Integer index : entry.getValue().getFirst()) {
+                resultSuccess[index] = true;
+                getsResults[index] = tmpRes[pos];
+                pos++;
+            }
+        }
+        boolean isMix = isMix(writeBuffer.size(), deleteBuffer.size(), 0);
+        Object[] results = familyMapBatch(familyMap, resultSuccess, isMix);
+
+        // merge result
+        for (int i = 0; i < getsResults.length; i++) {
+            if (getsResults[i] != null) {
+                if (results[i] != null) {
+                    throw new IOException("unexpected batch result, table: " + tableNameString + ", result: " + results[i]);
+                }
+                results[i] = getsResults[i];
+            }
+        }
+        return results;
+    }
+    
     private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
         List<Cell> cells = new ArrayList<>();
         ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
@@ -875,6 +1063,9 @@ public class OHTable implements HTableInterface {
 
     @Override
     public Result get(final Get get) throws IOException {
+        if (isDDSMode()) {
+            return getForDDS(get);
+        }
         if (get.getFamilyMap().keySet() == null || get.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
@@ -949,7 +1140,13 @@ public class OHTable implements HTableInterface {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         Result[] results = new Result[gets.size()];
-        if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
+        
+        // In DDS mode, avoid potential recursion by using individual get operations
+        if (isDDSMode()) {
+            for (int i = 0; i < gets.size(); i++) {
+                results[i] = get(gets.get(i));
+            }
+        } else if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
             batch(gets, results);
         } else {
             List<Future<Result>> futures = new LinkedList<>();
@@ -969,6 +1166,76 @@ public class OHTable implements HTableInterface {
         return results;
     }
 
+    public Result getForDDS(final Get get) throws IOException {
+        checkFamilyViolation(get.getFamilyMap().keySet());
+        ServerCallable<Result> serverCallable = getRequestCallable(get);
+        return executeServerCallable(serverCallable);
+    }
+
+    private ServerCallable<Result> getRequestCallable(Get get) {
+        return new ServerCallable<Result>(configuration,
+                executeAble,
+                tableNameString,
+                get.getRow(),
+                get.getRow(),
+                operationTimeout) {
+            public Result call() throws IOException {
+                List<KeyValue> keyValueList = new ArrayList<KeyValue>();
+                for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap().entrySet()) {
+                    byte[] family = entry.getKey();
+                    String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family), configuration);
+
+                    try {
+                        long t1 = System.currentTimeMillis();
+                        ObTableQuery obTableQuery;
+                        ObHTableFilter filter = buildObHTableFilter(get.getFilter(),
+                                get.getTimeRange(), get.getMaxVersions(), entry.getValue());
+
+                        if (queryOptimized(entry.getValue())) {
+                            obTableQuery = buildObTableQuery(filter, get.getRow(), get.getRow(),
+                                    get.getTimeRange(), -1, entry.getValue());
+                        } else {
+                            obTableQuery = buildObTableQuery(filter, get.getRow(), true,
+                                    get.getRow(), true, -1);
+                        }
+
+                        ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery, targetTableName);
+                        OperationExecuteAble executeAble = obTableClient != null ? this.obTableClient : this.executeAble;
+                        ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) executeAble.execute(request);
+                        byte[] newK = new byte[0];
+                        byte[] newQ = new byte[0];
+                        while (clientQueryStreamResult.next()) {
+                            List<ObObj> row = clientQueryStreamResult.getRow();
+                            byte[] k = (byte[]) row.get(0).getValue();
+                            byte[] q = (byte[]) row.get(1).getValue();
+                            long t = (Long) row.get(2).getValue();
+                            byte[] v = (byte[]) row.get(3).getValue();
+                            if (k == null && q == null) {
+                                k = newK;
+                                q = newQ;
+                            } else {
+                                newK = k;
+                                newQ = q;
+                            }
+                            keyValueList.add(new KeyValue(k, family, q, t, v));
+                        }
+
+                        TableHBaseLoggerFactory.MONITOR.info("get cost: {}ms, table: {}, optimize: {}, cells: {}",
+                                (System.currentTimeMillis() - t1),
+                                getTargetTableName(tableNameString, Bytes.toString(family), configuration),
+                                queryOptimized(), keyValueList.size());
+                    } catch (Exception e) {
+                        TableHBaseLoggerFactory.logger.error(LCD.convert("01-00002"), tableNameString,
+                                Bytes.toString(family), e);
+                        throw new IOException("query table:" + tableNameString + " family "
+                                + Bytes.toString(family) + " error.", e);
+                    }
+                }
+                return new Result(keyValueList);
+            }
+        };
+    }
+    
     /**
      * hbase的获取这个rowkey，没有的话就前一个rowkey，不支持
      * @param row row
@@ -982,6 +1249,10 @@ public class OHTable implements HTableInterface {
 
     @Override
     public ResultScanner getScanner(final Scan scan) throws IOException {
+        if (obTableClient == null) {
+            return getScannerForDDS(scan);
+        }
+        
         if (scan.getFamilyMap().keySet().isEmpty()) {
             // check nothing, use table group;
         } else {
@@ -1162,6 +1433,129 @@ public class OHTable implements HTableInterface {
         return getScanner(scan);
     }
 
+    public boolean queryOptimized() {
+        return this.localHTableQueryOptimize || this.hTableQueryOptimize;
+    }
+
+    public boolean queryOptimized(Set<byte[]> qualifiers) {
+        boolean ret = false;
+        if (queryOptimized() && qualifiers != null && !qualifiers.isEmpty()) {
+            for (byte[] aQualifier : qualifiers) {
+                if (aQualifier != null && aQualifier.length > 0) {
+                    ret = true;
+                } else {
+                    return false;
+                }
+            }
+        }
+        return ret;
+    }
+
+    public ResultScanner getScannerForDDS(final Scan scan) throws IOException {
+        checkFamilyViolation(scan.getFamilyMap().keySet());
+        //be careful about the packet size, if the packet exceed the max result size, leading to error
+        ServerCallable<ResultScanner> serverCallable = new ServerCallable<ResultScanner>(
+                configuration, executeAble, tableNameString, scan.getStartRow(), scan.getStopRow(),
+                operationTimeout) {
+            public ResultScanner call() throws Exception {
+                if (scan.getFamilyMap().keySet().isEmpty() || scan.getFamilyMap().size() > 1) {
+                    throw new FeatureNotSupportedException("scan family map is not supported yet");
+                } else {
+                    for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap().entrySet()) {
+                        byte[] f = entry.getKey();
+                        try {
+                            ObHTableFilter filter = buildObHTableFilter(scan.getFilter(),
+                                    scan.getTimeRange(), scan.getMaxVersions(), entry.getValue());
+                            ObTableQuery obTableQuery;
+                            if (Arrays.equals(scan.getStartRow(), HConstants.EMPTY_START_ROW)
+                                    && Arrays.equals(scan.getStopRow(), HConstants.EMPTY_START_ROW)) {
+                                obTableQuery = buildObTableQuery(filter, (ObNewRange)null, scan.getBatch());
+                            } else if (!scan.isReversed() && queryOptimized(entry.getValue())) {
+                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                        scan.getStopRow(), false, scan.getBatch(), entry.getValue());
+                            } else if (scan.isReversed()) {
+                                // 由于 HBase 接口与 OB 接口表达范围的差异, reverse scan 需要交换 startRow 和 stopRow
+                                obTableQuery = buildObTableQuery(filter, scan.getStopRow(), false,
+                                        scan.getStartRow(), true, scan.getBatch());
+                                obTableQuery.setScanOrder(ObScanOrder.Reverse);
+                            } else {
+                                obTableQuery = buildObTableQuery(filter, scan.getStartRow(), true,
+                                        scan.getStopRow(), false, scan.getBatch());
+                            }
+
+                            obTableQuery.setMaxResultSize(scan.getMaxResultSize());
+                            long t1 = System.currentTimeMillis();
+                            ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
+                                    getTargetTableName(tableNameString, Bytes.toString(f), configuration));
+                            ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) executeAble
+                                    .execute(request);
+                            TableHBaseLoggerFactory.MONITOR.info("get cost query result: {}ms, table: {}, query optimize: {}",
+                                    (System.currentTimeMillis() - t1),
+                                    getTargetTableName(tableNameString, Bytes.toString(f), configuration), queryOptimized());
+                            return new ClientStreamScanner(clientQueryStreamResult, tableNameString, f, false);
+                        } catch (Exception e) {
+                            logger
+                                    .error(LCD.convert("01-00003"), tableNameString, Bytes.toString(f), e);
+                            throw new IOException("scan table:" + tableNameString + " family "
+                                    + Bytes.toString(f) + " error.", e);
+                        }
+                    }
+                }
+
+                throw new IOException("scan table:" + tableNameString + "has no family");
+            }
+        };
+        return executeServerCallable(serverCallable);
+    }
+
+    private void checkFamilyViolation(Collection<byte[]> families) {
+        for (byte[] family : families) {
+            if (isBlank(Bytes.toString(family))) {
+                throw new IllegalArgumentException("family is blank");
+            }
+            this.familyString = new String(family, StandardCharsets.UTF_8);
+            this.currentTableFamily = tableNameString.toLowerCase() + CH_SPLITE_TYPE + familyString.toLowerCase();
+        }
+
+    }
+
+    private void innerDeleteForDDS(Delete delete) throws IOException {
+        checkArgument(delete.getRow() != null, "row is null");
+        checkArgument(!delete.isEmpty(), "delete is empty");
+        List<Integer> errorCodeList = new ArrayList<Integer>();
+        try {
+            checkFamilyViolation(delete.getFamilyMap().keySet());
+
+            Map.Entry<byte[], List<KeyValue>> entry = delete.getFamilyMap().entrySet().iterator()
+                    .next();
+            ObTableBatchOperation batch = buildObTableBatchOperation(entry.getValue(), false, null,
+                    false);
+
+            ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch,
+                    getTargetTableName(tableNameString, Bytes.toString(entry.getKey()), configuration));
+            ObTableBatchOperationResult result = (ObTableBatchOperationResult) executeAble
+                    .execute(request);
+            boolean hasError = false;
+            int throwErrorCode = 0;
+            for (ObTableOperationResult obTableOperationResult : result.getResults()) {
+                int errorCode = obTableOperationResult.getHeader().getErrno();
+                errorCodeList.add(errorCode);
+                if (errorCode != 0) {
+                    hasError = true;
+                    throwErrorCode = errorCode;
+                }
+            }
+
+            if (hasError) {
+                throw new ObTableException(throwErrorCode);
+            }
+        } catch (Exception e) {
+            logger.error(LCD.convert("01-00004"), tableNameString, errorCodeList, e);
+            throw new IOException("delete  table " + tableNameString + " error codes "
+                    + errorCodeList, e);
+        }
+    }
+
     @Override
     public void put(Put put) throws IOException {
         doPut(Collections.singletonList(put));
@@ -1282,13 +1676,23 @@ public class OHTable implements HTableInterface {
     @Override
     public void delete(Delete delete) throws IOException {
         checkFamilyViolation(delete.getFamilyMap().keySet(), false);
-        innerDelete(delete);
+        if (isDDSMode()) {
+            innerDeleteForDDS(delete);
+        } else {
+            innerDelete(delete);
+        }
     }
 
     @Override
     public void delete(List<Delete> deletes) throws IOException {
-        for (Delete delete : deletes) {
-            innerDelete(delete);
+        if (isDDSMode()) { // DDS mode
+            for (Delete delete : deletes) {
+                innerDeleteForDDS(delete);
+            }
+        } else {
+            for (Delete delete : deletes) {
+                innerDelete(delete);
+            }
         }
     }
 
@@ -1366,8 +1770,12 @@ public class OHTable implements HTableInterface {
 
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration));
-            ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                .execute(request);
+            ObTableQueryAndMutateResult result = null;
+            if (!isDDSMode()) {
+                result = (ObTableQueryAndMutateResult) obTableClient.execute(request);
+            } else {
+                result = (ObTableQueryAndMutateResult) executeAble.execute(request);
+            }
             return result.getAffectedRows() > 0;
     }
 
@@ -1405,9 +1813,16 @@ public class OHTable implements HTableInterface {
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batchOperation,
                 getTargetTableName(tableNameString, Bytes.toString(f), configuration));
-            request.setReturningAffectedEntity(true);
-            ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                .execute(request);
+            request.setReturningAffectedEntity(append.isReturnResults());
+            ObTableQueryAndMutateResult result = null;
+            if (obTableClient != null) {
+                result = (ObTableQueryAndMutateResult) obTableClient.execute(request);
+            } else {
+                result = (ObTableQueryAndMutateResult) executeAble.execute(request);
+            }
+            if (!append.isReturnResults()) {
+                return null;
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1466,8 +1881,12 @@ public class OHTable implements HTableInterface {
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration));
             request.setReturningAffectedEntity(true);
-            ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                .execute(request);
+            ObTableQueryAndMutateResult result = null;
+            if (obTableClient != null) {
+                result = (ObTableQueryAndMutateResult) obTableClient.execute(request);
+            } else {
+                result = (ObTableQueryAndMutateResult) executeAble.execute(request);
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             List<KeyValue> keyValues = new ArrayList<KeyValue>();
             for (List<ObObj> row : queryResult.getPropertiesRows()) {
@@ -1516,8 +1935,12 @@ public class OHTable implements HTableInterface {
             ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
                 batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration));
             request.setReturningAffectedEntity(true);
-            ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                .execute(request);
+            ObTableQueryAndMutateResult result = null;
+            if (obTableClient != null) {
+                result = (ObTableQueryAndMutateResult) obTableClient.execute(request);
+            } else {
+                result = (ObTableQueryAndMutateResult) executeAble.execute(request);
+            }
             ObTableQueryResult queryResult = result.getAffectedEntity();
             if (queryResult.getPropertiesRows().size() != 1) {
                 throw new IllegalStateException("the increment result size illegal "
@@ -1550,7 +1973,10 @@ public class OHTable implements HTableInterface {
 
     @Override
     public void flushCommits() throws IOException {
-
+        if (isDDSMode()) {
+            flushCommitsForDDS();
+            return;
+        }
         try {
             if (writeBuffer.isEmpty()){
                 return;
@@ -1596,6 +2022,45 @@ public class OHTable implements HTableInterface {
                         logger.error(LCD.convert("01-00008"), row, tableNameString, autoFlush,
                                 writeBuffer.size(), e);
                     });
+                }
+            }
+        } finally {
+            if (clearBufferOnFail) {
+                writeBuffer.clear();
+                currentWriteBufferSize = 0;
+            } else {
+                // the write buffer was adjusted by processBatchOfPuts
+                currentWriteBufferSize = 0;
+                for (Put aPut : writeBuffer) {
+                    currentWriteBufferSize += aPut.heapSize();
+                }
+            }
+        }
+    }
+    
+    private void flushCommitsForDDS() throws IOException {
+        try {
+            boolean[] resultSuccess = new boolean[writeBuffer.size()];
+            try {
+                Map<String, Pair<List<Integer>, List<KeyValue>>> familyMap = new HashMap<String, Pair<List<Integer>, List<KeyValue>>>();
+                for (int i = 0; i < writeBuffer.size(); i++) {
+                    Put aPut = writeBuffer.get(i);
+                    Map<byte[], List<KeyValue>> innerFamilyMap = aPut.getFamilyMap();
+                    // multi family can not ensure automatic
+                    geneInnerFamilyMap(i, innerFamilyMap, familyMap);
+                }
+                familyMapBatch(familyMap, resultSuccess, false);
+
+            } finally {
+                // mutate list so that it is empty for complete success, or contains
+                // only failed records results are returned in the same order as the
+                // requests in list walk the list backwards, so we can remove from list
+                // without impacting the indexes of earlier members
+                for (int i = resultSuccess.length - 1; i >= 0; i--) {
+                    if (resultSuccess[i]) {
+                        // successful Puts are removed from the list here.
+                        writeBuffer.remove(i);
+                    }
                 }
             }
         } finally {
@@ -1742,8 +2207,12 @@ public class OHTable implements HTableInterface {
     @Override
     public void setOperationTimeout(int operationTimeout) {
         this.operationTimeout = operationTimeout;
-        this.obTableClient.setRuntimeMaxWait(operationTimeout);
-        this.obTableClient.setRuntimeBatchMaxWait(operationTimeout);
+        if (this.obTableClient != null) {
+            this.obTableClient.setRuntimeMaxWait(operationTimeout);
+            this.obTableClient.setRuntimeBatchMaxWait(operationTimeout);
+        } else { // TODO: dds set configuration
+
+        }
         this.operationExecuteInPool = this.configuration.getBoolean(
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
@@ -1768,7 +2237,75 @@ public class OHTable implements HTableInterface {
     }
 
     public void setRuntimeBatchExecutor(ExecutorService runtimeBatchExecutor) {
-        this.obTableClient.setRuntimeBatchExecutor(runtimeBatchExecutor);
+        if (this.obTableClient != null) {
+            this.obTableClient.setRuntimeBatchExecutor(runtimeBatchExecutor);
+        }
+    }
+
+    /**
+     * 封装batch请求。返回batch操作的结果集results
+     * @param familyMap 所有的batch请求的容器
+     * @param resultSuccess batch请求的返回值数组
+     * @param isMix 是否为混合请求的batch
+     * @throws IOException
+     */
+    private Object[] familyMapBatch(Map<String, Pair<List<Integer>, List<KeyValue>>> familyMap,
+                                    boolean[] resultSuccess, boolean isMix) throws IOException {
+        Object[] batchResults = new Object[resultSuccess.length];
+
+        for (Map.Entry<String, Pair<List<Integer>, List<KeyValue>>> entry : familyMap.entrySet()) {
+            List<Integer> errorCodeList = new ArrayList<Integer>(entry.getValue().getSecond().size());
+            ObTableBatchOperation batch;
+            try {
+                String targetTableName = getTargetTableName(this.tableNameString, entry.getKey(), configuration);
+                batch = buildObTableBatchOperation(entry.getValue().getSecond(), false, null,
+                        isMix);
+                ObTableBatchOperationRequest request = buildObTableBatchOperationRequest(batch, targetTableName);
+                ObTableBatchOperationResult result = (ObTableBatchOperationResult) executeAble.execute(request);
+                List<ObTableOperationResult> resultList = result.getResults();
+                Map<Integer, ObTableOperationResult> throwResults = new HashMap<>();
+
+                for (ObTableOperationResult opResult : resultList) {
+                    int errorCode = opResult.getHeader().getErrno();
+                    errorCodeList.add(errorCode);
+                    if (errorCode != 0) {
+                        throwResults.put(entry.getValue().getFirst().get(0), opResult);
+                    }
+                }
+
+                for (Map.Entry<Integer, ObTableOperationResult> throwResult : throwResults.entrySet()) {
+                    if (throwResult.getValue() != null) {
+                        ExceptionUtil.throwObTableException(throwResult.getValue().getExecuteHost(),
+                                throwResult.getValue().getExecutePort(), throwResult.getValue().getSequence(),
+                                throwResult.getValue().getUniqueId(), throwResult.getValue().getHeader().getErrno(), targetTableName);
+                    }
+                }
+
+                for (Integer index : entry.getValue().getFirst()) {
+                    resultSuccess[index] = true;
+                    List<KeyValue> keyValues = new ArrayList<>();
+                    keyValues.add(new KeyValue());
+                    Result kvRes = new Result(keyValues);
+                    batchResults[index] = kvRes;
+                }
+            } catch (Exception e) {
+                if (e instanceof ObTableException) {
+                    ObTableException ee = (ObTableException)e;
+                    errorCodeList.add(ee.getErrorCode());
+                }
+
+                logger.error(LCD.convert("01-00008"), tableNameString, errorCodeList, autoFlush,
+                        resultSuccess.length, e);
+
+                throw new IOException(
+                        "batch mutate table " + tableNameString + ", error codes " + errorCodeList
+                                + ", auto flush " + autoFlush + ", and current buffer size "
+                                + resultSuccess.length
+                                + ". batch opertaions failed. may caused by put and delete the same k/q at a batch or "
+                                + "don't have any data", e);
+            }
+        }
+        return batchResults;
     }
 
     <T> T executeServerCallable(final ServerCallable<T> serverCallable) throws IOException {
@@ -1857,6 +2394,118 @@ public class OHTable implements HTableInterface {
         }
         return obHTableFilter;
     }
+
+    private ObTableQuery buildObTableQuery(ObHTableFilter filter, ObNewRange obNewRange,
+                                           int batchSize) {
+        ObTableQuery obTableQuery = new ObTableQuery();
+        obTableQuery.setIndexName("PRIMARY");
+        obTableQuery.sethTableFilter(filter);
+        for (String column : ALL_COLUMNS) {
+            obTableQuery.addSelectColumn(column);
+        }
+        if (obNewRange != null) {
+            obTableQuery.addKeyRange(obNewRange);
+        }
+        if (batchSize > 0) {
+            obTableQuery.setBatchSize(batchSize);
+        }
+        return obTableQuery;
+    }
+
+    private ObTableQuery buildObTableQuery(ObHTableFilter filter,
+                                           byte[] start, boolean includeStart,
+                                           byte[] stop, boolean includeStop,
+                                           int batchSize, Set<byte[]> qualifiers) {
+        List<ObNewRange> obRangeList = new ArrayList<>();
+        for (byte[] qualifier : qualifiers) {
+            if (qualifier.length == 0) {
+                throw new ObTableUnexpectedException("qualifier is empty when use htable optimize query");
+            }
+
+            ObNewRange obNewRange = new ObNewRange();
+            if (includeStart) {
+                obNewRange.setStartKey(ObRowKey.getInstance(start, qualifier, ObObj.getMin()));
+            } else {
+                obNewRange.setStartKey(ObRowKey.getInstance(start, qualifier, ObObj.getMax()));
+            }
+
+            if (Arrays.equals(stop, HConstants.EMPTY_START_ROW)) {
+                obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), qualifier, ObObj.getMax()));
+            } else if (includeStop) {
+                obNewRange.setEndKey(ObRowKey.getInstance(stop, qualifier, ObObj.getMax()));
+            } else {
+                obNewRange.setEndKey(ObRowKey.getInstance(stop, qualifier, ObObj.getMin()));
+            }
+            obRangeList.add(obNewRange);
+        }
+
+        return buildObTableQuery(filter, obRangeList, batchSize);
+    }
+
+    private ObTableQuery buildObTableQuery(ObHTableFilter filter, List<ObNewRange> obNewRangeList,
+                                           int batchSize) {
+        ObTableQuery obTableQuery = new ObTableQuery();
+        obTableQuery.setIndexName("PRIMARY");
+        obTableQuery.sethTableFilter(filter);
+        for (String column : ALL_COLUMNS) {
+            obTableQuery.addSelectColumn(column);
+        }
+        if (obNewRangeList.size() > 0) {
+            for (ObNewRange obNewRange : obNewRangeList) {
+                obTableQuery.addKeyRange(obNewRange);
+            }
+        }
+        if (batchSize > 0) {
+            obTableQuery.setBatchSize(batchSize);
+        }
+        return obTableQuery;
+    }
+    private ObTableQuery buildObTableQuery(ObHTableFilter filter,
+                                           byte[] start, byte[] stop, TimeRange tr,
+                                           int batchSize, Set<byte[]> qualifiers) {
+        List<ObNewRange> obRangeList = new ArrayList<>();
+        for (byte[] qualifier : qualifiers) {
+            if (qualifier.length == 0) {
+                throw new ObTableUnexpectedException("qualifier is empty when use htable optimize query");
+            }
+
+            ObNewRange obNewRange = new ObNewRange();
+            obNewRange.setStartKey(ObRowKey.getInstance(start, qualifier, -tr.getMax()));
+            if (Arrays.equals(stop, HConstants.EMPTY_START_ROW)) {
+                obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), qualifier, -tr.getMin()));
+            } else {
+                obNewRange.setEndKey(ObRowKey.getInstance(stop, qualifier, -tr.getMin()));
+            }
+            obRangeList.add(obNewRange);
+        }
+
+        return buildObTableQuery(filter, obRangeList, batchSize);
+    }
+
+    private ObTableQuery buildObTableQuery(ObHTableFilter filter, byte[] start,
+                                           boolean includeStart, byte[] stop, boolean includeStop,
+                                           int batchSize) {
+        ObNewRange obNewRange = new ObNewRange();
+
+        if (includeStart) {
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMin(), ObObj.getMin()));
+        } else {
+            obNewRange.setStartKey(ObRowKey.getInstance(start, ObObj.getMax(), ObObj.getMax()));
+        }
+
+        if (Arrays.equals(stop, HConstants.EMPTY_START_ROW)) {
+            obNewRange.setEndKey(ObRowKey.getInstance(ObObj.getMax(), ObObj.getMax(),
+                    ObObj.getMax()));
+        } else if (includeStop) {
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMax(), ObObj.getMax()));
+        } else {
+            obNewRange.setEndKey(ObRowKey.getInstance(stop, ObObj.getMin(), ObObj.getMin()));
+        }
+
+        return buildObTableQuery(filter, obNewRange, batchSize);
+    }
+
+
 
     private byte[] buildCheckAndMutateFilterString(byte[] family, byte[] qualifier,
                                                    CompareFilter.CompareOp compareOp, byte[] value)
@@ -2008,6 +2657,26 @@ public class OHTable implements HTableInterface {
         batch.setSamePropertiesNames(true);
         return batch;
     }
+
+    private ObTableBatchOperation buildObTableBatchOperation(List<KeyValue> keyValueList,
+                                                             boolean putToAppend,
+                                                             List<byte[]> qualifiers,
+                                                             boolean isMix) {
+        ObTableBatchOperation batch = new ObTableBatchOperation();
+        for (KeyValue kv : keyValueList) {
+            if (qualifiers != null) {
+                qualifiers.add(kv.getQualifier());
+            }
+            batch.addTableOperation(buildObTableOperation(kv, putToAppend));
+        }
+        // batch with the same type
+        batch.setSameType(!isMix);
+        batch.setSamePropertiesNames(true);
+        return batch;
+    }
+
+
+
 
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(KeyValue kv,
                                                                      ObTableOperationType operationType,

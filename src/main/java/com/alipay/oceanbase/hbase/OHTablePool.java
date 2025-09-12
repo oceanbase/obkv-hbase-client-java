@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.constants.OHConstants;
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
+import com.alipay.oceanbase.hbase.util.ExecuteAbleManager;
 import com.alipay.oceanbase.hbase.util.KeyDefiner;
 import com.alipay.oceanbase.hbase.util.OHTableFactory;
 import com.google.protobuf.Descriptors;
@@ -39,12 +40,14 @@ import org.apache.hadoop.hbase.util.PoolMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
 
 public class OHTablePool implements Closeable {
@@ -156,6 +159,43 @@ public class OHTablePool implements Closeable {
         this.tables = new PoolMap<>(this.poolType, this.maxSize);
     }
 
+    public void init() throws Exception {
+        if (tableAttributes != null) {
+            Map<String, Map<String, String>> tableAttributeMap = new HashMap<String, Map<String, String>>();
+            for (Map.Entry<String, byte[]> entry : tableAttributes.entrySet()) {
+                String key = entry.getKey();
+                byte[] value = entry.getValue();
+                String[] parsedKey = KeyDefiner.parsePoolOHTableAttributeName(key);
+                if (parsedKey != null) {
+                    String tableName = parsedKey[0];
+                    String attributeName = parsedKey[1];
+
+                    Map<String, String> attributeMap = tableAttributeMap.get(tableName);
+
+                    if (attributeMap == null) {
+                        attributeMap = new HashMap<String, String>();
+                        tableAttributeMap.put(tableName, attributeMap);
+                    }
+
+                    attributeMap.put(attributeName, Bytes.toString(value));
+                }
+            }
+
+            for (Map.Entry<String, Map<String, String>> entry : tableAttributeMap.entrySet()) {
+                Map<String, String> attributeMap = entry.getValue();
+                String paramUrl = attributeMap.get(HBASE_OCEANBASE_PARAM_URL);
+                String fullUserName = attributeMap.get(HBASE_OCEANBASE_FULL_USER_NAME);
+                String password = attributeMap.get(HBASE_OCEANBASE_PASSWORD);
+                ExecuteAbleManager.getOrCreateObTableClient(config, paramUrl, fullUserName,
+                        password);
+            }
+        }
+
+        if (isNotBlank(config.get(HBASE_OCEANBASE_DDS_APP_NAME))) {
+            ExecuteAbleManager.getOrCreateDdsObTableClient(config);
+        }
+    }
+    
     /**
      * Get a reference to the specified table from the pool.
      *

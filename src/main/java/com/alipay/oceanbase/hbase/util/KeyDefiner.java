@@ -25,4 +25,14 @@ public class KeyDefiner {
     public static String genPooledOHTableAttributeName(String tableName, String key) {
         return tableName + OHConstants.HBASE_HTABLE_POOL_SEPERATOR + key;
     }
+    public static String[] parsePoolOHTableAttributeName(String key) {
+        if (key == null) {
+            return null;
+        }
+        String[] parsedKey = key.split("\\" + OHConstants.HBASE_HTABLE_POOL_SEPERATOR);
+        if (parsedKey.length != 2) {
+            return null;
+        }
+        return parsedKey;
+    }
 }

@@ -92,6 +92,17 @@ public class OHTableFactory extends HTableFactory {
     }
 
     private Configuration adjustConfiguration(Configuration configuration, String tableName) {
+        // Check if DDS mode is configured
+        String ddsAppName = configuration.get(HBASE_OCEANBASE_DDS_APP_NAME);
+        String ddsAppDsName = configuration.get(HBASE_OCEANBASE_DDS_APP_DS_NAME);
+        String ddsVersion = configuration.get(HBASE_OCEANBASE_DDS_VERSION);
+
+        if (isNotBlank(ddsAppName) && isNotBlank(ddsAppDsName) && isNotBlank(ddsVersion)) {
+            // DDS mode - no additional parameter validation needed
+            // The DDS parameters are already set in configuration
+            return configuration;
+        }
+        
         byte[] isOdpModeAttr = tablePool.getTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE);
         if ((isOdpModeAttr != null && Bytes.toBoolean(isOdpModeAttr))
             || (isOdpModeAttr == null && configuration.getBoolean(HBASE_OCEANBASE_ODP_MODE, false))) {

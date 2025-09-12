@@ -161,6 +161,20 @@ public final class OHConstants {
 
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 
-    public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
+public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
+
+
+    /**
+     * DDS (Data Distribution Service) related constants
+     */
+    public static final String   HBASE_OCEANBASE_DDS_APP_NAME                = "hbase.oceanbase.dds.app.name";
+    public static final String   HBASE_OCEANBASE_DDS_APP_DS_NAME             = "hbase.oceanbase.dds.app.ds.name";
+    public static final String   HBASE_OCEANBASE_DDS_VERSION                 = "hbase.oceanbase.dds.version";
+    public static final String   HBASE_HTABLE_CLIENT_WRITE_BUFFER            = "hbase.client.write.buffer";
+
+    public static final long     DEFAULT_HBASE_HTABLE_CLIENT_WRITE_BUFFER    = 2097152;
+
+    public static final char     CH_SINGLE_QUOTA                             = '\'';
+    public static final char     CH_SPLITE_TYPE                              = '|';
 
 }
