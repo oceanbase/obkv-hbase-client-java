@@ -1152,6 +1152,7 @@ public class OHTable implements Table {
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                                 getTargetTableName(tableNameString));
+                        request.setNeedTabletId(false);
                         request.setAllowDistributeScan(false);
                         String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
                                 request.getObTableQueryRequest(), tableNameString);
@@ -1188,6 +1189,7 @@ public class OHTable implements Table {
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            request.setNeedTabletId(false);
                             request.setAllowDistributeScan(false);
                             List<Partition> partitions = obTableClient
                                     .getPartition(targetTableName, false);
@@ -2373,6 +2375,7 @@ public class OHTable implements Table {
         }
         batch.setEntityType(ObTableEntityType.HKV);
         batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        batch.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return batch;
     }
 
@@ -2478,6 +2481,7 @@ public class OHTable implements Table {
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return request;
     }
 
@@ -2492,6 +2496,7 @@ public class OHTable implements Table {
         asyncRequest.setTableName(targetTableName);
         asyncRequest.setObTableQueryRequest(request);
         asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return asyncRequest;
     }
 
@@ -2507,6 +2512,7 @@ public class OHTable implements Table {
         request.setEntityType(ObTableEntityType.HKV);
         request.setReturningAffectedEntity(true);
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
+        request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return request;
     }
 
