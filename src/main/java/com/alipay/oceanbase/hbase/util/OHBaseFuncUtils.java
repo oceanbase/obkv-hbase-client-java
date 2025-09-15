@@ -107,4 +107,15 @@ public class OHBaseFuncUtils {
             return true;
         }
     }
+
+    public static boolean needTabletId(ObTableClient tableClient) {
+        if (tableClient.isOdpMode()) {
+            return ObGlobal.isDistributeNeedTabletIdSupport()
+                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0
+                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+        } else {
+            return ObGlobal.isDistributeNeedTabletIdSupport()
+                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+        }
+    }
 }
