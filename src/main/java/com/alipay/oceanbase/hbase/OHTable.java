@@ -1110,6 +1110,7 @@ public class OHTable implements HTableInterface {
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
                             getTargetTableName(tableNameString));
+                        request.setNeedTabletId(false);
                         request.setAllowDistributeScan(false);
                         String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
                             request.getObTableQueryRequest(), tableNameString);
@@ -1136,6 +1137,7 @@ public class OHTable implements HTableInterface {
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            request.setNeedTabletId(false);
                             request.setAllowDistributeScan(false);
                             List<Partition> partitions = obTableClient
                                 .getPartition(targetTableName, false);
