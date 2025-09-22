@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.HConstants;
 import java.util.Properties;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
+import static com.alipay.oceanbase.rpc.property.Property.RPC_CONNECT_TIMEOUT;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.hadoop.hbase.ipc.RpcClient.DEFAULT_SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
@@ -78,8 +79,7 @@ public class OHConnectionConfiguration {
             if (conf.get(SOCKET_TIMEOUT) != null) {
                 rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, DEFAULT_SOCKET_TIMEOUT);
             } else {
-                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT,
-                    DEFAULT_SOCKET_TIMEOUT_CONNECT);
+                rpcConnectTimeout = RPC_CONNECT_TIMEOUT.getDefaultInt(); // use table default value
             }
         }
         this.rpcConnectTimeout = rpcConnectTimeout;
