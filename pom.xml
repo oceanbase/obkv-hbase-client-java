@@ -4,7 +4,7 @@
 
     <groupId>com.oceanbase</groupId>
     <artifactId>obkv-hbase-client</artifactId>
-    <version>1.4.0</version>
+    <version>1.4.1-SNAPSHOT</version>
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>OceanBase JavaClient for HBaseApi</description>
@@ -27,7 +27,7 @@
 
     <scm>
         <connection>scm:git:https://github.com/oceanbase/obkv-hbase-client-java.git</connection>
-        <tag>obkv-hbase-client-1.4.0</tag>
+        <tag>obkv-hbase-client-1.3.0</tag>
         <url>https://github.com/oceanbase/obkv-hbase-client-java</url>
     </scm>
 
@@ -478,7 +478,7 @@
                         </goals>
                         <configuration>
                             <rules>
-                                <DependencyConvergence></DependencyConvergence>
+                                <DependencyConvergence />
                             </rules>
                         </configuration>
                     </execution>
@@ -486,5 +486,5 @@
             </plugin>
         </plugins>
     </build>
-    <profiles></profiles>
+    <profiles />
 </project>
