@@ -17,12 +17,11 @@
 
 package com.alipay.oceanbase.hbase;
 
-import com.mysql.cj.conf.ConnectionUrlParser.Pair;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.PoolMap;
 import org.junit.Assert;
 import org.junit.Before;
@@ -38,12 +37,12 @@ import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 public class OHTableDDSTest {
-    private String        APP_NAME          = "obkv";
-    private String        APP_DS_NAME_4x    = "obkv4_adapt_dds_client_test";
-    private String        APP_DS_NAME_2x    = "obkv4_adapt_dds_client_test_2x";
-    private String        VERSION           = "v1.0";
-    private String        APP_DS_NAME       = APP_DS_NAME_2x;
-    private String        hTableName        = APP_DS_NAME.equals(APP_DS_NAME_4x) ? "test" : "testt";
+    private String        APP_NAME       = "obkv";
+    private String        APP_DS_NAME_4x = "obkv4_adapt_dds_client_test";
+    private String        APP_DS_NAME_2x = "obkv4_adapt_dds_client_test_2x";
+    private String        VERSION        = "v1.0";
+    private String        APP_DS_NAME    = APP_DS_NAME_2x;
+    private String        hTableName     = APP_DS_NAME.equals(APP_DS_NAME_4x) ? "test" : "testt";
 
     protected OHTablePool ohTablePool;
 
@@ -92,7 +91,7 @@ public class OHTableDDSTest {
      */
     @Test
     public void testSharding00() throws Exception {
-        String family =  "family";
+        String family = "family";
         String column1 = "column1";
         String value = "value";
         long timestamp = System.currentTimeMillis();
@@ -109,7 +108,8 @@ public class OHTableDDSTest {
             try {
                 // 测试单个分区内的操作
                 Put put = new Put(toBytes(key1));
-                put.add(family.getBytes(), column1.getBytes(), timestamp, toBytes(value + "_" + partitionPrefix));
+                put.add(family.getBytes(), column1.getBytes(), timestamp,
+                    toBytes(value + "_" + partitionPrefix));
                 hTable.put(put);
                 Get get = new Get(toBytes(key1));
                 get.addColumn(family.getBytes(), toBytes(column1));
@@ -776,7 +776,7 @@ public class OHTableDDSTest {
             for (int partition = 0; partition < scans.size(); partition++) {
                 Pair<byte[], byte[]> scan = scans.get(partition);
                 
-                Scan s = new Scan(scan.left, scan.right);
+                Scan s = new Scan(scan.getFirst(), scan.getSecond());
                 s.addFamily(family1.getBytes());
                 ResultScanner scanner = hTable.getScanner(s);
                 int count1 = 0;
@@ -787,7 +787,7 @@ public class OHTableDDSTest {
                 }
                 scanner.close();
                 
-                s = new Scan(scan.left, scan.right);
+                s = new Scan(scan.getFirst(), scan.getSecond());
                 s.addFamily(family2.getBytes());
                 scanner = hTable.getScanner(s);
                 int count2 = 0;
@@ -804,7 +804,7 @@ public class OHTableDDSTest {
             for (int partition = 0; partition < Math.min(5, scans.size()); partition++) {
                 Pair<byte[], byte[]> scan = scans.get(partition);
                 
-                Scan s = new Scan(scan.right, scan.left);
+                Scan s = new Scan(scan.getSecond(), scan.getFirst());
                 s.addFamily(family1.getBytes());
                 s.setReversed(true);
                 ResultScanner scanner = hTable.getScanner(s);
