@@ -161,8 +161,7 @@ public final class OHConstants {
 
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 
-public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
-
+    public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
 
     /**
      * DDS (Data Distribution Service) related constants

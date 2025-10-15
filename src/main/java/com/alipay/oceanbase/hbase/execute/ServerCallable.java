@@ -33,13 +33,13 @@ import java.util.concurrent.Callable;
 
 public abstract class ServerCallable<T> implements Callable<T> {
 
-    protected final Configuration conf;
-    protected final ObTableClient obTableClient;
+    protected final Configuration        conf;
+    protected final ObTableClient        obTableClient;
     protected final OperationExecuteAble executeAble;
-    protected final String        tableNameString;
-    protected int                 callTimeout;
-    protected long                globalStartTime, endTime;
-    protected byte[]              startRow, endRow;
+    protected final String               tableNameString;
+    protected int                        callTimeout;
+    protected long                       globalStartTime, endTime;
+    protected byte[]                     startRow, endRow;
 
     /**
      * ServerCallable
@@ -70,8 +70,8 @@ public abstract class ServerCallable<T> implements Callable<T> {
      * @param endRow end row
      * @param callTimeout timeout
      */
-    public ServerCallable(Configuration conf, OperationExecuteAble executeAble, String tableNameString,
-                          byte[] startRow, byte[] endRow, int callTimeout) {
+    public ServerCallable(Configuration conf, OperationExecuteAble executeAble,
+                          String tableNameString, byte[] startRow, byte[] endRow, int callTimeout) {
         this.conf = conf;
         this.obTableClient = null;
         this.executeAble = executeAble;

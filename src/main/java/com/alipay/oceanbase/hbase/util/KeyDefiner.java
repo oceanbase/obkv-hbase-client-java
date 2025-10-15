@@ -25,6 +25,7 @@ public class KeyDefiner {
     public static String genPooledOHTableAttributeName(String tableName, String key) {
         return tableName + OHConstants.HBASE_HTABLE_POOL_SEPERATOR + key;
     }
+
     public static String[] parsePoolOHTableAttributeName(String key) {
         if (key == null) {
             return null;

@@ -102,7 +102,7 @@ public class OHTableFactory extends HTableFactory {
             // The DDS parameters are already set in configuration
             return configuration;
         }
-        
+
         byte[] isOdpModeAttr = tablePool.getTableAttribute(tableName, HBASE_OCEANBASE_ODP_MODE);
         if ((isOdpModeAttr != null && Bytes.toBoolean(isOdpModeAttr))
             || (isOdpModeAttr == null && configuration.getBoolean(HBASE_OCEANBASE_ODP_MODE, false))) {

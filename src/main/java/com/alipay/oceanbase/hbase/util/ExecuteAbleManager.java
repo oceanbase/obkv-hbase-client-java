@@ -43,7 +43,7 @@ import static org.apache.commons.lang.StringUtils.isNotBlank;
  */
 public class ExecuteAbleManager {
     private static final Logger                                               logger                       = TableHBaseLoggerFactory
-            .getLogger("ExecuteAbleManager");
+                                                                                                               .getLogger("ExecuteAbleManager");
 
     public static final ConcurrentHashMap<ObTableClientKey, ReentrantLock>    OB_TABLE_CLIENT_LOCK         = new ConcurrentHashMap<ObTableClientKey, ReentrantLock>();
     public static final Map<ObTableClientKey, ObTableClient>                  OB_TABLE_CLIENT_INSTANCE     = new ConcurrentHashMap<ObTableClientKey, ObTableClient>();
@@ -61,8 +61,8 @@ public class ExecuteAbleManager {
      * @param conf the config
      */
     public static OperationExecuteAble getOrCreateExecuteAble(Configuration conf)
-            throws IllegalArgumentException,
-            IOException {
+                                                                                 throws IllegalArgumentException,
+                                                                                 IOException {
         // 1. try to get ObTableClient according to the table-specific paramURL
         String paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
         String fullUserName = conf.get(HBASE_OCEANBASE_FULL_USER_NAME);
@@ -83,7 +83,7 @@ public class ExecuteAbleManager {
      * @throws IOException
      */
     public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey)
-            throws IOException {
+                                                                                           throws IOException {
         if (OB_TABLE_CLIENT_INSTANCE.get(obTableClientKey) == null) {
             ReentrantLock tmp = new ReentrantLock();
             ReentrantLock lock = OB_TABLE_CLIENT_LOCK.putIfAbsent(obTableClientKey, tmp);
@@ -125,10 +125,10 @@ public class ExecuteAbleManager {
      */
     public static ObTableClient getOrCreateObTableClient(Configuration conf, String paramUrl,
                                                          String fullUserName, String password)
-            throws IOException {
+                                                                                              throws IOException {
         if (logger.isDebugEnabled()) {
             logger.debug("try to getOrCreateObTableClient with paramUrl:" + paramUrl
-                    + ", fullUserName:" + fullUserName);
+                         + ", fullUserName:" + fullUserName);
         }
         checkArgument(isNotBlank(paramUrl), HBASE_OCEANBASE_PARAM_URL + " is blank");
         checkArgument(isNotBlank(fullUserName), HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
@@ -197,8 +197,8 @@ public class ExecuteAbleManager {
                 return false;
             ObTableClientKey that = (ObTableClientKey) o;
             return Objects.equal(paramUrl, that.paramUrl)
-                    && Objects.equal(fullUserName, that.fullUserName)
-                    && Objects.equal(password, that.password);
+                   && Objects.equal(fullUserName, that.fullUserName)
+                   && Objects.equal(password, that.password);
         }
 
         @Override
@@ -209,7 +209,7 @@ public class ExecuteAbleManager {
         @Override
         public String toString() {
             return "ObTableClientKey{" + "paramUrl='" + paramUrl + '\'' + ", fullUserName='"
-                    + fullUserName + '\'' + ", properties=" + properties + '}';
+                   + fullUserName + '\'' + ", properties=" + properties + '}';
         }
     }
 
@@ -264,8 +264,8 @@ public class ExecuteAbleManager {
                 return false;
             DdsObTableClientKey that = (DdsObTableClientKey) o;
             return Objects.equal(getAppName(), that.getAppName())
-                    && Objects.equal(getAppDsName(), that.getAppDsName())
-                    && Objects.equal(getVersion(), that.getVersion());
+                   && Objects.equal(getAppDsName(), that.getAppDsName())
+                   && Objects.equal(getVersion(), that.getVersion());
         }
 
         @Override
@@ -276,8 +276,8 @@ public class ExecuteAbleManager {
         @Override
         public String toString() {
             return "DdsObTableClientKey{" + "appName='" + appName + '\'' + ", appDsName='"
-                    + appDsName + '\'' + ", version='" + version + '\'' + ", properties="
-                    + properties + '}';
+                   + appDsName + '\'' + ", version='" + version + '\'' + ", properties="
+                   + properties + '}';
         }
     }
 
@@ -289,7 +289,7 @@ public class ExecuteAbleManager {
      * @throws IOException
      */
     public static DdsObTableClient getOrCreateDdsObTableClient(DdsObTableClientKey ddsObTableClientKey)
-            throws IOException {
+                                                                                                       throws IOException {
         if (DDS_OB_TABLE_CLIENT_INSTANCE.get(ddsObTableClientKey) == null) {
             ReentrantLock tmp = new ReentrantLock();
             ReentrantLock lock = DDS_OB_TABLE_CLIENT_LOCK.putIfAbsent(ddsObTableClientKey, tmp);
@@ -310,7 +310,7 @@ public class ExecuteAbleManager {
             } catch (Exception e) {
                 logger.error(LCD.convert("01-00010"), ddsObTableClientKey, e);
                 throw new IOException("create DdsObTableClient error with " + ddsObTableClientKey,
-                        e);
+                    e);
             } finally {
                 lock.unlock();
             }
@@ -327,14 +327,14 @@ public class ExecuteAbleManager {
      * @throws IOException
      */
     public static DdsObTableClient getOrCreateDdsObTableClient(Configuration conf)
-            throws IllegalArgumentException,
-            IOException {
+                                                                                  throws IllegalArgumentException,
+                                                                                  IOException {
         String appName = conf.get(HBASE_OCEANBASE_DDS_APP_NAME);
         String appDsName = conf.get(HBASE_OCEANBASE_DDS_APP_DS_NAME);
         String version = conf.get(HBASE_OCEANBASE_DDS_VERSION);
         if (logger.isDebugEnabled()) {
             logger.debug("try to getOrCreateDdsObTableClient with appName:" + appName
-                    + ", appDsName:" + appDsName + ", version:" + version);
+                         + ", appDsName:" + appDsName + ", version:" + version);
         }
         checkArgument(isNotBlank(appName), HBASE_OCEANBASE_DDS_APP_NAME + " is blank");
         checkArgument(isNotBlank(appDsName), HBASE_OCEANBASE_DDS_APP_DS_NAME + " is blank");

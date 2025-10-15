@@ -53,7 +53,6 @@ import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
-import jdk.nashorn.internal.objects.Global;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
@@ -652,12 +651,20 @@ public class OHTable implements HTableInterface {
                     Collections.singletonList(delete), true,
                     resultMapSingleOp);
         } else if (delete.getFamilyCellMap().size() > 1) {
-            boolean has_delete_family = delete.getFamilyMap().entrySet().stream()
-                    .flatMap(entry -> entry.getValue().stream()).anyMatch(
-                            kv -> KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamily || KeyValue.Type.codeToType(
-                                    kv.getType()) == KeyValue.Type.DeleteFamilyVersion);
-            if (!has_delete_family) {
+            boolean hasDeleteFamily = false;
+            for (Map.Entry<byte[], List<KeyValue>> entry : delete.getFamilyMap().entrySet()) {
+                for (KeyValue kv : entry.getValue()) {
+                    KeyValue.Type type = KeyValue.Type.codeToType(kv.getType());
+                    if (type == KeyValue.Type.DeleteFamily || type == KeyValue.Type.DeleteFamilyVersion) {
+                        hasDeleteFamily = true;
+                        break;
+                    }
+                }
+                if (hasDeleteFamily) {
+                    break;
+                }
+            }
+            if (!hasDeleteFamily) {
                 return buildBatchOperation(tableNameString,
                         Collections.singletonList(delete), true,
                         resultMapSingleOp);
@@ -1151,8 +1158,13 @@ public class OHTable implements HTableInterface {
         } else {
             List<Future<Result>> futures = new LinkedList<>();
             for (int i = 0; i < gets.size(); i++) {
-                int index = i;
-                Future<Result> future = executePool.submit(() -> get(gets.get(index)));
+                final int index = i;
+                Future<Result> future = executePool.submit(new Callable<Result>() {
+                    @Override
+                    public Result call() throws Exception {
+                        return get(gets.get(index));
+                    }
+                });
                 futures.add(future);
             }
             for (int i = 0; i < gets.size(); i++) {
@@ -2018,10 +2030,10 @@ public class OHTable implements HTableInterface {
                     }
                 }
                 if (!exceptionRowMap.isEmpty()) {
-                    exceptionRowMap.forEach((e, row)->{
-                        logger.error(LCD.convert("01-00008"), row, tableNameString, autoFlush,
-                                writeBuffer.size(), e);
-                    });
+                    for (Map.Entry<ObTableException, Row> entry : exceptionRowMap.entrySet()) {
+                        logger.error(LCD.convert("01-00008"), entry.getValue(), tableNameString, autoFlush,
+                                writeBuffer.size(), entry.getKey());
+                    }
                 }
             }
         } finally {

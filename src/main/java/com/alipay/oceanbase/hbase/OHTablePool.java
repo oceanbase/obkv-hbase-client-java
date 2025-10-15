@@ -187,7 +187,7 @@ public class OHTablePool implements Closeable {
                 String fullUserName = attributeMap.get(HBASE_OCEANBASE_FULL_USER_NAME);
                 String password = attributeMap.get(HBASE_OCEANBASE_PASSWORD);
                 ExecuteAbleManager.getOrCreateObTableClient(config, paramUrl, fullUserName,
-                        password);
+                    password);
             }
         }
 
@@ -195,7 +195,7 @@ public class OHTablePool implements Closeable {
             ExecuteAbleManager.getOrCreateDdsObTableClient(config);
         }
     }
-    
+
     /**
      * Get a reference to the specified table from the pool.
      *
