@@ -59,6 +59,9 @@ public class ExecuteAbleManager {
      * the specific table is not declared。
      *
      * @param conf the config
+     * @return OperationExecuteAble instance
+     * @throws IllegalArgumentException if configuration is invalid
+     * @throws IOException if there's an I/O error during creation
      */
     public static OperationExecuteAble getOrCreateExecuteAble(Configuration conf)
                                                                                  throws IllegalArgumentException,
@@ -78,9 +81,9 @@ public class ExecuteAbleManager {
     /**
      * Get or create ObTableClient according to the obTableClientKey.
      *
-     * @param obTableClientKey
-     * @return
-     * @throws IOException
+     * @param obTableClientKey the key for ObTableClient
+     * @return ObTableClient instance
+     * @throws IOException if there's an I/O error during creation
      */
     public static ObTableClient getOrCreateObTableClient(ObTableClientKey obTableClientKey)
                                                                                            throws IOException {
@@ -116,12 +119,12 @@ public class ExecuteAbleManager {
     /**
      * Get or create ObTableClient according to paramUrl info.
      *
-     * @param conf
-     * @param paramUrl
-     * @param fullUserName
-     * @param password
-     * @return
-     * @throws IOException
+     * @param conf the configuration
+     * @param paramUrl the parameter URL
+     * @param fullUserName the full user name
+     * @param password the password
+     * @return ObTableClient instance
+     * @throws IOException if there's an I/O error during creation
      */
     public static ObTableClient getOrCreateObTableClient(Configuration conf, String paramUrl,
                                                          String fullUserName, String password)
@@ -284,9 +287,9 @@ public class ExecuteAbleManager {
     /**
      * Get or create DdsObTableClient according to ddsObTableClientKey.
      *
-     * @param ddsObTableClientKey
-     * @return
-     * @throws IOException
+     * @param ddsObTableClientKey the key for DdsObTableClient
+     * @return DdsObTableClient instance
+     * @throws IOException if there's an I/O error during creation
      */
     public static DdsObTableClient getOrCreateDdsObTableClient(DdsObTableClientKey ddsObTableClientKey)
                                                                                                        throws IOException {
@@ -321,10 +324,10 @@ public class ExecuteAbleManager {
     /**
      *  Get or create DdsObTableClient according to appDataSource.
      *
-     * @param conf
-     * @return
-     * @throws IllegalArgumentException
-     * @throws IOException
+     * @param conf the configuration
+     * @return DdsObTableClient instance
+     * @throws IllegalArgumentException if configuration is invalid
+     * @throws IOException if there's an I/O error during creation
      */
     public static DdsObTableClient getOrCreateDdsObTableClient(Configuration conf)
                                                                                   throws IllegalArgumentException,

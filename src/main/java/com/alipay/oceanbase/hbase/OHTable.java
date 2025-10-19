@@ -833,9 +833,9 @@ public class OHTable implements HTableInterface {
 
     /**
      * 批量的batch请求，目前支持put和delete以及get。 不支持复杂的get请求，即设置maxVersion、filter等限制，只可以获取最新的版本
-     * @param actions
-     * @return
-     * @throws IOException
+     * @param actions the list of row actions to execute
+     * @return array of results
+     * @throws IOException if there's an I/O error during execution
      */
     public Object[] batchForDDS(List<? extends Row> actions) throws IOException {
         Map<String, Pair<List<Integer>, List<KeyValue>>> familyMap = new HashMap<>();
