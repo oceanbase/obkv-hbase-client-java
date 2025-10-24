@@ -23,10 +23,11 @@ public class OHMetrics {
     public OHMetrics(String metricsName) {
         this.metricsName = metricsName;
         this.registry = new MetricRegistry();
-        trackers = new OHMetricsTracker[OHOperationType.values().length];
-        for (int i = 0; i < trackers.length; ++i) {
+        trackers = new OHMetricsTracker[OHOperationType.values().length - 1];
+        // OHOperationType(0) is INVALID, skip it
+        for (int i = 1; i < trackers.length; ++i) {
             OHOperationType opType = OHOperationType.valueOf(i);
-            trackers[i] = new OHMetricsTracker(this.registry,
+            trackers[i - 1] = new OHMetricsTracker(this.registry,
                     metricsName,
                     opType);
         }
@@ -56,7 +57,7 @@ public class OHMetrics {
     }
 
     private OHMetricsTracker getTracker(OHOperationType opType) {
-        return trackers[opType.getValue()];
+        return trackers[opType.getValue() - 1];
     }
 
     public String getMetricsName() { return this.metricsName; }

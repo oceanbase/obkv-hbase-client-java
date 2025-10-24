@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
@@ -64,15 +65,18 @@ public class OHBaseFuncUtils {
         }
     }
 
-    public static boolean isAllPut(List<? extends Row> actions) {
-        boolean isAllPut = true;
-        for (Row action : actions) {
-            if (!(action instanceof Put)) {
-                isAllPut = false;
-                break;
+    public static boolean isAllPut(OHOperationType opType, List<? extends Row> actions) {
+        if (opType.getValue() == OHOperationType.PUT.getValue()
+                || opType.getValue() == OHOperationType.PUT_LIST.getValue()) {
+            return true;
+        } else {
+            for (Row action : actions) {
+                if (!(action instanceof Put)) {
+                    return false;
+                }
             }
+            return true;
         }
-        return isAllPut;
     }
 
     public static void sortHBaseResult(List<Cell> cells) {
