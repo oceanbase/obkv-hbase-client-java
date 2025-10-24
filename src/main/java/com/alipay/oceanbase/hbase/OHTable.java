@@ -27,6 +27,7 @@ import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
+import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.location.model.partition.Partition;
 import com.alipay.oceanbase.rpc.mutation.BatchOperation;
 import com.alipay.oceanbase.rpc.mutation.result.BatchOperationResult;
@@ -86,6 +87,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang.StringUtils.isBlank;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static com.alipay.oceanbase.hbase.filter.HBaseFilterUtils.writeBytesWithEscape;
+import static org.apache.hadoop.hbase.client.MetricsConnection.CLIENT_SIDE_METRICS_ENABLED_KEY;
 
 public class OHTable implements Table {
 
@@ -198,6 +200,8 @@ public class OHTable implements Table {
 
     private RegionLocator        regionLocator;
 
+    private final OHMetrics      metrics;
+
     /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
@@ -229,6 +233,13 @@ public class OHTable implements Table {
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
+        if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
+                                                                           obTableClient.getDatabase(),
+                                                                           obTableClient.getClusterName()));
+        } else {
+            this.metrics = null;
+        }
 
         finishSetUp();
     }
@@ -281,6 +292,13 @@ public class OHTable implements Table {
         this.obTableClient.setRpcExecuteTimeout(ohConnectionConf.getRpcTimeout());
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
+        if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
+                                                                            obTableClient.getDatabase(),
+                                                                            obTableClient.getClusterName()));
+        } else {
+            this.metrics = null;
+        }
 
         finishSetUp();
     }
@@ -310,6 +328,7 @@ public class OHTable implements Table {
         this.executePool = executePool;
         this.obTableClient = obTableClient;
         this.configuration = new Configuration();
+        this.metrics = null;
         finishSetUp();
     }
 
@@ -352,6 +371,13 @@ public class OHTable implements Table {
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(operationTimeout);
+        if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
+                                                                            obTableClient.getDatabase(),
+                                                                            obTableClient.getClusterName()));
+        } else {
+            this.metrics = null;
+        }
 
         finishSetUp();
     }
@@ -395,6 +421,13 @@ public class OHTable implements Table {
         this.obTableClient.setRpcExecuteTimeout(rpcTimeout);
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(operationTimeout);
+        if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
+                                                                            obTableClient.getDatabase(),
+                                                                            obTableClient.getClusterName()));
+        } else {
+            this.metrics = null;
+        }
 
         finishSetUp();
     }
@@ -491,6 +524,49 @@ public class OHTable implements Table {
         return ohConnectionConf;
     }
 
+    private abstract class OperationExecuteCallback<T> {
+        private final OHOperationType opType;
+        private final long singleOpCount;
+        OperationExecuteCallback(OHOperationType opType, long singleOpCount) {
+            this.opType = opType;
+            this.singleOpCount = singleOpCount;
+        }
+        abstract T execute() throws IOException;
+
+        public OHOperationType getOpType() {
+            return this.opType;
+        }
+
+        public long getSingleOpCount() {
+            return this.singleOpCount;
+        }
+    }
+
+    private <T> T execute(OperationExecuteCallback<T> callback) throws IOException {
+        if (this.metrics != null) {
+            long startTimeMs = System.currentTimeMillis();
+            MetricsImporter importer = new MetricsImporter();
+            importer.setSingleOpCount(callback.getSingleOpCount());
+            try {
+                return callback.execute();
+            } catch (Exception e) {
+                // do not deal with any exception, just record
+                importer.setIsFailedOp(true); // set as failed op
+                if (e instanceof IOException) {
+                    throw e;
+                } else {
+                    throw new IOException("meet non-IOException in callback execute", e);
+                }
+            } finally {
+                long duration = System.currentTimeMillis() - startTimeMs;
+                importer.setDuration(duration);
+                this.metrics.update(new ObPair<OHOperationType, MetricsImporter>(callback.getOpType(), importer));
+            }
+        } else {
+            return callback.execute();
+        }
+    }
+
     @Override
     public TableName getName() {
         return TableName.valueOf(tableNameString);
@@ -528,9 +604,14 @@ public class OHTable implements Table {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        Get newGet = new Get(get);
-        newGet.setCheckExistenceOnly(true);
-        return this.get(newGet).getExists();
+        return execute(new OperationExecuteCallback<Boolean>(OHOperationType.EXISTS, 1) {
+            @Override
+            Boolean execute() throws IOException {
+                Get newGet = new Get(get);
+                newGet.setCheckExistenceOnly(true);
+                return innerGetImpl(newGet).getExists();
+            }
+        });
     }
 
     @Override
@@ -617,6 +698,7 @@ public class OHTable implements Table {
     private BatchOperation compatOldServerDel(final List<? extends Row> actions, final Object[] results, BatchError batchError, int i)
             throws Exception {
         Delete delete = (Delete)actions.get(i);
+        checkArgument(delete.getRow() != null, "row is null");
         List<Integer> resultMapSingleOp = new LinkedList<>();
         if (delete.isEmpty()) {
             return buildBatchOperation(tableNameString,
@@ -705,6 +787,17 @@ public class OHTable implements Table {
 
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
+        OHOperationType opType = OHOperationType.BATCH;
+         execute(new OperationExecuteCallback<Void>(opType, actions.size()) {
+            @Override
+            public Void execute() throws IOException {
+                innerBatchImpl(actions, results, opType);
+                return null;
+            }
+        });
+    }
+
+    private void innerBatchImpl(final List<? extends Row> actions, final Object[] results, final OHOperationType opType) throws IOException {
         if (actions == null || actions.isEmpty()) {
             return;
         }
@@ -848,17 +941,24 @@ public class OHTable implements Table {
     public <R> void batchCallback(List<? extends Row> actions, Object[] results,
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
-        try {
-            batch(actions, results);
-        } finally {
-            if (results != null) {
-                for (int i = 0; i < results.length; i++) {
-                    if (!(results[i] instanceof ObTableException)) {
-                        callback.update(new byte[0], actions.get(i).getRow(), (R) results[i]);
+        OHOperationType opType = OHOperationType.BATCH_CALLBACK;
+        execute(new OperationExecuteCallback<Void>(opType, actions.size()) {
+            @Override
+            public Void execute() throws IOException {
+                try {
+                    innerBatchImpl(actions, results, opType);
+                    return null;
+                } finally {
+                    if (results != null) {
+                        for (int i = 0; i < results.length; i++) {
+                            if (!(results[i] instanceof ObTableException)) {
+                                callback.update(new byte[0], actions.get(i).getRow(), (R) results[i]);
+                            }
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
     public static int compareByteArray(byte[] bt1, byte[] bt2) {
@@ -944,6 +1044,15 @@ public class OHTable implements Table {
 
     @Override
     public Result get(final Get get) throws IOException {
+        return execute(new OperationExecuteCallback<Result>(OHOperationType.GET, 1) {
+            @Override
+            Result execute() throws IOException {
+                return innerGetImpl(get);
+            }
+        });
+    }
+
+    private Result innerGetImpl(final Get get) throws IOException {
         if (get.getFamilyMap().keySet().isEmpty()) {
             if (!FeatureSupport.isEmptyFamilySupported()) {
                 throw new FeatureNotSupportedException("empty family get not supported yet within observer version: " + ObGlobal.obVsnString());
@@ -954,7 +1063,7 @@ public class OHTable implements Table {
         }
 
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
-            obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
+                obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
             public Result call() throws IOException {
                 List<Cell> keyValueList = new ArrayList<>();
                 byte[] family = new byte[] {};
@@ -975,11 +1084,11 @@ public class OHTable implements Table {
                             getTargetTableName(tableNameString), isWeakRead(get));
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                            .execute(request);
+                                .execute(request);
                         getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
-                            .entrySet()) {
+                                .entrySet()) {
                             family = entry.getKey();
                             if (!get.getColumnFamilyTimeRange().isEmpty()) {
                                 Map<byte[], TimeRange> colFamTimeRangeMap = get.getColumnFamilyTimeRange();
@@ -997,14 +1106,14 @@ public class OHTable implements Table {
                                 getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration), isWeakRead(get));
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
-                                .execute(request);
+                                    .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
-                                family);
+                                    family);
                         }
                     }
                 } catch (Exception e) {
                     throw new IOException("query table:" + tableNameString + " family "
-                                          + Bytes.toString(family) + " error.", e);
+                            + Bytes.toString(family) + " error.", e);
                 }
                 if (get.isCheckExistenceOnly()) {
                     return Result.create(null, !keyValueList.isEmpty());
@@ -1019,15 +1128,21 @@ public class OHTable implements Table {
 
     @Override
     public Result[] get(List<Get> gets) throws IOException {
-        Result[] results = new Result[gets.size()];
-        if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
-            batch(gets, results);
-        } else {
-            for (int i = 0; i < gets.size(); i++) {
-                results[i] = get(gets.get(i));
+        OHOperationType opType = OHOperationType.GET_LIST;
+        return execute(new OperationExecuteCallback<Result[]>(opType, gets.size()) {
+            @Override
+            Result[] execute() throws IOException {
+                Result[] results = new Result[gets.size()];
+                if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
+                    innerBatchImpl(gets, results, opType);
+                } else {
+                    for (int i = 0; i < gets.size(); i++) {
+                        results[i] = innerGetImpl(gets.get(i));
+                    }
+                }
+                return results;
             }
-        }
-        return results;
+        });
     }
 
     @Override
@@ -1228,15 +1343,29 @@ public class OHTable implements Table {
 
     @Override
     public void put(Put put) throws IOException {
-        doPut(Collections.singletonList(put));
+        OHOperationType opType = OHOperationType.PUT;
+        execute(new OperationExecuteCallback<Void>(opType, 1) {
+            @Override
+            public Void execute() throws IOException {
+                doPut(Collections.singletonList(put), opType);
+                return null;
+            }
+        });
     }
 
     @Override
     public void put(List<Put> puts) throws IOException {
-        doPut(puts);
+        OHOperationType opType = OHOperationType.PUT_LIST;
+        execute(new OperationExecuteCallback<Void>(opType, puts.size()) {
+            @Override
+            public Void execute() throws IOException {
+                doPut(puts, opType);
+                return null;
+            }
+        });
     }
 
-    private void doPut(List<Put> puts) throws IOException {
+    private void doPut(List<Put> puts, OHOperationType opType) throws IOException {
         int n = 0;
         for (Put put : puts) {
             validatePut(put);
@@ -1248,17 +1377,17 @@ public class OHTable implements Table {
             n++;
             if (n % putWriteBufferCheck == 0 && currentWriteBufferSize.get() > writeBufferSize) {
                 if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
-                    flushCommitsV2();
+                    flushCommitsV2(opType);
                 } else {
-                    flushCommits();
+                    flushCommits(opType);
                 }
             }
         }
         if (autoFlush || currentWriteBufferSize.get() > writeBufferSize) {
             if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
-                flushCommitsV2();
+                flushCommitsV2(opType);
             } else {
-                flushCommits();
+                flushCommits(opType);
             }
         }
     }
@@ -1348,12 +1477,10 @@ public class OHTable implements Table {
         return checkAndPut(row, family, qualifier, getCompareOp(op), value, put);
     }
 
-    private void innerDelete(Delete delete) throws IOException {
-        checkArgument(delete.getRow() != null, "row is null");
+    private void innerDelete(List<Delete> deletes, OHOperationType opType) throws IOException {
         try {
-            List<Delete> actions = Collections.singletonList(delete);
-            Object[] results = new Object[actions.size()];
-            batch(actions, results);
+            Object[] results = new Object[deletes.size()];
+            innerBatchImpl(deletes, results, opType);
         } catch (Exception e) {
             throw e;
         }
@@ -1361,15 +1488,27 @@ public class OHTable implements Table {
 
     @Override
     public void delete(Delete delete) throws IOException {
-        checkFamilyViolation(delete.getFamilyCellMap().keySet(), false);
-        innerDelete(delete);
+        OHOperationType opType = OHOperationType.DELETE;
+        execute(new OperationExecuteCallback<Void>(opType, 1) {
+            @Override
+            public Void execute() throws IOException {
+                checkFamilyViolation(delete.getFamilyCellMap().keySet(), false);
+                innerDelete(Collections.singletonList(delete), opType);
+                return null;
+            }
+        });
     }
 
     @Override
     public void delete(List<Delete> deletes) throws IOException {
-        for (Delete delete : deletes) {
-            innerDelete(delete);
-        }
+        OHOperationType opType = OHOperationType.DELETE_LIST;
+        execute(new OperationExecuteCallback<Void>(opType, deletes.size()) {
+            @Override
+            public Void execute() throws IOException {
+                innerDelete(deletes, opType);
+                return null;
+            }
+        });
     }
 
     /**
@@ -1623,7 +1762,7 @@ public class OHTable implements Table {
         return incrementColumnValue(row, family, qualifier, amount);
     }
 
-    public void flushCommits() throws IOException {
+    public void flushCommits(OHOperationType opType) throws IOException {
 
         try {
             if (writeBuffer.isEmpty()) {
@@ -1633,7 +1772,7 @@ public class OHTable implements Table {
             boolean[] resultSuccess = new boolean[writeBuffer.size()];
             try {
                 Object[] results = new Object[writeBuffer.size()];
-                batch(writeBuffer, results);
+                innerBatchImpl(writeBuffer, results, opType);
                 for (int i = 0; i != resultSuccess.length; ++i) {
                     if (results[i] instanceof ObTableException) {
                         resultSuccess[i] = false;
@@ -1680,13 +1819,13 @@ public class OHTable implements Table {
         }
     }
 
-    public void flushCommitsV2() throws IOException {
+    public void flushCommitsV2(OHOperationType opType) throws IOException {
         try {
             if (writeBuffer.isEmpty()) {
                 return;
             }
             try {
-                ObHbaseRequest request = buildHbaseRequest(writeBuffer);
+                ObHbaseRequest request = buildHbaseRequest(writeBuffer, opType);
                 try {
                     ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
                 } catch (Exception e) {
@@ -2339,6 +2478,7 @@ public class OHTable implements Table {
             } else if (row instanceof Delete) {
                 boolean disExec = obTableClient.getServerCapacity().isSupportDistributedExecute();
                 Delete delete = (Delete) row;
+                checkArgument(delete.getRow() != null, "row is null");
                 if (delete.isEmpty()) {
                     singleOpResultNum++;
                     if (disExec) {
