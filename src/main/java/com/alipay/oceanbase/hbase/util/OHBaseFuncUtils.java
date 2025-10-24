@@ -118,4 +118,20 @@ public class OHBaseFuncUtils {
                     && tableClient.getServerCapacity().isSupportDistributedExecute();
         }
     }
+
+    // names concatenated by periods
+    public static String metricsNameBuilder(String... name) {
+        StringBuilder builder = new StringBuilder();
+        if (name != null) {
+           for (String n : name) {
+               if (n != null && !n.isEmpty()) {
+                   if (builder.length() > 0) {
+                       builder.append('.');
+                   }
+                   builder.append(n);
+               }
+           }
+        }
+        return builder.toString();
+    }
 }
