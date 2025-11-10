@@ -25,17 +25,17 @@ public class OHMetrics {
         this.registry = new MetricRegistry();
         trackers = new OHMetricsTracker[OHOperationType.values().length - 1];
         // OHOperationType(0) is INVALID, skip it
-        for (int i = 1; i < trackers.length; ++i) {
+        for (int i = 1; i <= trackers.length; ++i) {
             OHOperationType opType = OHOperationType.valueOf(i);
             trackers[i - 1] = new OHMetricsTracker(this.registry,
-                    metricsName,
-                    opType);
+                                                   metricsName,
+                                                   opType);
         }
-        this.reporter = JmxReporter.forRegistry(this.registry).build();
+        this.reporter = JmxReporter.forRegistry(this.registry)
+                                   .inDomain("com.oceanbase.hbase.metrics")
+                                   .build();
         this.reporter.start();
-    }
-    public void start() {
-        scheduler.scheduleWithFixedDelay(this::updateMetrics, 10, 0, TimeUnit.SECONDS);
+        scheduler.scheduleWithFixedDelay(this::updateMetrics, 0, 10, TimeUnit.SECONDS);
     }
     // get the size of current queue，only update these metrics to corresponding trackers, ignore those concurrently added metrics
     private void updateMetrics() {
@@ -70,5 +70,19 @@ public class OHMetrics {
     public MetricsExporter acquireMetrics(OHOperationType opType) {
         OHMetricsTracker tracker = getTracker(opType);
         return tracker.acquireMetrics();
+    }
+
+    public void stop() {
+        reporter.stop();
+        try {
+            scheduler.shutdown();
+            // wait at most 500 ms to close the scheduler
+            if (!scheduler.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            logger.warn("scheduler await for terminate interrupted: {}.", e.getMessage());
+            scheduler.shutdownNow();
+        }
     }
 }

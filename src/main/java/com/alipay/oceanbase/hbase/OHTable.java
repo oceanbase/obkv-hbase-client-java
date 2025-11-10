@@ -64,6 +64,7 @@ import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.hbase.util.VersionInfo;
+import org.apache.hbase.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 
 import java.io.ByteArrayOutputStream;
@@ -1624,7 +1625,7 @@ public class OHTable implements Table {
                     return result.getAffectedRows() > 0;
                 } catch (Exception e) {
                     logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                    throw new IOException(opType.name() + " type table:" + tableNameString + " e.msg:"
+                    throw new IOException(opType.toCamelCase() + " type table:" + tableNameString + " e.msg:"
                             + e.getMessage() + " error.", e);
                 }
             }
@@ -1904,6 +1905,9 @@ public class OHTable implements Table {
     public void close() throws IOException {
         if (cleanupPoolOnClose) {
             executePool.shutdown();
+        }
+        if (metrics != null) {
+            metrics.stop();
         }
     }
 
@@ -2897,5 +2901,10 @@ public class OHTable implements Table {
                 "The compare condition is null. Please use"
                         + " ifNotExists/ifEquals/ifMatches before executing the request");
         }
+    }
+
+    @VisibleForTesting
+    public OHMetrics getMetrics() {
+        return metrics;
     }
 }
