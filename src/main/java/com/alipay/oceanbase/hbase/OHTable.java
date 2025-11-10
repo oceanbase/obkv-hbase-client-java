@@ -48,6 +48,7 @@ import com.alipay.oceanbase.rpc.table.ObHBaseParams;
 import com.alipay.oceanbase.rpc.table.ObKVParams;
 import com.alipay.oceanbase.rpc.table.ObTableClientQueryImpl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -72,7 +73,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
-import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 import static com.alipay.oceanbase.rpc.mutation.MutationFactory.colVal;
 import static com.alipay.oceanbase.rpc.mutation.MutationFactory.row;
 import static com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation.getInstance;
@@ -217,7 +217,8 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                obTableClient.getDatabase(), obTableClient.getClusterName()));
+                                                                           obTableClient.getDatabase(),
+                                                                           obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
@@ -275,7 +276,8 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                obTableClient.getDatabase(), obTableClient.getClusterName()));
+                                                                            obTableClient.getDatabase(),
+                                                                            obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
@@ -350,7 +352,8 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                obTableClient.getDatabase(), obTableClient.getClusterName()));
+                                                                            obTableClient.getDatabase(),
+                                                                            obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
@@ -1157,45 +1160,45 @@ public class OHTable implements HTableInterface {
                                         scan.getMaxVersions(), columnFilters);
                                 obTableQuery = buildObTableQuery(filter, scan);
 
-                        request = buildObTableQueryAsyncRequest(obTableQuery,
-                            getTargetTableName(tableNameString), OHOperationType.SCAN);
-                        clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                            .execute(request);
-                        return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                            tableNameString, family, true, metrics);
-                    } else {
-                        for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
-                            .entrySet()) {
-                            family = entry.getKey();
-                            if (!scan.getColumnFamilyTimeRange().isEmpty()) {
-                                Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
-                                if (colFamTimeRangeMap.size() > 1) {
-                                    throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
-                                } else if (colFamTimeRangeMap.get(family) == null) {
-                                    throw new IllegalArgumentException("Scan family is not matched in ColumnFamilyTimeRange");
-                                } else {
-                                    TimeRange tr = colFamTimeRangeMap.get(family);
-                                    scan.setTimeRange(tr.getMin(), tr.getMax());
+                                request = buildObTableQueryAsyncRequest(obTableQuery,
+                                    getTargetTableName(tableNameString), OHOperationType.SCAN);
+                                clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                    .execute(request);
+                                return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                    tableNameString, family, true, metrics);
+                            } else {
+                                for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
+                                    .entrySet()) {
+                                    family = entry.getKey();
+                                    if (!scan.getColumnFamilyTimeRange().isEmpty()) {
+                                        Map<byte[], TimeRange> colFamTimeRangeMap = scan.getColumnFamilyTimeRange();
+                                        if (colFamTimeRangeMap.size() > 1) {
+                                            throw new FeatureNotSupportedException("setColumnFamilyTimeRange is only supported in single column family for now");
+                                        } else if (colFamTimeRangeMap.get(family) == null) {
+                                            throw new IllegalArgumentException("Scan family is not matched in ColumnFamilyTimeRange");
+                                        } else {
+                                            TimeRange tr = colFamTimeRangeMap.get(family);
+                                            scan.setTimeRange(tr.getMin(), tr.getMax());
+                                        }
+                                    }
+                                    filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
+                                        scan.getMaxVersions(), entry.getValue());
+                                    obTableQuery = buildObTableQuery(filter, scan);
+
+                                    request = buildObTableQueryAsyncRequest(
+                                        obTableQuery,
+                                        getTargetTableName(tableNameString, Bytes.toString(family),
+                                            configuration), OHOperationType.SCAN);
+                                    clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
+                                        .execute(request);
+                                    return new ClientStreamScanner(clientQueryAsyncStreamResult,
+                                        tableNameString, family, false, metrics);
                                 }
                             }
-                            filter = buildObHTableFilter(scan.getFilter(), scan.getTimeRange(),
-                                scan.getMaxVersions(), entry.getValue());
-                            obTableQuery = buildObTableQuery(filter, scan);
-
-                            request = buildObTableQueryAsyncRequest(
-                                obTableQuery,
-                                getTargetTableName(tableNameString, Bytes.toString(family),
-                                    configuration), OHOperationType.SCAN);
-                            clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
-                                .execute(request);
-                            return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                tableNameString, family, false, metrics);
+                        } catch (Exception e) {
+                            throw new IOException("scan table:" + tableNameString + " family "
+                                                  + Bytes.toString(family) + " error.", e);
                         }
-                    }
-                } catch (Exception e) {
-                    throw new IOException("scan table:" + tableNameString + " family "
-                                          + Bytes.toString(family) + " error.", e);
-                }
 
                         throw new IOException("scan table:" + tableNameString + "has no family");
                     }
@@ -1521,7 +1524,7 @@ public class OHTable implements HTableInterface {
                         .execute(request);
                     return result.getAffectedRows() > 0;
                 } catch (Exception e) {
-                    throw new IOException(opType.name() + " type table:" + tableNameString
+                    throw new IOException(opType.toCamelCase() + " type table:" + tableNameString
                                           + " e.msg:" + e.getMessage() + " error.", e);
                 }
             }
@@ -1736,6 +1739,9 @@ public class OHTable implements HTableInterface {
         flushCommits();
         if (cleanupPoolOnClose) {
             executePool.shutdown();
+        }
+        if (metrics != null) {
+            metrics.stop();
         }
         this.isClosed = true;
     }
@@ -2747,5 +2753,10 @@ public class OHTable implements HTableInterface {
             }
         }
         return this.mutator;
+    }
+
+    @VisibleForTesting
+    public OHMetrics getMetrics() {
+        return metrics;
     }
 }
