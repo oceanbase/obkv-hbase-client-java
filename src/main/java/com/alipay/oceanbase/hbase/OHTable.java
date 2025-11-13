@@ -71,7 +71,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
@@ -153,36 +152,6 @@ public class OHTable implements Table {
      * in the pool.
      */
     private boolean              operationExecuteInPool = false;
-
-    /**
-     * the buffer of put request
-     */
-    private final List<Put>      writeBuffer            = new CopyOnWriteArrayList<>();
-    /**
-     * when the put request reach the write buffer size the do put will
-     * flush commits automatically
-     */
-    private long                 writeBufferSize;
-    /**
-     * the do put check write buffer every putWriteBufferCheck puts
-     */
-    private int                  putWriteBufferCheck;
-
-    /**
-     * decide whether clear the buffer when meet exception.the default
-     * value is true. Be careful about the correctness when set it false
-     */
-    private boolean              clearBufferOnFail      = true;
-
-    /**
-     * whether flush the put automatically
-     */
-    private boolean              autoFlush              = true;
-
-    /**
-     * current buffer size
-     */
-    private AtomicLong           currentWriteBufferSize = new AtomicLong(0);
 
     /**
      * the max size of put key value
@@ -361,9 +330,6 @@ public class OHTable implements Table {
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
-        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
-        this.writeBufferSize = connectionConfig.getWriteBufferSize();
         this.tableName = tableName.getName();
         int numRetries = connectionConfig.getNumRetries();
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
@@ -412,9 +378,6 @@ public class OHTable implements Table {
             HBASE_CLIENT_OPERATION_EXECUTE_IN_POOL,
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = connectionConfig.getMaxKeyValueSize();
-        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
-        this.writeBufferSize = connectionConfig.getWriteBufferSize();
         int numRetries = connectionConfig.getNumRetries();
         this.obTableClient = ObTableClientManager.getOrCreateObTableClient(setUserDefinedNamespace(
             this.tableNameString, connectionConfig));
@@ -488,10 +451,6 @@ public class OHTable implements Table {
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = this.configuration.getInt(MAX_KEYVALUE_SIZE_KEY,
             MAX_KEYVALUE_SIZE_DEFAULT);
-        this.putWriteBufferCheck = this.configuration.getInt(HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK,
-            DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
-        this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
-            WRITE_BUFFER_SIZE_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -552,11 +511,7 @@ public class OHTable implements Table {
             } catch (Exception e) {
                 // do not deal with any exception, just record
                 importer.setIsFailedOp(true); // set as failed op
-                if (e instanceof IOException) {
-                    throw (IOException) e;
-                } else {
-                    throw new IOException("meet non-IOException in callback execute", e);
-                }
+                throw e;
             } finally {
                 long duration = System.currentTimeMillis() - startTimeMs;
                 importer.setDuration(duration);
@@ -1396,29 +1351,14 @@ public class OHTable implements Table {
     }
 
     private void doPut(List<Put> puts, OHOperationType opType) throws IOException {
-        int n = 0;
         for (Put put : puts) {
             validatePut(put);
             checkFamilyViolation(put.getFamilyCellMap().keySet(), true);
-            writeBuffer.add(put);
-            currentWriteBufferSize.addAndGet(put.heapSize());
-
-            // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
-            n++;
-            if (n % putWriteBufferCheck == 0 && currentWriteBufferSize.get() > writeBufferSize) {
-                if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
-                    flushCommitsV2(opType);
-                } else {
-                    flushCommits(opType);
-                }
-            }
         }
-        if (autoFlush || currentWriteBufferSize.get() > writeBufferSize) {
-            if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
-                flushCommitsV2(opType);
-            } else {
-                flushCommits(opType);
-            }
+        if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+            flushCommitsV2(puts, opType);
+        } else {
+            flushCommits(puts, opType);
         }
     }
 
@@ -1811,92 +1751,34 @@ public class OHTable implements Table {
         return incrementColumnValue(row, family, qualifier, amount);
     }
 
-    public void flushCommits(OHOperationType opType) throws IOException {
-
+    private void flushCommits(final List<Put> puts, OHOperationType opType) throws IOException {
+        if (puts.isEmpty()) {
+            return;
+        }
         try {
-            if (writeBuffer.isEmpty()) {
-                return;
-            }
-            Map<ObTableException, Row> exceptionRowMap = new LinkedHashMap();
-            boolean[] resultSuccess = new boolean[writeBuffer.size()];
-            try {
-                Object[] results = new Object[writeBuffer.size()];
-                innerBatchImpl(writeBuffer, results, opType);
-                for (int i = 0; i != resultSuccess.length; ++i) {
-                    if (results[i] instanceof ObTableException) {
-                        resultSuccess[i] = false;
-                        exceptionRowMap.put((ObTableException) results[i], writeBuffer.get(i));
-                    } else {
-                        resultSuccess[i] = true;
-                    }
-                }
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
-                    writeBuffer.size(), e);
-                if (e instanceof IOException) {
-                    throw (IOException) e;
-                }
-            } finally {
-                // mutate list so that it is empty for complete success, or contains
-                // only failed records results are returned in the same order as the
-                // requests in list walk the list backwards, so we can remove from list
-                // without impacting the indexes of earlier members
-                for (int i = resultSuccess.length - 1; i >= 0; i--) {
-                    if (resultSuccess[i]) {
-                        // successful Puts are removed from the list here.
-                        writeBuffer.remove(i);
-                    }
-                }
-                if (!exceptionRowMap.isEmpty()) {
-                    for (Map.Entry<ObTableException, Row> entry : exceptionRowMap.entrySet()) {
-                        logger.error(LCD.convert("01-00008"), entry.getValue(), tableNameString,
-                            autoFlush, writeBuffer.size(), entry.getKey());
-                    }
-                }
-            }
-        } finally {
-            if (clearBufferOnFail) {
-                writeBuffer.clear();
-                currentWriteBufferSize.set(0);
-            } else {
-                // the write buffer was adjusted by processBatchOfPuts
-                currentWriteBufferSize.set(0);
-                for (Put aPut : writeBuffer) {
-                    currentWriteBufferSize.addAndGet(aPut.heapSize());
-                }
+            Object[] results = new Object[puts.size()];
+            innerBatchImpl(puts, results, opType);
+        } catch (Exception e) {
+            logger.error(LCD.convert("01-00008"), tableNameString, null, puts.size(), e);
+            if (e instanceof IOException) {
+                throw (IOException) e;
             }
         }
     }
 
-    public void flushCommitsV2(OHOperationType opType) throws IOException {
+    private void flushCommitsV2(final List<Put> puts, OHOperationType opType) throws IOException {
+        if (puts.isEmpty()) {
+            return;
+        }
         try {
-            if (writeBuffer.isEmpty()) {
-                return;
-            }
-            try {
-                ObHbaseRequest request = buildHbaseRequest(writeBuffer, opType);
-                try {
-                    ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
-                } catch (Exception e) {
-                    throw new IOException(tableNameString + " table occurred unexpected error.", e);
-                }
-            } catch (Exception e) {
-                logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
-                    writeBuffer.size(), e);
-                if (e instanceof IOException) {
-                    throw (IOException) e;
-                }
-            }
-        } finally {
-            if (clearBufferOnFail) {
-                writeBuffer.clear();
-                currentWriteBufferSize.set(0);
+            ObHbaseRequest request = buildHbaseRequest(puts, opType);
+            ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
+        } catch (Exception e) {
+            logger.error(LCD.convert("01-00008"), tableNameString, null, puts.size(), e);
+            if (e instanceof IOException) {
+                throw (IOException) e;
             } else {
-                // the write buffer was adjusted by processBatchOfPuts
-                currentWriteBufferSize.set(0);
-                for (Put aPut : writeBuffer) {
-                    currentWriteBufferSize.addAndGet(aPut.heapSize());
-                }
+                throw new IOException(tableNameString + " table occurred unexpected error.", e);
             }
         }
     }
