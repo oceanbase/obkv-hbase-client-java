@@ -21,20 +21,47 @@ import com.yammer.metrics.core.*;
 import com.yammer.metrics.stats.Snapshot;
 
 public class MetricsExporter {
-    private double   failRate;
-    private long     failCount;
-    private long     totalRuntime;
-    private double   averageSingleOpCount;
-    private Timer    latencyHistogram;    // for p99
-    private Snapshot latencySnapshot;
+    private final long totalOpCount;
+    private final double averageOps;
+    private final double oneMinuteAverageOps;
+    private final double fiveMinuteAverageOps;
+    private final double fifteenMinuteAverageOps;
+    private final double averageLatency; // ms
+    private final long maxLatency; // ms
+    private final long minLatency; // ms
+    private final double medianLatency; // ms
+    private final double P75thPercentile; // ms
+    private final double P95thPercentile; // ms
+    private final double P98thPercentile; // ms
+    private final double P99thPercentile; // ms
+    private final double P999thPercentile; // ms
+    private long failCount;
+    private long totalRuntime; // ms
+    private double failRate;
+    private double averageSingleOpCount;
 
-    public MetricsExporter() {
+    public MetricsExporter(Timer latencyHistogram) {
+        this.totalOpCount = latencyHistogram.count();
+        this.averageOps = latencyHistogram.meanRate();
+        this.oneMinuteAverageOps = latencyHistogram.oneMinuteRate();
+        this.fiveMinuteAverageOps = latencyHistogram.fiveMinuteRate();
+        this.fifteenMinuteAverageOps = latencyHistogram.fifteenMinuteRate();
+        Snapshot snapshot = latencyHistogram.getSnapshot();
+        // Time unit of duration stored in Timer is nanosecond, convert it to millisecond
+        double nanosecondsToMilliseconds = 1_000_000.0;
+        this.averageLatency = latencyHistogram.mean() / nanosecondsToMilliseconds;
+        this.maxLatency = (long) (latencyHistogram.max() / nanosecondsToMilliseconds);
+        this.minLatency = (long) (latencyHistogram.min() / nanosecondsToMilliseconds);
+        this.medianLatency = snapshot.getMedian() / nanosecondsToMilliseconds;
+        this.P75thPercentile = snapshot.get75thPercentile() / nanosecondsToMilliseconds;
+        this.P95thPercentile = snapshot.get95thPercentile() / nanosecondsToMilliseconds;
+        this.P98thPercentile = snapshot.get98thPercentile() / nanosecondsToMilliseconds;
+        this.P99thPercentile = snapshot.get99thPercentile() / nanosecondsToMilliseconds;
+        this.P999thPercentile = snapshot.get999thPercentile() / nanosecondsToMilliseconds;
         this.failRate = 0;
         this.failCount = 0L;
         this.totalRuntime = 0L;
         this.averageSingleOpCount = 0;
-        this.latencyHistogram = null;
-        this.latencySnapshot = null;
     }
 
     public void setFailRate(double failRate) {
@@ -53,32 +80,24 @@ public class MetricsExporter {
         this.averageSingleOpCount = averageSingleOpCount;
     }
 
-    public void setLatencyHistogram(Timer latencyHistogram) {
-        this.latencyHistogram = latencyHistogram;
-    }
-
-    public void setLatencySnapshot(Snapshot latencySnapshot) {
-        this.latencySnapshot = latencySnapshot;
-    }
-
     public long getCount() {
-        return latencyHistogram.count();
+        return totalOpCount;
     }
 
     public double getAverageOps() {
-        return latencyHistogram.meanRate();
+        return averageOps;
     }
 
     public double getOneMinuteAverageOps() {
-        return latencyHistogram.oneMinuteRate();
+        return oneMinuteAverageOps;
     }
 
     public double getFiveMinuteAverageOps() {
-        return latencyHistogram.fiveMinuteRate();
+        return fiveMinuteAverageOps;
     }
 
     public double getFifteenMinuteAverageOps() {
-        return latencyHistogram.fifteenMinuteRate();
+        return fifteenMinuteAverageOps;
     }
 
     public double getFailRate() {
@@ -98,39 +117,39 @@ public class MetricsExporter {
     }
 
     public double getAverageLatency() {
-        return latencyHistogram.mean();
+        return averageLatency;
     }
 
-    public double getMaxLatency() {
-        return latencyHistogram.max();
+    public long getMaxLatency() {
+        return maxLatency;
     }
 
-    public double getMinLatency() {
-        return latencyHistogram.min();
+    public long getMinLatency() {
+        return minLatency;
     }
 
     public double getMedian() {
-        return latencySnapshot.getMedian();
+        return medianLatency;
     }
 
     public double get75thPercentile() {
-        return latencySnapshot.get75thPercentile();
+        return P75thPercentile;
     }
 
     public double get95thPercentile() {
-        return latencySnapshot.get95thPercentile();
+        return P95thPercentile;
     }
 
     public double get98thPercentile() {
-        return latencySnapshot.get98thPercentile();
+        return P98thPercentile;
     }
 
     public double get99thPercentile() {
-        return latencySnapshot.get99thPercentile();
+        return P99thPercentile;
     }
 
     public double get999thPercentile() {
-        return latencySnapshot.get999thPercentile();
+        return P999thPercentile;
     }
 
     public static MetricsExporter getInstanceOf(double averageSingleOpCount,
@@ -138,13 +157,11 @@ public class MetricsExporter {
                                                 long failCount,
                                                 long totalRuntime,
                                                 Timer latencyHistogram) {
-        MetricsExporter exporter = new MetricsExporter();
+        MetricsExporter exporter = new MetricsExporter(latencyHistogram);
         exporter.setAverageSingleOpCount(averageSingleOpCount);
         exporter.setFailRate(failRate);
         exporter.setFailCount(failCount);
         exporter.setTotalRuntime(totalRuntime);
-        exporter.setLatencyHistogram(latencyHistogram);
-        exporter.setLatencySnapshot(latencyHistogram.getSnapshot());
         return exporter;
     }
 }
