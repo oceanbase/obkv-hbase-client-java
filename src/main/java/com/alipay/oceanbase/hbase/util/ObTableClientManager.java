@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
+import com.alipay.oceanbase.rpc.location.model.ObRoutePolicy;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.TableName;
@@ -86,7 +87,7 @@ public class ObTableClientManager {
         for (Map.Entry<Object, Object> property : connectionConfig.getProperties().entrySet()) {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
-        
+
         return getOrCreateObTableClient(obTableClientKey, connectionConfig);
     }
 
@@ -118,6 +119,15 @@ public class ObTableClientManager {
                     obTableClient.setPassword(obTableClientKey.getPassword());
                     obTableClient.setRpcConnectTimeout(connectionConfig.getRpcConnectTimeout());
                     obTableClient.addProperty(RPC_OPERATION_TIMEOUT.getKey(), Integer.toString(connectionConfig.getServerOperationTimeout()));
+                    if (connectionConfig.getIdc() != null) {
+                        obTableClient.setCurrentIDC(connectionConfig.getIdc());
+                    }
+                    if (connectionConfig.getRoutePolicy() != null) {
+                        obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
+                    }
+                    if (connectionConfig.getGlobalWeakRead() != null) {
+                        obTableClient.setReadConsistency(connectionConfig.getGlobalWeakRead());;
+                    }
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
