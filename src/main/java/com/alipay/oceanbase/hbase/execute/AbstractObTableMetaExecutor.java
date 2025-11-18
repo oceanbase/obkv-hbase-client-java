@@ -1,5 +1,6 @@
 package com.alipay.oceanbase.hbase.execute;
 
+import com.alipay.oceanbase.hbase.util.OHBaseExceptionUtil;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
@@ -24,7 +25,7 @@ public abstract class AbstractObTableMetaExecutor<T> implements ObTableMetaExecu
                     null /*tableName*/
             );
         } catch (Exception e) {
-            throw new IOException("Failed to execute request", e);
+            throw OHBaseExceptionUtil.convertTableException(e);
         }
         return parse(response);
     }
