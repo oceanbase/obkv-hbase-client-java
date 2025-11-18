@@ -205,8 +205,7 @@ public class OHTable implements Table {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                           obTableClient.getDatabase(),
-                                                                           obTableClient.getClusterName()));
+                                                                           obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
@@ -264,8 +263,7 @@ public class OHTable implements Table {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase(),
-                                                                            obTableClient.getClusterName()));
+                                                                            obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
@@ -340,8 +338,7 @@ public class OHTable implements Table {
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase(),
-                                                                            obTableClient.getClusterName()));
+                                                                            obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
@@ -387,8 +384,7 @@ public class OHTable implements Table {
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase(),
-                                                                            obTableClient.getClusterName()));
+                                                                            obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
@@ -486,10 +482,10 @@ public class OHTable implements Table {
 
     private abstract class OperationExecuteCallback<T> {
         private final OHOperationType opType;
-        private final long singleOpCount;
-        OperationExecuteCallback(OHOperationType opType, long singleOpCount) {
+        private final long batchSize;
+        OperationExecuteCallback(OHOperationType opType, long batchSize) {
             this.opType = opType;
-            this.singleOpCount = singleOpCount;
+            this.batchSize = batchSize;
         }
         abstract T execute() throws IOException;
 
@@ -497,8 +493,8 @@ public class OHTable implements Table {
             return this.opType;
         }
 
-        public long getSingleOpCount() {
-            return this.singleOpCount;
+        public long getBatchSize() {
+            return this.batchSize;
         }
     }
 
@@ -506,7 +502,7 @@ public class OHTable implements Table {
         if (this.metrics != null) {
             long startTimeMs = System.currentTimeMillis();
             MetricsImporter importer = new MetricsImporter();
-            importer.setSingleOpCount(callback.getSingleOpCount());
+            importer.setBatchSize(callback.getBatchSize());
             try {
                 return callback.execute();
             } catch (Exception e) {
@@ -561,7 +557,7 @@ public class OHTable implements Table {
     @Override
     public boolean exists(Get get) throws IOException {
         OHOperationType opType = OHOperationType.EXISTS;
-        return execute(new OperationExecuteCallback<Boolean>(opType, 1) {
+        return execute(new OperationExecuteCallback<Boolean>(opType, 1 /* batchSize */) {
             @Override
             Boolean execute() throws IOException {
                 Get newGet = new Get(get);
@@ -574,17 +570,16 @@ public class OHTable implements Table {
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
         OHOperationType opType = OHOperationType.EXISTS_LIST;
-        return execute(new OperationExecuteCallback<boolean[]>(opType, gets.size()) {
+        return execute(new OperationExecuteCallback<boolean[]>(opType, gets.size() /* batchSize */) {
             @Override
             boolean[] execute() throws IOException {
                 boolean[] ret = new boolean[gets.size()];
                 List<Get> newGets = new ArrayList<>();
                 // if just checkExistOnly, batch get will not return any result or row count
                 // therefore we have to set checkExistOnly as false and so the result can be returned
-                // TODO: adjust ExistOnly in server when using batch get
                 for (Get get : gets) {
                     Get newGet = new Get(get);
-                    newGet.setCheckExistenceOnly(false);
+                    newGet.setCheckExistenceOnly(true);
                     newGets.add(newGet);
                 }
                 Result[] results = new Result[newGets.size()];
@@ -592,7 +587,7 @@ public class OHTable implements Table {
                     innerBatchImpl(newGets, results, opType);
                 } else {
                     for (int i = 0; i < newGets.size(); i++) {
-                        results[i] = innerGetImpl(newGets.get(i), opType); // TODO：循环执行的类型用什么？
+                        results[i] = innerGetImpl(newGets.get(i), opType); // still use list type even executing gets one by one in loop
                     }
                 }
                 for (int i = 0; i < results.length; ++i) {
@@ -758,11 +753,11 @@ public class OHTable implements Table {
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
         OHOperationType opType = OHOperationType.BATCH;
-         execute(new OperationExecuteCallback<Void>(opType, actions.size()) {
+         execute(new OperationExecuteCallback<Void>(opType, actions.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 innerBatchImpl(actions, results, opType);
-                return null;
+                return null; // return null for the return type Void, primitive type like void cannot be template type
             }
         });
     }
@@ -913,12 +908,12 @@ public class OHTable implements Table {
                                   Batch.Callback<R> callback) throws IOException,
                                                              InterruptedException {
         OHOperationType opType = OHOperationType.BATCH_CALLBACK;
-        execute(new OperationExecuteCallback<Void>(opType, actions.size()) {
+        execute(new OperationExecuteCallback<Void>(opType, actions.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 try {
                     innerBatchImpl(actions, results, opType);
-                    return null;
+                    return null; // return null for the return type Void, primitive type like void cannot be template type
                 } finally {
                     if (results != null) {
                         for (int i = 0; i < results.length; i++) {
@@ -1016,7 +1011,7 @@ public class OHTable implements Table {
     @Override
     public Result get(final Get get) throws IOException {
         OHOperationType opType = OHOperationType.GET;
-        return execute(new OperationExecuteCallback<Result>(opType, 1) {
+        return execute(new OperationExecuteCallback<Result>(opType, 1 /* batchSize */) {
             @Override
             Result execute() throws IOException {
                 return innerGetImpl(get, opType);
@@ -1101,7 +1096,7 @@ public class OHTable implements Table {
     @Override
     public Result[] get(List<Get> gets) throws IOException {
         OHOperationType opType = OHOperationType.GET_LIST;
-        return execute(new OperationExecuteCallback<Result[]>(opType, gets.size()) {
+        return execute(new OperationExecuteCallback<Result[]>(opType, gets.size() /* batchSize */) {
             @Override
             Result[] execute() throws IOException {
                 Result[] results = new Result[gets.size()];
@@ -1109,7 +1104,7 @@ public class OHTable implements Table {
                     innerBatchImpl(gets, results, opType);
                 } else {
                     for (int i = 0; i < gets.size(); i++) {
-                        results[i] = innerGetImpl(gets.get(i), opType); // TODO: 这种单次循环执行的类型是用 LIST 类型还是用 EXIST 类型？
+                        results[i] = innerGetImpl(gets.get(i), opType); // still use list type even executing gets one by one in loop
                     }
                 }
                 return results;
@@ -1119,7 +1114,7 @@ public class OHTable implements Table {
 
     @Override
     public ResultScanner getScanner(final Scan scan) throws IOException {
-        return execute(new OperationExecuteCallback<ResultScanner>(OHOperationType.SCAN, 1) {
+        return execute(new OperationExecuteCallback<ResultScanner>(OHOperationType.SCAN, 1 /* batchSize */) {
             @Override
             ResultScanner execute() throws IOException {
                 if (scan.getFamilyMap().keySet().isEmpty()) {
@@ -1321,11 +1316,11 @@ public class OHTable implements Table {
     @Override
     public void put(Put put) throws IOException {
         OHOperationType opType = OHOperationType.PUT;
-        execute(new OperationExecuteCallback<Void>(opType, 1) {
+        execute(new OperationExecuteCallback<Void>(opType, 1 /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 doPut(Collections.singletonList(put), opType);
-                return null;
+                return null; // return null for the return type Void, primitive type like void cannot be template type
             }
         });
     }
@@ -1333,11 +1328,11 @@ public class OHTable implements Table {
     @Override
     public void put(List<Put> puts) throws IOException {
         OHOperationType opType = OHOperationType.PUT_LIST;
-        execute(new OperationExecuteCallback<Void>(opType, puts.size()) {
+        execute(new OperationExecuteCallback<Void>(opType, puts.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 doPut(puts, opType);
-                return null;
+                return null; // return null for the return type Void, primitive type like void cannot be template type
             }
         });
     }
@@ -1446,12 +1441,12 @@ public class OHTable implements Table {
     @Override
     public void delete(Delete delete) throws IOException {
         OHOperationType opType = OHOperationType.DELETE;
-        execute(new OperationExecuteCallback<Void>(opType, 1) {
+        execute(new OperationExecuteCallback<Void>(opType, 1 /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 checkFamilyViolation(delete.getFamilyCellMap().keySet(), false);
                 innerDelete(Collections.singletonList(delete), opType);
-                return null;
+                return null; // return null for the return type Void, primitive type like void cannot be template type
             }
         });
     }
@@ -1459,11 +1454,11 @@ public class OHTable implements Table {
     @Override
     public void delete(List<Delete> deletes) throws IOException {
         OHOperationType opType = OHOperationType.DELETE_LIST;
-        execute(new OperationExecuteCallback<Void>(opType, deletes.size()) {
+        execute(new OperationExecuteCallback<Void>(opType, deletes.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 innerDelete(deletes, opType);
-                return null;
+                return null; // return null for the return type Void, primitive type like void cannot be template type
             }
         });
     }
@@ -1523,7 +1518,7 @@ public class OHTable implements Table {
                                      CompareFilter.CompareOp compareOp, byte[] value,
                                      TimeRange timeRange, RowMutations rowMutations, OHOperationType opType)
                                                                                     throws IOException {
-        return execute(new OperationExecuteCallback<Boolean>(opType, rowMutations.getMutations().size()) {
+        return execute(new OperationExecuteCallback<Boolean>(opType, rowMutations.getMutations().size() /* batchSize */) {
             @Override
             Boolean execute() throws IOException {
                 try {
@@ -1577,7 +1572,7 @@ public class OHTable implements Table {
     @Override
     public Result append(Append append) throws IOException {
         OHOperationType opType = OHOperationType.APPEND;
-        return execute(new OperationExecuteCallback<Result>(opType, 1) {
+        return execute(new OperationExecuteCallback<Result>(opType, 1 /* batchSize */) {
             @Override
             Result execute() throws IOException {
                 checkArgument(!append.isEmpty(), "Invalid arguments to %s, zero columns specified",
@@ -1636,7 +1631,7 @@ public class OHTable implements Table {
     @Override
     public Result increment(Increment increment) throws IOException {
         OHOperationType opType = OHOperationType.INCREMENT;
-        return execute(new OperationExecuteCallback<Result>(opType, 1) {
+        return execute(new OperationExecuteCallback<Result>(opType, 1 /* batchSize */) {
             @Override
             Result execute() throws IOException {
                 checkArgument(!increment.isEmpty(), "Invalid arguments to %s, zero columns specified", increment.toString());
@@ -1695,7 +1690,7 @@ public class OHTable implements Table {
     public long incrementColumnValue(byte[] row, byte[] family, byte[] qualifier, long amount)
                                                                                               throws IOException {
         OHOperationType opType = OHOperationType.INCREMENT_COLUMN_VALUE;
-        return execute(new OperationExecuteCallback<Long>(opType, 1) {
+        return execute(new OperationExecuteCallback<Long>(opType, 1 /* batchSize */) {
             @Override
             Long execute() throws IOException {
                 try {
@@ -2813,4 +2808,5 @@ public class OHTable implements Table {
     public OHMetrics getMetrics() {
         return metrics;
     }
+
 }

@@ -3,12 +3,12 @@ package com.alipay.oceanbase.hbase.util;
 public class MetricsImporter {
     private boolean isFailedOp;
     private long duration;
-    private long singleOpCount;
+    private long batchSize;
 
     public MetricsImporter() {
         this.isFailedOp = false;
         this.duration = 0;
-        this.singleOpCount = 0;
+        this.batchSize = 0;
     }
 
     public void setIsFailedOp(boolean isFailedOp) {
@@ -19,8 +19,8 @@ public class MetricsImporter {
         this.duration = duration;
     }
 
-    public void setSingleOpCount(long singleOpCount) {
-        this.singleOpCount = singleOpCount;
+    public void setBatchSize(long batchSize) {
+        this.batchSize = batchSize;
     }
 
     public boolean isFailedOp() {
@@ -31,7 +31,7 @@ public class MetricsImporter {
         return duration;
     }
 
-    public long getSingleOpCount() {
-        return singleOpCount;
+    public long getBatchSize() {
+        return batchSize;
     }
 }
