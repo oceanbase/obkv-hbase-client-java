@@ -1047,7 +1047,7 @@ public class OHTable implements Table {
                         processColumnFilters(columnFilters, get.getFamilyMap());
                         obTableQuery = buildObTableQuery(get, columnFilters);
                         ObTableQueryAsyncRequest request = buildObTableQueryAsyncRequest(obTableQuery,
-                                getTargetTableName(tableNameString), opType);
+                            getTargetTableName(tableNameString), isWeakRead(get), opType);
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
@@ -1069,8 +1069,8 @@ public class OHTable implements Table {
                             }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
-                                    getTargetTableName(tableNameString, Bytes.toString(family),
-                                            configuration), opType);
+                                getTargetTableName(tableNameString, Bytes.toString(family),
+                                    configuration), isWeakRead(get), opType);
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                     .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
@@ -1154,7 +1154,7 @@ public class OHTable implements Table {
 
                                 request = buildObTableQueryAsyncRequest(obTableQuery,
                                         getTargetTableName(tableNameString),
-                                        OHOperationType.SCAN);
+                                        isWeakRead(scan), OHOperationType.SCAN);
                                 clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                         .execute(request);
                                 return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1182,7 +1182,7 @@ public class OHTable implements Table {
                                             obTableQuery,
                                             getTargetTableName(tableNameString, Bytes.toString(family),
                                                     configuration),
-                                            OHOperationType.SCAN);
+                                            isWeakRead(scan), OHOperationType.SCAN);
                                     clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                             .execute(request);
                                     return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1239,8 +1239,7 @@ public class OHTable implements Table {
                         obTableQuery = buildObTableQuery(filter, scan);
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
-                                getTargetTableName(tableNameString),
-                                OHOperationType.SCAN);
+                                getTargetTableName(tableNameString), isWeakRead(scan), OHOperationType.SCAN);
                         request.setNeedTabletId(false);
                         request.setAllowDistributeScan(false);
                         String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
@@ -1277,7 +1276,7 @@ public class OHTable implements Table {
 
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
-                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName, OHOperationType.SCAN);
+                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName, isWeakRead(scan), OHOperationType.SCAN);
                             request.setNeedTabletId(false);
                             request.setAllowDistributeScan(false);
                             List<Partition> partitions = obTableClient
@@ -2096,6 +2095,32 @@ public class OHTable implements Table {
         return obTableQuery;
     }
 
+    /**
+     * Check if the Get or Scan operation is configured for weak read.
+     *
+     * @param query the Get or Scan object to check
+     * @return true if weak read is enabled, false otherwise
+     */
+    public static boolean isWeakRead(Object query) {
+        if (query == null) {
+            return false;
+        }
+        byte[] consistency = null;
+        if (query instanceof Get) {
+            consistency = ((Get) query).getAttribute(HBASE_HTABLE_READ_CONSISTENCY);
+        } else if (query instanceof Scan) {
+            consistency = ((Scan) query).getAttribute(HBASE_HTABLE_READ_CONSISTENCY);
+        } else {
+            return false;
+        }
+        if (consistency == null) {
+            return false;
+        }
+        String consistencyStr = Bytes.toString(consistency);
+        System.out.println("consistencyStr: " + consistencyStr);
+        return "weak".equalsIgnoreCase(consistencyStr);
+    }
+
     public static ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
                                                                    List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
@@ -2356,6 +2381,9 @@ public class OHTable implements Table {
                 ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
+                    if (isWeakRead(get)) {
+                        query.setReadConsistency("weak");
+                    }
                 } catch (Exception e) {
                     logger.error("unexpected error occurs when set row key", e);
                     throw new IOException(e);
@@ -2533,11 +2561,15 @@ public class OHTable implements Table {
 
     private ObTableQueryRequest buildObTableQueryRequest(ObTableQuery obTableQuery,
                                                          String targetTableName,
+                                                         Boolean isWeakRead,
                                                          OHOperationType opType) {
         ObTableQueryRequest request = new ObTableQueryRequest();
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
+        if (isWeakRead) {
+            request.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+        }
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         request.setHbaseOpType(opType);
@@ -2546,6 +2578,7 @@ public class OHTable implements Table {
 
     private ObTableQueryAsyncRequest buildObTableQueryAsyncRequest(ObTableQuery obTableQuery,
                                                                    String targetTableName,
+                                                                   Boolean isWeakRead,
                                                                    OHOperationType opType) {
         ObTableQueryRequest request = new ObTableQueryRequest();
         request.setEntityType(ObTableEntityType.HKV);
@@ -2557,6 +2590,9 @@ public class OHTable implements Table {
         asyncRequest.setObTableQueryRequest(request);
         asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
+        if (isWeakRead) {
+            asyncRequest.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+        }
         asyncRequest.setHbaseOpType(opType);
         return asyncRequest;
     }
