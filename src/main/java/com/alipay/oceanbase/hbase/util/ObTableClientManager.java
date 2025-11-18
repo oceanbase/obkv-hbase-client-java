@@ -123,7 +123,7 @@ public class ObTableClientManager {
                         obTableClient.setCurrentIDC(connectionConfig.getIdc());
                     }
                     if (connectionConfig.getRoutePolicy() != null) {
-                        obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
+                        obTableClient.setRoutePolicy(connectionConfig.getRoutePolicy());
                     }
                     if (connectionConfig.getGlobalWeakRead() != null) {
                         obTableClient.setReadConsistency(connectionConfig.getGlobalWeakRead());;

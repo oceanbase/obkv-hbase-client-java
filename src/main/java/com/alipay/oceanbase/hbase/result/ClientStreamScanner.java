@@ -17,9 +17,13 @@
 
 package com.alipay.oceanbase.hbase.result;
 
+import com.alipay.oceanbase.hbase.util.MetricsImporter;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
+import com.alipay.oceanbase.hbase.util.OHMetrics;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
+import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
@@ -29,10 +33,8 @@ import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.mortbay.util.SingletonList;
 import org.slf4j.Logger;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
@@ -55,26 +57,32 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private boolean                         isTableGroup = false;
 
+    private OHMetrics                       metrics;
+
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
-                               Scan scan, boolean isTableGroup) {
+                               Scan scan, boolean isTableGroup, OHMetrics metrics) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.scan = scan;
         family = isTableGroup ? null : scan.getFamilyMap().entrySet().iterator().next().getKey();
         this.isTableGroup = isTableGroup;
+        this.metrics = metrics;
     }
 
     public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
-                               Scan scan, boolean isTableGroup) {
+                               Scan scan, boolean isTableGroup, OHMetrics metrics) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.scan = scan;
         family = isTableGroup ? null : scan.getFamilyMap().entrySet().iterator().next().getKey();
         this.isTableGroup = isTableGroup;
+        this.metrics = metrics;
     }
 
     @Override
     public Result next() throws IOException {
+        long startTimeMs = System.currentTimeMillis();
+        MetricsImporter importer = metrics == null ? null : new MetricsImporter();
         try {
             if (scan.getLimit() > 0 && lineCount++ >= scan.getLimit()) {
                 close();
@@ -134,6 +142,13 @@ public class ClientStreamScanner extends AbstractClientScanner {
             logger.error(LCD.convert("01-00000"), streamResult.getTableName(), e);
             throw new IOException(String.format("get table %s stream next result error ",
                 streamResult.getTableName()), e);
+        } finally {
+            if (metrics != null) {
+                long duration = System.currentTimeMillis() - startTimeMs;
+                importer.setDuration(duration);
+                importer.setBatchSize(1);
+                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN, importer));
+            }
         }
     }
 
