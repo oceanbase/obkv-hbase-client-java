@@ -36,7 +36,7 @@ public class OHMetricsTracker {
         if (importer.isFailedOp()) {
             failedOpCounter.mark();
         }
-        totalSingleOpCount.inc(importer.getSingleOpCount());
+        totalSingleOpCount.inc(importer.getBatchSize());
         totalRuntime.inc(importer.getDuration());
     }
 
