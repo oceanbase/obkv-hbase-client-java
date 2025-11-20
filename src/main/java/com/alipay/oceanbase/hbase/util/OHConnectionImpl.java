@@ -190,7 +190,6 @@ public class OHConnectionImpl implements Connection {
                     return new OHTable(OHConnectionImpl.this, this,
                         OHConnectionImpl.this.connectionConfig, pool);
                 } catch (Exception e) {
-                    LOGGER.error("Fail to build new OHTable", e);
                     throw new RuntimeException(e);
                 }
             }

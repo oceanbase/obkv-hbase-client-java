@@ -986,8 +986,6 @@ public class OHTable implements Table {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00002"), tableNameString, Bytes.toString(family),
-                        e);
                     throw new IOException("query table:" + tableNameString + " family "
                                           + Bytes.toString(family) + " error.", e);
                 }
@@ -1085,8 +1083,6 @@ public class OHTable implements Table {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                        e);
                     throw new IOException("scan table:" + tableNameString + " family "
                                           + Bytes.toString(family) + " error.", e);
                 }
@@ -1185,8 +1181,6 @@ public class OHTable implements Table {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                            e);
                     throw new IOException("scan table:" + tableNameString + " family "
                             + Bytes.toString(family) + " error.", e);
                 }
@@ -1313,7 +1307,6 @@ public class OHTable implements Table {
         try {
             return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00005"), put, tableNameString, e);
             throw new IOException("checkAndPut type table:" + tableNameString + " e.msg:"
                                   + e.getMessage() + " error.", e);
         }
@@ -1333,7 +1326,6 @@ public class OHTable implements Table {
             Object[] results = new Object[actions.size()];
             batch(actions, results);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00004"), tableNameString, e);
             throw e;
         }
     }
@@ -1376,7 +1368,6 @@ public class OHTable implements Table {
         try {
             return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00005"), delete, tableNameString, e);
             throw new IOException("checkAndDelete type table:" + tableNameString + " e.msg:"
                                   + e.getMessage() + " error.", e);
         }
@@ -1396,7 +1387,6 @@ public class OHTable implements Table {
         try {
             return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
             throw new IOException("checkAndMutate type table:" + tableNameString + " e.msg:"
                                   + e.getMessage() + " error.", e);
         }
@@ -1500,7 +1490,6 @@ public class OHTable implements Table {
             }
             return Result.create(keyValues);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00006"), tableNameString, e);
             throw new IOException("append table " + tableNameString + " error.", e);
         }
     }
@@ -1551,7 +1540,6 @@ public class OHTable implements Table {
             }
             return Result.create(keyValues);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00007"), tableNameString, e);
             throw new IOException("increment table " + tableNameString + " error.", e);
         }
     }
@@ -1596,7 +1584,6 @@ public class OHTable implements Table {
             }
             return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3).getValue());
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00007"), tableNameString, e);
             throw new IOException("increment table " + tableNameString + " error.", e);
         }
     }
@@ -1627,8 +1614,6 @@ public class OHTable implements Table {
                     }
                 }
             } catch (Exception e) {
-                logger.error(LCD.convert("01-00008"), tableNameString, null, autoFlush,
-                    writeBuffer.size(), e);
                 if (e instanceof IOException) {
                     throw (IOException) e;
                 }
@@ -2243,7 +2228,6 @@ public class OHTable implements Table {
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
                 } catch (Exception e) {
-                    logger.error("unexpected error occurs when set row key", e);
                     throw new IOException(e);
                 }
                 batch.addOperation(query);
@@ -2566,7 +2550,6 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
                     timeRange, rowMutations);
             } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
                 throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                                       + e.getMessage() + " error.", e);
             }
@@ -2581,7 +2564,6 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
                     timeRange, rowMutations);
             } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
                 throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                                       + e.getMessage() + " error.", e);
             }
@@ -2594,7 +2576,6 @@ public class OHTable implements Table {
                 return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
                     timeRange, mutation);
             } catch (Exception e) {
-                logger.error(LCD.convert("01-00005"), mutation, tableNameString, e);
                 throw new IOException("checkAndMutate type table: " + tableNameString + " e.msg: "
                                       + e.getMessage() + " error.", e);
             }
