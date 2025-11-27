@@ -2370,7 +2370,7 @@ public class OHTable implements Table {
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
                     if (isWeakRead(get)) {
-                        query.setReadConsistency("weak");
+                        query.setReadConsistency(ObReadConsistency.WEAK);
                     }
                 } catch (Exception e) {
                     logger.error("unexpected error occurs when set row key", e);
@@ -2556,7 +2556,7 @@ public class OHTable implements Table {
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         if (isWeakRead) {
-            request.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+            request.setConsistencyLevel(ObReadConsistency.WEAK);
         }
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
@@ -2579,7 +2579,7 @@ public class OHTable implements Table {
         asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         if (isWeakRead) {
-            asyncRequest.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+            asyncRequest.setConsistencyLevel(ObReadConsistency.WEAK);
         }
         asyncRequest.setHbaseOpType(opType);
         return asyncRequest;

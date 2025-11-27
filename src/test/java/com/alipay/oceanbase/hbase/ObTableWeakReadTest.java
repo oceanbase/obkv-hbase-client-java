@@ -169,8 +169,8 @@ public class ObTableWeakReadTest {
     private static String ODP_IP = "ip-addr";
     private static int ODP_PORT = 0;
     private static String ODP_DATABASE = "database-name";
-    private static String JDBC_IP = "6.12.233.118";
-    private static String JDBC_PORT = "10207";
+    private static String JDBC_IP = "";
+    private static String JDBC_PORT = "";
     private static String JDBC_DATABASE = "test";
     private static String JDBC_URL = "jdbc:mysql://"
             + JDBC_IP
