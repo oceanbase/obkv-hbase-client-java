@@ -21,6 +21,8 @@ import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.alipay.oceanbase.rpc.location.model.ObRoutePolicy;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObReadConsistency;
+import com.alipay.oceanbase.hbase.OHTable;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.TableName;
@@ -60,7 +62,7 @@ public class ObTableClientManager {
             obTableClientKey.setDatabase(connectionConfig.getDatabase());
         } else {
             checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
-                    + " is blank");
+                                                                      + " is blank");
             obTableClientKey = new ObTableClientKey();
             String paramUrl = connectionConfig.getParamUrl();
             if (!paramUrl.contains("database")) {
@@ -75,7 +77,7 @@ public class ObTableClientManager {
             }
         }
         checkArgument(isNotBlank(connectionConfig.getFullUsername()),
-                HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
+            HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
         obTableClientKey.setFullUserName(connectionConfig.getFullUsername());
 
         if (connectionConfig.getPassword() == null) {
@@ -126,7 +128,7 @@ public class ObTableClientManager {
                         obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
                     }
                     if (connectionConfig.getGlobalWeakRead() != null) {
-                        obTableClient.setReadConsistency(connectionConfig.getGlobalWeakRead());;
+                        obTableClient.setReadConsistency(ObReadConsistency.getByName(connectionConfig.getGlobalWeakRead()));
                     }
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
@@ -141,7 +143,7 @@ public class ObTableClientManager {
     }
 
     public static ObTableClient getOrCreateObTableClientByTableName(TableName tableName, OHConnectionConfiguration connectionConfig) throws IllegalArgumentException,
-                                                                                                                            IOException {
+            IOException {
         String tableNameString = tableName.getNameAsString();
         ObTableClient obTableClient = getOrCreateObTableClient(
                 OHTable.setUserDefinedNamespace(tableNameString, connectionConfig));

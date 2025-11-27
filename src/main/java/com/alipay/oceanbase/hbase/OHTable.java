@@ -2399,7 +2399,7 @@ public class OHTable implements HTableInterface {
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
                     if (isWeakRead(get)) {
-                        query.setReadConsistency("weak");
+                        query.setReadConsistency(ObReadConsistency.WEAK);
                     }
                 } catch (Exception e) {
                     throw new IOException(e);
@@ -2606,7 +2606,7 @@ public class OHTable implements HTableInterface {
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         if (isWeakRead) {
-            request.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+            request.setConsistencyLevel(ObReadConsistency.WEAK);
         }
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
@@ -2630,7 +2630,7 @@ public class OHTable implements HTableInterface {
         asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         asyncRequest.setHbaseOpType(opType);
         if (isWeakRead) {
-            asyncRequest.setConsistencyLevel(ObTableConsistencyLevel.EVENTUAL);
+            asyncRequest.setConsistencyLevel(ObReadConsistency.WEAK);
         }
         return asyncRequest;
     }

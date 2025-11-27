@@ -2,7 +2,6 @@ package com.alipay.oceanbase.hbase.execute;
 
 import com.alipay.oceanbase.hbase.util.OHBaseExceptionUtil;
 import com.alipay.oceanbase.rpc.ObTableClient;
-import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaRequest;
 import com.alipay.oceanbase.rpc.meta.ObTableMetaResponse;
 import com.alipay.oceanbase.rpc.table.ObTable;
