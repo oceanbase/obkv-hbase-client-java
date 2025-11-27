@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
 import com.alipay.oceanbase.rpc.location.model.ObRoutePolicy;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObReadConsistency;
 import com.alipay.oceanbase.hbase.OHTable;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -123,10 +124,10 @@ public class ObTableClientManager {
                         obTableClient.setCurrentIDC(connectionConfig.getIdc());
                     }
                     if (connectionConfig.getRoutePolicy() != null) {
-                        obTableClient.setRoutePolicy(connectionConfig.getRoutePolicy());
+                        obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
                     }
                     if (connectionConfig.getGlobalWeakRead() != null) {
-                        obTableClient.setReadConsistency(connectionConfig.getGlobalWeakRead());;
+                        obTableClient.setReadConsistency(ObReadConsistency.getByName(connectionConfig.getGlobalWeakRead()));
                     }
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
