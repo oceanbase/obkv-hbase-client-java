@@ -2370,7 +2370,7 @@ public class OHTable implements Table {
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
                     if (isWeakRead(get)) {
-                        query.setReadConsistency(ObReadConsistency.WEAK);
+                        batch.setReadConsistency(ObReadConsistency.WEAK);
                     }
                 } catch (Exception e) {
                     logger.error("unexpected error occurs when set row key", e);
