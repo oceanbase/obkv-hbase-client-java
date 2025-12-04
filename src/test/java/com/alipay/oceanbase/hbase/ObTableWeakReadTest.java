@@ -168,6 +168,7 @@ public class ObTableWeakReadTest {
     private static boolean USE_ODP = false;
     private static String ODP_IP = "ip-addr";
     private static int ODP_PORT = 0;
+    private static int ODP_SQL_PORT = 0;
     private static String ODP_DATABASE = "database-name";
     private static String JDBC_IP = "";
     private static String JDBC_PORT = "";
@@ -176,6 +177,13 @@ public class ObTableWeakReadTest {
             + JDBC_IP
             + ":"
             + JDBC_PORT
+            + "/"
+            + JDBC_DATABASE
+            + "?rewriteBatchedStatements=TRUE&allowMultiQueries=TRUE&useLocalSessionState=TRUE&useUnicode=TRUE&characterEncoding=utf-8&socketTimeout=30000000&connectTimeout=600000&sessionVariables=ob_query_timeout=60000000000";
+    private static String JDBC_PROXY_URL = "jdbc:mysql://"
+            + ODP_IP
+            + ":"
+            + ODP_SQL_PORT
             + "/"
             + JDBC_DATABASE
             + "?rewriteBatchedStatements=TRUE&allowMultiQueries=TRUE&useLocalSessionState=TRUE&useUnicode=TRUE&characterEncoding=utf-8&socketTimeout=30000000&connectTimeout=600000&sessionVariables=ob_query_timeout=60000000000";
@@ -210,11 +218,15 @@ public class ObTableWeakReadTest {
             + "WHERE t.table_name = ? AND t.tenant_id = ? AND t.tablet_id = ?;";
     private static String SET_SQL_AUDIT_PERSENT_SQL = "SET GLOBAL ob_sql_audit_percentage =?;";
     private static String GET_TENANT_ID_SQL = "SELECT tenant_id FROM oceanbase.__all_tenant WHERE tenant_name = ?";
+    private static String SET_IDC_SQL = "ALTER PROXYCONFIG SET proxy_idc_name = ?;";
+    private static String SET_ROUTE_POLICY_SQL = "ALTER PROXYCONFIG SET proxy_route_policy = ?;";
     private Connection tenantConnection = null;
     private Connection sysConnection = null;
+    private Connection proxyConnection = null;
     private org.apache.hadoop.hbase.client.Connection connection = null;
     private static Connection staticTenantConnection = null;
     private static Connection staticSysConnection = null;
+    private static Connection staticProxyConnection = null;
     private static org.apache.hadoop.hbase.client.Connection staticonnection = null;
     private static int staticTenantId = 0;
     private static boolean clear = false;
@@ -227,17 +239,19 @@ public class ObTableWeakReadTest {
             config.set(HBASE_OCEANBASE_ODP_ADDR, ODP_IP);
             config.setInt(HBASE_OCEANBASE_ODP_PORT, ODP_PORT);
             config.set(HBASE_OCEANBASE_DATABASE, ODP_DATABASE);
+            // 在 ODP 模式下，IDC 和路由策略通过 SQL 设置，不在这里设置
         } else {
             config.set(HBASE_OCEANBASE_PARAM_URL, PARAM_URL);
             config.set(HBASE_OCEANBASE_SYS_USER_NAME, PROXY_SYS_USER_NAME);
             config.set(HBASE_OCEANBASE_SYS_PASSWORD, PROXY_SYS_USER_PASSWORD);
             config.set(HBASE_OCEANBASE_FULL_USER_NAME, FULL_USER_NAME);
             config.set(HBASE_OCEANBASE_PASSWORD, PASSWORD);
+            // 在非 ODP 模式下，IDC 和路由策略通过配置设置
+            if (idc != null) {
+                config.set(HBASE_HTABLE_CLIENT_IDC, idc);
+            }
+            config.set(HBASE_HTABLE_CLIENT_ROUTE_POLICY, routePolicy);
         }
-        if (idc != null) {
-            config.set(HBASE_HTABLE_CLIENT_IDC, idc);
-        }
-        config.set(HBASE_HTABLE_CLIENT_ROUTE_POLICY, routePolicy);
     }
 
     /**
@@ -255,11 +269,32 @@ public class ObTableWeakReadTest {
         return DriverManager.getConnection(JDBC_URL, "root@sys", PASSWORD);
     }
 
+    /**
+     * 获取代理连接
+     */
+    private static Connection getProxyConnection() throws SQLException {
+        if (USE_ODP) {
+            // ODP 连接需要包含集群信息的用户名
+            // FULL_USER_NAME 格式: user@tenant#cluster
+            // 对于代理连接，使用 root@sys#cluster 格式
+            String[] parts = FULL_USER_NAME.split("#");
+            String clusterName = parts.length > 1 ? parts[1] : "";
+            String proxyUserName = PROXY_SYS_USER_NAME + "@sys";
+            if (!clusterName.isEmpty()) {
+                proxyUserName += "#" + clusterName;
+            }
+            return DriverManager.getConnection(JDBC_PROXY_URL, proxyUserName, PROXY_SYS_USER_PASSWORD);
+        } else {
+            return null;
+        }
+    }
+
     @org.junit.BeforeClass
     public static void beforeClass() throws Exception {
         // 所有测试用例执行前创建表和连接（只执行一次）
         staticTenantConnection = getConnection();
         staticSysConnection = getSysConnection();
+        staticProxyConnection = getProxyConnection();
         staticTenantId = getTenantId(staticSysConnection);
         createTable(staticTenantConnection);
         setSqlAuditPersent(staticTenantConnection, SQL_AUDIT_PERSENT);
@@ -276,6 +311,7 @@ public class ObTableWeakReadTest {
     public void setup() throws Exception {
         tenantConnection = staticTenantConnection;
         sysConnection = staticSysConnection;
+        proxyConnection = staticProxyConnection;
         tenant_id = staticTenantId;
         connection = staticonnection;
     }
@@ -510,6 +546,34 @@ public class ObTableWeakReadTest {
         }
     }
 
+    private void setIdc(Configuration config, String idc) throws Exception {
+        if (USE_ODP) {
+            if (proxyConnection != null) {
+                PreparedStatement statement = proxyConnection.prepareStatement(SET_IDC_SQL);
+                statement.setString(1, idc);
+                statement.execute();
+                statement.close();
+            }
+        } else {
+            if (idc != null) {
+                config.set(HBASE_HTABLE_CLIENT_IDC, idc);
+            }
+        }
+    }
+
+    private void setRoutePolicy(Configuration config, String routePolicy) throws Exception {
+        if (USE_ODP) {
+            if (proxyConnection != null) {
+                PreparedStatement statement = proxyConnection.prepareStatement(SET_ROUTE_POLICY_SQL);
+                statement.setString(1, routePolicy);
+                statement.execute();
+                statement.close();
+            }
+        } else {
+            config.set(HBASE_HTABLE_CLIENT_ROUTE_POLICY, routePolicy);
+        }
+    }
+
     /*
      * 测试场景：用户正常使用场景，使用get接口进行指定IDC读
      * 测试预期：发到对应的IDC上进行读取
@@ -518,6 +582,11 @@ public class ObTableWeakReadTest {
     public void testIdcGet1() throws Exception {
         Configuration config = HBaseConfiguration.create();
         initObkvConfig(config, IDC2, FOLLOW_FIRST_ROUTE_POLICY);
+        // 在 ODP 模式下，需要在创建连接前通过 SQL 设置 IDC 和路由策略
+        if (USE_ODP) {
+            setIdc(config, IDC2);
+            setRoutePolicy(config, FOLLOW_FIRST_ROUTE_POLICY);
+        }
         org.apache.hadoop.hbase.client.Connection hbaseConnection = ConnectionFactory
                 .createConnection(config);
         Table table = hbaseConnection.getTable(TableName.valueOf(TABLE_NAME));
