@@ -519,33 +519,47 @@ public class OHTable implements HTableInterface {
      */
     @Override
     public boolean exists(Get get) throws IOException {
-        return execute(new OperationExecuteCallback<Boolean>(OHOperationType.EXISTS, 1) {
+        OHOperationType opType = OHOperationType.EXISTS;
+        return execute(new OperationExecuteCallback<Boolean>(opType, 1) {
             @Override
             Boolean execute() throws IOException {
                 Get newGet = new Get(get);
                 newGet.setCheckExistenceOnly(true);
-                return innerGetImpl(newGet).getExists();
+                return innerGetImpl(newGet, opType).getExists();
             }
         });
     }
 
     @Override
     public boolean[] existsAll(List<Get> gets) throws IOException {
-        boolean[] ret = new boolean[gets.size()];
-        List<Get> newGets = new ArrayList<>();
-        // if just checkExistOnly, batch get will not return any result or row count
-        // therefore we have to set checkExistOnly as false and so the result can be returned
-        // TODO: adjust ExistOnly in server when using batch get
-        for (Get get : gets) {
-            Get newGet = new Get(get);
-            newGet.setCheckExistenceOnly(false);
-            newGets.add(newGet);
-        }
-        Result[] results = get(newGets);
-        for (int i = 0; i < results.length; ++i) {
-            ret[i] = !results[i].isEmpty();
-        }
-        return ret;
+        OHOperationType opType = OHOperationType.EXISTS_LIST;
+        return execute(new OperationExecuteCallback<boolean[]>(opType, gets.size() /* batchSize */) {
+            @Override
+            boolean[] execute() throws IOException {
+                boolean[] ret = new boolean[gets.size()];
+                List<Get> newGets = new ArrayList<>();
+                // if just checkExistOnly, batch get will not return any result or row count
+                // therefore we have to set checkExistOnly as false and so the result can be returned
+                // TODO: adjust ExistOnly in server when using batch get
+                for (Get get : gets) {
+                    Get newGet = new Get(get);
+                    newGet.setCheckExistenceOnly(false);
+                    newGets.add(newGet);
+                }
+                Result[] results = new Result[newGets.size()];
+                if (ObGlobal.isHBaseBatchGetSupport()) {
+                    innerBatchImpl(newGets, results, opType);
+                } else {
+                    for (int i = 0; i < newGets.size(); i++) {
+                        results[i] = innerGetImpl(newGets.get(i), opType); // still use list type even executing gets one by one in loop
+                    }
+                }
+                for (int i = 0; i < results.length; ++i) {
+                    ret[i] = !results[i].isEmpty();
+                }
+                return ret;
+            }
+        });
     }
 
     @Override
@@ -713,7 +727,7 @@ public class OHTable implements HTableInterface {
         });
     }
 
-    private void innerBatchImpl(final List<? extends Row> actions, final Object[] results, final OHOperationType opType) throws IOException {
+    public void innerBatchImpl(final List<? extends Row> actions, final Object[] results, final OHOperationType opType) throws IOException {
         if (actions == null || actions.isEmpty()) {
             return;
         }
@@ -976,15 +990,16 @@ public class OHTable implements HTableInterface {
 
     @Override
     public Result get(final Get get) throws IOException {
-        return execute(new OperationExecuteCallback<Result>(OHOperationType.GET, 1) {
+        OHOperationType opType = OHOperationType.GET;
+        return execute(new OperationExecuteCallback<Result>(opType, 1) {
             @Override
             Result execute() throws IOException {
-                return innerGetImpl(get);
+                return innerGetImpl(get, opType);
             }
         });
     }
 
-    private Result innerGetImpl(final Get get) throws IOException {
+    private Result innerGetImpl(final Get get, OHOperationType opType) throws IOException {
         if (get.getFamilyMap().keySet().isEmpty()) {
             if (!FeatureSupport.isEmptyFamilySupported()) {
                 throw new FeatureNotSupportedException("empty family get not supported yet within observer version: " + ObGlobal.obVsnString());
@@ -1013,7 +1028,7 @@ public class OHTable implements HTableInterface {
                         processColumnFilters(columnFilters, get.getFamilyMap());
                         obTableQuery = buildObTableQuery(get, columnFilters);
                         ObTableQueryAsyncRequest request = buildObTableQueryAsyncRequest(obTableQuery,
-                                getTargetTableName(tableNameString));
+                                getTargetTableName(tableNameString), opType);
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
@@ -1036,7 +1051,7 @@ public class OHTable implements HTableInterface {
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
                                     getTargetTableName(tableNameString, Bytes.toString(family),
-                                            configuration));
+                                            configuration), opType);
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                     .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
@@ -1066,12 +1081,12 @@ public class OHTable implements HTableInterface {
             Result[] execute() throws IOException {
                 Result[] results = new Result[gets.size()];
                 if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
-                    batch(gets, results);
+                    innerBatchImpl(gets, results, opType);
                 } else {
                     List<Future<Result>> futures = new LinkedList<>();
                     for (int i = 0; i < gets.size(); i++) {
                         int index = i;
-                        Future<Result> future = executePool.submit(() -> innerGetImpl(gets.get(index)));
+                        Future<Result> future = executePool.submit(() -> innerGetImpl(gets.get(index), opType));
                         futures.add(future);
                     }
                     for (int i = 0; i < gets.size(); i++) {
@@ -1135,7 +1150,7 @@ public class OHTable implements HTableInterface {
                         obTableQuery = buildObTableQuery(filter, scan);
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
-                            getTargetTableName(tableNameString));
+                            getTargetTableName(tableNameString), OHOperationType.SCAN);
                         clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
                         return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1162,7 +1177,7 @@ public class OHTable implements HTableInterface {
                             request = buildObTableQueryAsyncRequest(
                                 obTableQuery,
                                 getTargetTableName(tableNameString, Bytes.toString(family),
-                                    configuration));
+                                    configuration), OHOperationType.SCAN);
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1212,7 +1227,7 @@ public class OHTable implements HTableInterface {
                         List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
 
                         request = buildObTableQueryAsyncRequest(obTableQuery,
-                            getTargetTableName(tableNameString));
+                            getTargetTableName(tableNameString), OHOperationType.SCAN);
                         request.setNeedTabletId(false);
                         request.setAllowDistributeScan(false);
                         String phyTableName = obTableClient.getPhyTableNameFromTableGroup(
@@ -1239,7 +1254,7 @@ public class OHTable implements HTableInterface {
                             List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
                             String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
                                     configuration);
-                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName);
+                            request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName, OHOperationType.SCAN);
                             request.setNeedTabletId(false);
                             request.setAllowDistributeScan(false);
                             List<Partition> partitions = obTableClient
@@ -1287,6 +1302,7 @@ public class OHTable implements HTableInterface {
         execute(new OperationExecuteCallback<Void>(opType, 1) {
             @Override
             public Void execute() throws IOException {
+                ((OHBufferedMutatorImpl) getBufferedMutator()).setOpType(opType);
                 getBufferedMutator().mutate(put);
                 if (autoFlush) {
                     flushCommits();
@@ -1302,6 +1318,7 @@ public class OHTable implements HTableInterface {
         execute(new OperationExecuteCallback<Void>(opType, puts.size()) {
             @Override
             public Void execute() throws IOException {
+                ((OHBufferedMutatorImpl) getBufferedMutator()).setOpType(opType);
                 getBufferedMutator().mutate(puts);
                 if (autoFlush) {
                     flushCommits();
@@ -2509,18 +2526,21 @@ public class OHTable implements HTableInterface {
     }
 
     private ObTableQueryRequest buildObTableQueryRequest(ObTableQuery obTableQuery,
-                                                         String targetTableName) {
+                                                         String targetTableName,
+                                                         OHOperationType opType) {
         ObTableQueryRequest request = new ObTableQueryRequest();
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
         request.setTableName(targetTableName);
         request.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         request.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
+        request.setHbaseOpType(opType);
         return request;
     }
 
     private ObTableQueryAsyncRequest buildObTableQueryAsyncRequest(ObTableQuery obTableQuery,
-                                                                   String targetTableName) {
+                                                                   String targetTableName,
+                                                                   OHOperationType opType) {
         ObTableQueryRequest request = new ObTableQueryRequest();
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
@@ -2531,6 +2551,7 @@ public class OHTable implements HTableInterface {
         asyncRequest.setObTableQueryRequest(request);
         asyncRequest.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         asyncRequest.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
+        asyncRequest.setHbaseOpType(opType);
         return asyncRequest;
     }
 

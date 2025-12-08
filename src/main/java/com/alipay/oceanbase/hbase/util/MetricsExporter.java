@@ -1,7 +1,8 @@
 package com.alipay.oceanbase.hbase.util;
 
-import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
+
+import com.yammer.metrics.core.*;
+import com.yammer.metrics.stats.Snapshot;
 
 public class MetricsExporter {
     private double failRate;
@@ -33,19 +34,19 @@ public class MetricsExporter {
     }
 
     public double getAverageOps() {
-        return latencyHistogram.getMeanRate();
+        return latencyHistogram.meanRate();
     }
 
     public double getOneMinuteAverageOps() {
-        return latencyHistogram.getOneMinuteRate();
+        return latencyHistogram.oneMinuteRate();
     }
 
     public double getFiveMinuteAverageOps() {
-        return latencyHistogram.getFiveMinuteRate();
+        return latencyHistogram.fiveMinuteRate();
     }
 
     public double getFifteenMinuteAverageOps() {
-        return latencyHistogram.getFifteenMinuteRate();
+        return latencyHistogram.fifteenMinuteRate();
     }
 
     public double getFailRate() {
@@ -57,15 +58,15 @@ public class MetricsExporter {
     }
 
     public double getAverageLatency() {
-        return latencySnapshot.getMean();
+        return latencyHistogram.mean();
     }
 
-    public long getMaxLatency() {
-        return latencySnapshot.getMax();
+    public double getMaxLatency() {
+        return latencyHistogram.max();
     }
 
-    public long getMinLatency() {
-        return latencySnapshot.getMin();
+    public double getMinLatency() {
+        return latencyHistogram.min();
     }
 
     public double getMedian() {

@@ -2,8 +2,8 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
-import com.codahale.metrics.JmxReporter;
-import com.codahale.metrics.MetricRegistry;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.JmxReporter;
 import org.slf4j.Logger;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 public class OHMetrics {
     private static final Logger logger = TableHBaseLoggerFactory.getLogger(OHMetrics.class);
     private final String metricsName;
-    private final MetricRegistry registry;
+    private final MetricsRegistry registry;
     private final JmxReporter reporter;
     private static OHMetricsTracker[] trackers;
     private final ConcurrentLinkedQueue<ObPair<OHOperationType, MetricsImporter>> metricsQueue = new ConcurrentLinkedQueue<>();
@@ -22,7 +22,7 @@ public class OHMetrics {
 
     public OHMetrics(String metricsName) {
         this.metricsName = metricsName;
-        this.registry = new MetricRegistry();
+        this.registry = new MetricsRegistry();
         trackers = new OHMetricsTracker[OHOperationType.values().length];
         for (int i = 0; i < trackers.length; ++i) {
             OHOperationType opType = OHOperationType.valueOf(i);
@@ -30,7 +30,7 @@ public class OHMetrics {
                     metricsName,
                     opType);
         }
-        this.reporter = JmxReporter.forRegistry(this.registry).build();
+        this.reporter = new JmxReporter(this.registry);
         this.reporter.start();
     }
     public void start() {

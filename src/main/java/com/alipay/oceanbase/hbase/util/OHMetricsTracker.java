@@ -1,11 +1,10 @@
 package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
-import com.codahale.metrics.*;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.core.*;
 
 import java.util.concurrent.TimeUnit;
-
-import static com.codahale.metrics.MetricRegistry.name;
 
 public class OHMetricsTracker {
     private final OHOperationType opType;
@@ -14,17 +13,12 @@ public class OHMetricsTracker {
     private final Counter totalSingleOpCount; // the number of single mutations or queries
     private final Counter totalRuntime;
 
-    public OHMetricsTracker(MetricRegistry registry, String metricsName, OHOperationType opType) {
-        String typeName = opType.name();
+    public OHMetricsTracker(MetricsRegistry registry, String metricsName, OHOperationType opType) {
         this.opType = opType;
-        this.latencyHistogram = registry.timer(
-                name(OHMetrics.class, typeName, "latencyHistogram", metricsName));
-        this.failedOpCounter = registry.meter(
-                name(OHMetrics.class, typeName, "failedOpCounter", metricsName));
-        this.totalSingleOpCount = registry.counter(
-                name(OHMetrics.class, typeName, "totalSingleOpCount", metricsName));
-        this.totalRuntime = registry.counter(
-                name(OHMetrics.class, typeName, "totalRuntime", metricsName));
+        this.latencyHistogram = registry.newTimer(OHMetrics.class, "latencyHistogram", metricsName);
+        this.failedOpCounter = registry.newMeter(OHMetrics.class, "failedOpCounter", "failedOpCounter", TimeUnit.MILLISECONDS);
+        this.totalSingleOpCount = registry.newCounter(OHMetrics.class, "totalSingleOpCount", metricsName);
+        this.totalRuntime = registry.newCounter(OHMetrics.class, "totalRuntime", metricsName);
     }
 
     public OHOperationType getOpType() {
@@ -41,10 +35,10 @@ public class OHMetricsTracker {
     }
 
     public MetricsExporter acquireMetrics() {
-        long curTotalCount = this.latencyHistogram.getCount();
-        long curSingleOpCount = this.totalSingleOpCount.getCount();
+        long curTotalCount = this.latencyHistogram.count();
+        long curSingleOpCount = this.totalSingleOpCount.count();
         double averageSingleOpCount = ((double) curSingleOpCount) / ((double) curTotalCount); // the average number of single op per request
-        double failRate = this.failedOpCounter.getFiveMinuteRate(); // fail rate in 15 minutes
+        double failRate = this.failedOpCounter.fiveMinuteRate(); // fail rate in 15 minutes
 
         return MetricsExporter.getInstanceOf(averageSingleOpCount,
                                              failRate,
