@@ -22,12 +22,16 @@ import com.yammer.metrics.stats.Snapshot;
 
 public class MetricsExporter {
     private double   failRate;
+    private long     failCount;
+    private long     totalRuntime;
     private double   averageSingleOpCount;
     private Timer    latencyHistogram;    // for p99
     private Snapshot latencySnapshot;
 
     public MetricsExporter() {
         this.failRate = 0;
+        this.failCount = 0L;
+        this.totalRuntime = 0L;
         this.averageSingleOpCount = 0;
         this.latencyHistogram = null;
         this.latencySnapshot = null;
@@ -35,6 +39,14 @@ public class MetricsExporter {
 
     public void setFailRate(double failRate) {
         this.failRate = failRate;
+    }
+
+    public void setFailCount(long failCount) {
+        this.failCount = failCount;
+    }
+
+    public void setTotalRuntime(long totalRuntime) {
+        this.totalRuntime = totalRuntime;
     }
 
     public void setAverageSingleOpCount(double averageSingleOpCount) {
@@ -47,6 +59,10 @@ public class MetricsExporter {
 
     public void setLatencySnapshot(Snapshot latencySnapshot) {
         this.latencySnapshot = latencySnapshot;
+    }
+
+    public long getCount() {
+        return latencyHistogram.count();
     }
 
     public double getAverageOps() {
@@ -67,6 +83,14 @@ public class MetricsExporter {
 
     public double getFailRate() {
         return failRate;
+    }
+
+    public long getFailCount() {
+        return failCount;
+    }
+
+    public long getTotalRuntime() {
+        return totalRuntime;
     }
 
     public double getAverageSingleOpCount() {
@@ -109,11 +133,16 @@ public class MetricsExporter {
         return latencySnapshot.get999thPercentile();
     }
 
-    public static MetricsExporter getInstanceOf(double averageSingleOpCount, double failRate,
+    public static MetricsExporter getInstanceOf(double averageSingleOpCount,
+                                                double failRate,
+                                                long failCount,
+                                                long totalRuntime,
                                                 Timer latencyHistogram) {
         MetricsExporter exporter = new MetricsExporter();
         exporter.setAverageSingleOpCount(averageSingleOpCount);
         exporter.setFailRate(failRate);
+        exporter.setFailCount(failCount);
+        exporter.setTotalRuntime(totalRuntime);
         exporter.setLatencyHistogram(latencyHistogram);
         exporter.setLatencySnapshot(latencyHistogram.getSnapshot());
         return exporter;

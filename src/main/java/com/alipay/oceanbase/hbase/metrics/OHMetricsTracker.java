@@ -58,8 +58,14 @@ public class OHMetricsTracker {
         long curSingleOpCount = this.totalSingleOpCount.count();
         double averageSingleOpCount = curTotalCount == 0 ? 0 : ((double) curSingleOpCount)
                                                                / ((double) curTotalCount); // the average number of single op per request
-        double failRate = this.failedOpCounter.fiveMinuteRate(); // fail rate in 15 minutes
+        long failCount = this.failedOpCounter.count();
+        long runtime = this.totalRuntime.count();
+        double failRate = this.failedOpCounter.meanRate(); // fail rate
 
-        return MetricsExporter.getInstanceOf(averageSingleOpCount, failRate, latencyHistogram);
+        return MetricsExporter.getInstanceOf(averageSingleOpCount,
+                                             failRate,
+                                             failCount,
+                                             runtime,
+                                             latencyHistogram);
     }
 }
