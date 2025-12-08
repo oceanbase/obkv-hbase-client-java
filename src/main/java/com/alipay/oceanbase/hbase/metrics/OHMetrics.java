@@ -15,8 +15,9 @@
  * #L%
  */
 
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
+import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -45,12 +46,10 @@ public class OHMetrics {
         for (int i = 1; i <= trackers.length; ++i) {
             OHOperationType opType = OHOperationType.valueOf(i);
             trackers[i - 1] = new OHMetricsTracker(this.registry,
-                                                   metricsName,
-                                                   opType);
+                    metricsName,
+                    opType);
         }
-        this.reporter = JmxReporter.forRegistry(this.registry)
-                                   .inDomain("com.oceanbase.hbase.metrics")
-                                   .build();
+        this.reporter = new JmxReporter(registry);
         this.reporter.start();
         scheduler.scheduleWithFixedDelay(this::updateMetrics, 0, 10, TimeUnit.SECONDS);
     }
@@ -90,7 +89,7 @@ public class OHMetrics {
     }
 
     public void stop() {
-        reporter.stop();
+        reporter.shutdown();
         try {
             scheduler.shutdown();
             // wait at most 500 ms to close the scheduler

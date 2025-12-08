@@ -18,9 +18,9 @@
 package com.alipay.oceanbase.hbase.result;
 
 import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
-import com.alipay.oceanbase.hbase.util.MetricsImporter;
+import com.alipay.oceanbase.hbase.metrics.MetricsImporter;
+import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.hbase.util.OHBaseFuncUtils;
-import com.alipay.oceanbase.hbase.util.OHMetrics;
 import com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory;
 import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
@@ -141,7 +141,8 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 long duration = System.currentTimeMillis() - startTimeMs;
                 importer.setDuration(duration);
                 importer.setSingleOpCount(1);
-                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN, importer));
+                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN,
+                    importer));
             }
         }
     }

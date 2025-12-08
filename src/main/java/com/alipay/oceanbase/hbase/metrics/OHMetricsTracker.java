@@ -15,7 +15,7 @@
  * #L%
  */
 
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -56,11 +56,10 @@ public class OHMetricsTracker {
     public MetricsExporter acquireMetrics() {
         long curTotalCount = this.latencyHistogram.count();
         long curSingleOpCount = this.totalSingleOpCount.count();
-        double averageSingleOpCount = curTotalCount == 0 ? 0 : ((double) curSingleOpCount) / ((double) curTotalCount); // the average number of single op per request
+        double averageSingleOpCount = curTotalCount == 0 ? 0 : ((double) curSingleOpCount)
+                                                               / ((double) curTotalCount); // the average number of single op per request
         double failRate = this.failedOpCounter.fiveMinuteRate(); // fail rate in 15 minutes
 
-        return MetricsExporter.getInstanceOf(averageSingleOpCount,
-                                             failRate,
-                                             latencyHistogram);
+        return MetricsExporter.getInstanceOf(averageSingleOpCount, failRate, latencyHistogram);
     }
 }

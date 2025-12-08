@@ -15,7 +15,7 @@
  * #L%
  */
 
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 import com.yammer.metrics.core.*;
 import com.yammer.metrics.stats.Snapshot;

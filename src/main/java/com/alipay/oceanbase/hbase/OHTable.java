@@ -21,6 +21,8 @@ import com.alipay.oceanbase.hbase.exception.FeatureNotSupportedException;
 import com.alipay.oceanbase.hbase.exception.OperationTimeoutException;
 import com.alipay.oceanbase.hbase.execute.ServerCallable;
 import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
+import com.alipay.oceanbase.hbase.metrics.MetricsImporter;
+import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObGlobal;
@@ -217,8 +219,7 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                           obTableClient.getDatabase(),
-                                                                           obTableClient.getClusterName()));
+                obTableClient.getDatabase(), obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
@@ -276,8 +277,7 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase(),
-                                                                            obTableClient.getClusterName()));
+                obTableClient.getDatabase(), obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
@@ -352,8 +352,7 @@ public class OHTable implements HTableInterface {
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase(),
-                                                                            obTableClient.getClusterName()));
+                obTableClient.getDatabase(), obTableClient.getClusterName()));
         } else {
             this.metrics = null;
         }
