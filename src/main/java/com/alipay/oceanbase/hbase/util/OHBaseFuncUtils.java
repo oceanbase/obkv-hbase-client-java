@@ -52,18 +52,18 @@ public class OHBaseFuncUtils {
         if (tableClient.isOdpMode()) {
             // server version support and distributed capacity is enabled and odp version support
             return ObGlobal.isHBasePutPerfSupport()
-                    && tableClient.getServerCapacity().isSupportDistributedExecute()
-                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
+                   && tableClient.getServerCapacity().isSupportDistributedExecute()
+                   && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0;
         } else {
             // server version support and distributed capacity is enabled
             return ObGlobal.isHBasePutPerfSupport()
-                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+                   && tableClient.getServerCapacity().isSupportDistributedExecute();
         }
     }
 
     public static boolean isAllPut(OHOperationType opType, List<? extends Row> actions) {
         if (opType.getValue() == OHOperationType.PUT.getValue()
-                || opType.getValue() == OHOperationType.PUT_LIST.getValue()) {
+            || opType.getValue() == OHOperationType.PUT_LIST.getValue()) {
             return true;
         } else {
             for (Row action : actions) {
@@ -80,18 +80,17 @@ public class OHBaseFuncUtils {
             @Override
             public int compare(KeyValue kv1, KeyValue kv2) {
                 // 1. sort family in lexicographical order
-                int familyComparison = Bytes.compareTo(kv1.getFamilyArray(),
-                        kv1.getFamilyOffset(), kv1.getFamilyLength(), kv2.getFamilyArray(),
-                        kv2.getFamilyOffset(), kv2.getFamilyLength());
+                int familyComparison = Bytes.compareTo(kv1.getFamilyArray(), kv1.getFamilyOffset(),
+                    kv1.getFamilyLength(), kv2.getFamilyArray(), kv2.getFamilyOffset(),
+                    kv2.getFamilyLength());
                 if (familyComparison != 0) {
                     return familyComparison;
                 }
 
                 // 2: sort qualifier in lexicographical order
                 int qualifierComparison = Bytes.compareTo(kv1.getQualifierArray(),
-                        kv1.getQualifierOffset(), kv1.getQualifierLength(),
-                        kv2.getQualifierArray(), kv2.getQualifierOffset(),
-                        kv2.getQualifierLength());
+                    kv1.getQualifierOffset(), kv1.getQualifierLength(), kv2.getQualifierArray(),
+                    kv2.getQualifierOffset(), kv2.getQualifierLength());
                 if (qualifierComparison != 0) {
                     return qualifierComparison;
                 }
@@ -115,11 +114,11 @@ public class OHBaseFuncUtils {
     public static boolean needTabletId(ObTableClient tableClient) {
         if (tableClient.isOdpMode()) {
             return ObGlobal.isDistributeNeedTabletIdSupport()
-                    && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0
-                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+                   && ObGlobal.OB_PROXY_VERSION >= ObGlobal.OB_PROXY_VERSION_4_3_6_0
+                   && tableClient.getServerCapacity().isSupportDistributedExecute();
         } else {
             return ObGlobal.isDistributeNeedTabletIdSupport()
-                    && tableClient.getServerCapacity().isSupportDistributedExecute();
+                   && tableClient.getServerCapacity().isSupportDistributedExecute();
         }
     }
 
@@ -127,14 +126,14 @@ public class OHBaseFuncUtils {
     public static String metricsNameBuilder(String... name) {
         StringBuilder builder = new StringBuilder();
         if (name != null) {
-           for (String n : name) {
-               if (n != null && !n.isEmpty()) {
-                   if (builder.length() > 0) {
-                       builder.append('.');
-                   }
-                   builder.append(n);
-               }
-           }
+            for (String n : name) {
+                if (n != null && !n.isEmpty()) {
+                    if (builder.length() > 0) {
+                        builder.append('.');
+                    }
+                    builder.append(n);
+                }
+            }
         }
         return builder.toString();
     }

@@ -1,13 +1,29 @@
-package com.alipay.oceanbase.hbase.util;
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
 
+package com.alipay.oceanbase.hbase.util;
 
 import com.yammer.metrics.core.*;
 import com.yammer.metrics.stats.Snapshot;
 
 public class MetricsExporter {
-    private double failRate;
-    private double averageSingleOpCount;
-    private Timer latencyHistogram; // for p99
+    private double   failRate;
+    private double   averageSingleOpCount;
+    private Timer    latencyHistogram;    // for p99
     private Snapshot latencySnapshot;
 
     public MetricsExporter() {
@@ -93,8 +109,7 @@ public class MetricsExporter {
         return latencySnapshot.get999thPercentile();
     }
 
-    public static MetricsExporter getInstanceOf(double averageSingleOpCount,
-                                                double failRate,
+    public static MetricsExporter getInstanceOf(double averageSingleOpCount, double failRate,
                                                 Timer latencyHistogram) {
         MetricsExporter exporter = new MetricsExporter();
         exporter.setAverageSingleOpCount(averageSingleOpCount);
