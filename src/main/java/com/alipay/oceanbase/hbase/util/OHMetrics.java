@@ -32,7 +32,7 @@ public class OHMetrics {
                                                    opType);
         }
         this.reporter = JmxReporter.forRegistry(this.registry)
-                                   .inDomain("com.oceanbase.hbase.metrics")
+                                   .inDomain("com.alipay.oceanbase.hbase.metrics")
                                    .build();
         this.reporter.start();
         scheduler.scheduleWithFixedDelay(this::updateMetrics, 0, 10, TimeUnit.SECONDS);
