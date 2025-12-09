@@ -1,4 +1,4 @@
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 public class MetricsImporter {
     private boolean isFailedOp;
