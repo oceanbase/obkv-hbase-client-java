@@ -48,16 +48,15 @@ public class MetricsExporter {
         this.fifteenMinuteAverageOps = latencyHistogram.fifteenMinuteRate();
         Snapshot snapshot = latencyHistogram.getSnapshot();
         // Time unit of duration stored in Timer is nanosecond, convert it to millisecond
-        double nanosecondsToMilliseconds = 1_000_000.0;
-        this.averageLatency = latencyHistogram.mean() / nanosecondsToMilliseconds;
-        this.maxLatency = (long) (latencyHistogram.max() / nanosecondsToMilliseconds);
-        this.minLatency = (long) (latencyHistogram.min() / nanosecondsToMilliseconds);
-        this.medianLatency = snapshot.getMedian() / nanosecondsToMilliseconds;
-        this.P75thPercentile = snapshot.get75thPercentile() / nanosecondsToMilliseconds;
-        this.P95thPercentile = snapshot.get95thPercentile() / nanosecondsToMilliseconds;
-        this.P98thPercentile = snapshot.get98thPercentile() / nanosecondsToMilliseconds;
-        this.P99thPercentile = snapshot.get99thPercentile() / nanosecondsToMilliseconds;
-        this.P999thPercentile = snapshot.get999thPercentile() / nanosecondsToMilliseconds;
+        this.averageLatency = latencyHistogram.mean();
+        this.maxLatency = (long) (latencyHistogram.max());
+        this.minLatency = (long) (latencyHistogram.min());
+        this.medianLatency = snapshot.getMedian();
+        this.P75thPercentile = snapshot.get75thPercentile();
+        this.P95thPercentile = snapshot.get95thPercentile();
+        this.P98thPercentile = snapshot.get98thPercentile();
+        this.P99thPercentile = snapshot.get99thPercentile();
+        this.P999thPercentile = snapshot.get999thPercentile();
         this.failRate = 0;
         this.failCount = 0L;
         this.totalRuntime = 0L;
