@@ -17,7 +17,6 @@
 
 package com.alipay.oceanbase.hbase.util;
 
-import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import org.junit.Assert;
 
@@ -30,7 +29,7 @@ import java.util.Set;
  */
 public class JMXMetricsTestHelper {
 
-    private static final String JMX_DOMAIN = "com.oceanbase.hbase.metrics";
+    private static final String JMX_DOMAIN = "\"com.alipay.oceanbase.hbase.metrics\"";
     private final MBeanServer   mBeanServer;
 
     public JMXMetricsTestHelper() {
@@ -48,11 +47,14 @@ public class JMXMetricsTestHelper {
     public ObjectName getObjectName(OHOperationType opType, String metricsName, String attributeName) {
         try {
             // the format of JMX name: domain:name=metricName
-            // example: com.alipay.oceanbase.hbase.util.OHMetrics.PUT.latencyHistogram.metricsName
-            String name = String.format("%s.%s.%s.%s", OHMetrics.class.getName(), opType.name(),
-                attributeName, metricsName);
-
-            String objectNameStr = String.format("%s:name=%s", JMX_DOMAIN, name);
+            // 现在结构为: 表名 -> 操作类型 -> 指标名
+            // 路径为: com.alipay.oceanbase.hbase.metrics.OperationMetricsPlaceholder.<表名>.<操作类型>.<指标名>
+            // 例如: com.alipay.oceanbase.hbase.metrics.OperationMetricsPlaceholder.test.test.APPEND.latencyHistogram
+            // yammer metrics 的格式是: type=<class>,name=<name>
+            // 其中 name 是 metricsName.opTypeName.attributeName（表名 -> 操作类型 -> 指标名）
+            // scope 是 "操作类型.指标名"，所以完整的 name 是 "表名.操作类型.指标名"
+            String name = String.format("%s.%s", opType.name(), attributeName);
+            String objectNameStr = String.format("%s:name=\"%s\",scope=\"%s\",type=\"%s\"", JMX_DOMAIN, name, metricsName, "OHMetrics");
             return new ObjectName(objectNameStr);
         } catch (MalformedObjectNameException e) {
             throw new RuntimeException("Failed to create ObjectName", e);

@@ -20,7 +20,7 @@ package com.alipay.oceanbase.hbase.metrics;
 public class MetricsImporter {
     private boolean isFailedOp;
     private long    duration;
-    private long batchSize;
+    private long    batchSize;
 
     public MetricsImporter() {
         this.isFailedOp = false;

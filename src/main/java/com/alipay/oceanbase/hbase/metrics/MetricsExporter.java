@@ -21,24 +21,24 @@ import com.yammer.metrics.core.*;
 import com.yammer.metrics.stats.Snapshot;
 
 public class MetricsExporter {
-    private final long totalOpCount;
+    private final long   totalOpCount;
     private final double averageOps;
     private final double oneMinuteAverageOps;
     private final double fiveMinuteAverageOps;
     private final double fifteenMinuteAverageOps;
-    private final double averageLatency; // ms
-    private final long maxLatency; // ms
-    private final long minLatency; // ms
-    private final double medianLatency; // ms
-    private final double P75thPercentile; // ms
-    private final double P95thPercentile; // ms
-    private final double P98thPercentile; // ms
-    private final double P99thPercentile; // ms
-    private final double P999thPercentile; // ms
-    private long failCount;
-    private long totalRuntime; // ms
-    private double failRate;
-    private double averageSingleOpCount;
+    private final double averageLatency;         // ms
+    private final long   maxLatency;             // ms
+    private final long   minLatency;             // ms
+    private final double medianLatency;          // ms
+    private final double P75thPercentile;        // ms
+    private final double P95thPercentile;        // ms
+    private final double P98thPercentile;        // ms
+    private final double P99thPercentile;        // ms
+    private final double P999thPercentile;       // ms
+    private long         failCount;
+    private long         totalRuntime;           // ms
+    private double       failRate;
+    private double       averageSingleOpCount;
 
     public MetricsExporter(Timer latencyHistogram) {
         this.totalOpCount = latencyHistogram.count();
@@ -152,10 +152,8 @@ public class MetricsExporter {
         return P999thPercentile;
     }
 
-    public static MetricsExporter getInstanceOf(double averageSingleOpCount,
-                                                double failRate,
-                                                long failCount,
-                                                long totalRuntime,
+    public static MetricsExporter getInstanceOf(double averageSingleOpCount, double failRate,
+                                                long failCount, long totalRuntime,
                                                 Timer latencyHistogram) {
         MetricsExporter exporter = new MetricsExporter(latencyHistogram);
         exporter.setAverageSingleOpCount(averageSingleOpCount);
