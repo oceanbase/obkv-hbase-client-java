@@ -1,4 +1,4 @@
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.codahale.metrics.*;
