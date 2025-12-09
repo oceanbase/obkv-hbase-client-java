@@ -2098,6 +2098,8 @@ public class OHTable implements HTableInterface {
                 HConstants.DEFAULT_HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE));
         obTableQuery.setObKVParams(buildOBKVParams(scan));
         obTableQuery.setScanRangeColumns("K", "Q", "T");
+        byte[] hotOnly = scan.getAttribute(HBASE_HTABLE_QUERY_HOT_ONLY);
+        obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
         return obTableQuery;
     }
 
@@ -2124,6 +2126,8 @@ public class OHTable implements HTableInterface {
         }
         obTableQuery.setObKVParams(buildOBKVParams(get));
         obTableQuery.setScanRangeColumns("K", "Q", "T");
+        byte[] hotOnly = get.getAttribute(HBASE_HTABLE_QUERY_HOT_ONLY);
+        obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
         return obTableQuery;
     }
 
