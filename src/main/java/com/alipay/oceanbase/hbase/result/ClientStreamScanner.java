@@ -140,7 +140,7 @@ public class ClientStreamScanner extends AbstractClientScanner {
             if (metrics != null) {
                 long duration = System.currentTimeMillis() - startTimeMs;
                 importer.setDuration(duration);
-                importer.setSingleOpCount(1);
+                importer.setBatchSize(1);
                 metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN,
                     importer));
             }
