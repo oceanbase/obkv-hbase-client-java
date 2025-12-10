@@ -1,5 +1,6 @@
 package com.alipay.oceanbase.hbase.util;
 
+import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import org.junit.Assert;
 
@@ -12,7 +13,7 @@ import java.util.Set;
  */
 public class JMXMetricsTestHelper {
     
-    private static final String JMX_DOMAIN = "com.oceanbase.hbase.metrics";
+    private static final String JMX_DOMAIN = "com.alipay.oceanbase.hbase.metrics";
     private final MBeanServer mBeanServer;
     
     public JMXMetricsTestHelper() {
@@ -31,12 +32,11 @@ public class JMXMetricsTestHelper {
                                     String attributeName) {
         try {
             // the format of JMX name: domain:name=metricName
-            // example: com.alipay.oceanbase.hbase.util.OHMetrics.PUT.latencyHistogram.metricsName
-            String name = String.format("%s.%s.%s.%s",
-                    OHMetrics.class.getName(),
+            // example: test_multi_cf.test.PUT.latencyHistogram
+            String name = String.format("%s.%s.%s",
+                    metricsName,
                     opType.name(),
-                    attributeName,
-                    metricsName);
+                    attributeName);
             
             String objectNameStr = String.format("%s:name=%s",
                 JMX_DOMAIN, name);

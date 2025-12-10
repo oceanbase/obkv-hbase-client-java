@@ -1,8 +1,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.JMXMetricsTestHelper;
-import com.alipay.oceanbase.hbase.util.MetricsExporter;
-import com.alipay.oceanbase.hbase.util.OHMetrics;
+import com.alipay.oceanbase.hbase.metrics.MetricsExporter;
+import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.hbase.util.ObHTableTestUtil;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import org.apache.hadoop.conf.Configuration;

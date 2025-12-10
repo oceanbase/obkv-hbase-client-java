@@ -1,4 +1,4 @@
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.codahale.metrics.*;
@@ -18,13 +18,13 @@ public class OHMetricsTracker {
         String typeName = opType.name();
         this.opType = opType;
         this.latencyHistogram = registry.timer(
-                name(OHMetrics.class, typeName, "latencyHistogram", metricsName));
+                name(metricsName, typeName, "latencyHistogram"));
         this.failedOpCounter = registry.meter(
-                name(OHMetrics.class, typeName, "failedOpCounter", metricsName));
+                name(metricsName, typeName, "failedOpCounter"));
         this.totalSingleOpCount = registry.counter(
-                name(OHMetrics.class, typeName, "totalSingleOpCount", metricsName));
+                name(metricsName, typeName, "totalSingleOpCount"));
         this.totalRuntime = registry.counter(
-                name(OHMetrics.class, typeName, "totalRuntime", metricsName));
+                name(metricsName, typeName, "totalRuntime"));
     }
 
     public OHOperationType getOpType() {

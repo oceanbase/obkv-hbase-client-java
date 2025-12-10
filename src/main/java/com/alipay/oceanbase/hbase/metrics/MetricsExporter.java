@@ -1,4 +1,4 @@
-package com.alipay.oceanbase.hbase.util;
+package com.alipay.oceanbase.hbase.metrics;
 
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
