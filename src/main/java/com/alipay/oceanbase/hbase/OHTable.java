@@ -2127,11 +2127,13 @@ public class OHTable implements HTableInterface {
 
     /**
      * Check if the Get or Scan operation is configured for weak read.
+     * If the query does not have HBASE_HTABLE_READ_CONSISTENCY attribute set,
+     * it will fall back to the global configuration.
      *
      * @param query the Get or Scan object to check
      * @return true if weak read is enabled, false otherwise
      */
-    public static boolean isWeakRead(Object query) {
+    public boolean isWeakRead(Object query) {
         if (query == null) {
             return false;
         }
@@ -2143,11 +2145,16 @@ public class OHTable implements HTableInterface {
         } else {
             return false;
         }
+        String consistencyStr;
         if (consistency == null) {
-            return false;
+            // fall back to global configuration
+            consistencyStr = configuration.get(HBASE_HTABLE_READ_CONSISTENCY);
+            if (consistencyStr == null) {
+                return false;
+            }
+        } else {
+            consistencyStr = Bytes.toString(consistency);
         }
-        String consistencyStr = Bytes.toString(consistency);
-        System.out.println("consistencyStr: " + consistencyStr);
         return "weak".equalsIgnoreCase(consistencyStr);
     }
 
@@ -2360,10 +2367,14 @@ public class OHTable implements HTableInterface {
         BatchOperation batch = obTableClient.batchOperation(tableName);
         int posInList = -1;
         int singleOpResultNum;
+        int getOperationNum = 0;
+        // allGetIsWeakRead is initialized to true, and set to false if any Get is not weak read
+        boolean allGetIsWeakRead = true;
         for (Row row : actions) {
             singleOpResultNum = 0;
             posInList++;
             if (row instanceof Get) {
+                getOperationNum++;
                 if (!ObGlobal.isHBaseBatchGetSupport()) {
                     throw new FeatureNotSupportedException("server does not support batch get");
                 }
@@ -2398,8 +2409,9 @@ public class OHTable implements HTableInterface {
                 ObTableClientQueryImpl query = new ObTableClientQueryImpl(tableName, obTableQuery, obTableClient);
                 try {
                     query.setRowKey(row(colVal("K", Bytes.toString(get.getRow())), colVal("Q", null), colVal("T", Integer.MAX_VALUE)));
-                    if (isWeakRead(get)) {
-                        batch.setReadConsistency(ObReadConsistency.WEAK);
+                    // if any Get is not weak read, set allGetIsWeakRead to false
+                    if (!isWeakRead(get)) {
+                        allGetIsWeakRead = false;
                     }
                 } catch (Exception e) {
                     throw new IOException(e);
@@ -2494,6 +2506,10 @@ public class OHTable implements HTableInterface {
                     "not supported other type in batch yet,only support get, put and delete");
             }
             resultMapSingleOp.add(singleOpResultNum);
+        }
+        // only set weak read consistency when all operations are Get and all Get operations are weak read
+        if (getOperationNum == actions.size() && allGetIsWeakRead) {
+            batch.setReadConsistency(ObReadConsistency.WEAK);
         }
         batch.setEntityType(ObTableEntityType.HKV);
         batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
