@@ -126,9 +126,6 @@ public class ObTableClientManager {
                     if (connectionConfig.getRoutePolicy() != null) {
                         obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
                     }
-                    if (connectionConfig.getGlobalWeakRead() != null) {
-                        obTableClient.setReadConsistency(ObReadConsistency.getByName(connectionConfig.getGlobalWeakRead()));
-                    }
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
