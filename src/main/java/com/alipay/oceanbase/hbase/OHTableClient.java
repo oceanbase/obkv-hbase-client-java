@@ -18,6 +18,8 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.core.Lifecycle;
+import com.alipay.oceanbase.hbase.metrics.OHMetrics;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
 import com.google.protobuf.Service;
@@ -474,5 +476,10 @@ public class OHTableClient implements HTableInterface, Lifecycle {
     public Pair<byte[][], byte[][]> getStartEndKeys() throws IOException {
         checkStatus();
         return this.ohTable.getStartEndKeys();
+    }
+
+    @VisibleForTesting
+    public OHMetrics getMetrics() {
+        return ohTable.getMetrics();
     }
 }

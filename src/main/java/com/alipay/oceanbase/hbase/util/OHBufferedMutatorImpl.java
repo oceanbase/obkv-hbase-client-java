@@ -19,6 +19,7 @@ package com.alipay.oceanbase.hbase.util;
 
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
@@ -54,6 +55,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private final ExecutorService         pool;
     private int                           rpcTimeout;
     private int                           operationTimeout;
+    private OHOperationType               opType                 = OHOperationType.INVALID;
     private static final long             OB_VERSION_4_2_5_1     = calcVersion(4, (short) 2,
                                                                      (byte) 5, (byte) 1);
 
@@ -196,11 +198,18 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      */
     private void batchExecute(boolean flushAll) throws IOException {
         LinkedList<Mutation> execBuffer = new LinkedList<>();
+        OHOperationType curOpType = OHOperationType.INVALID;
+        if (opType.getValue() != OHOperationType.INVALID.getValue()) {
+            curOpType = opType;
+        }
         long dequeuedSize = 0L;
         try {
             Mutation m;
             while ((writeBufferSize <= 0 || dequeuedSize < (writeBufferSize * 2) || flushAll)
                 && (m = asyncWriteBuffer.poll()) != null) {
+                if (opType.getValue() == OHOperationType.INVALID.getValue()) {
+                    curOpType = determineOpType(m, curOpType);
+                }
                 execBuffer.add(m);
                 long size = m.heapSize();
                 currentAsyncBufferSize.addAndGet(-size);
@@ -211,7 +220,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 return;
             }
             Object[] results = new Object[execBuffer.size()];
-            ohTable.batch(execBuffer, results);
+            ohTable.innerBatchImpl(execBuffer, results, curOpType);
         } catch (Exception ex) {
             // do not recollect error operations, notify outside
             if (ex instanceof RetriesExhaustedWithDetailsException) {
@@ -225,6 +234,39 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
                 throw ex;
             }
         }
+    }
+
+    private OHOperationType determineOpType(Mutation m, OHOperationType curOpType) {
+        if (curOpType.getValue() == OHOperationType.BATCH.getValue()) {
+            // do nothing
+        } else if (curOpType.getValue() == OHOperationType.INVALID.getValue()) {
+            if (m instanceof Put) {
+                curOpType = OHOperationType.PUT;
+            } else { // only support Put and Delete
+                curOpType = OHOperationType.DELETE;
+            }
+        } else if (m instanceof Put) {
+            if (curOpType.getValue() == OHOperationType.PUT_LIST.getValue()) {
+                // do nothing
+            } else if (opType.getValue() == OHOperationType.PUT.getValue()) {
+                curOpType = OHOperationType.PUT_LIST;
+            } else {
+                curOpType = OHOperationType.BATCH;
+            }
+        } else {
+            if (curOpType.getValue() == OHOperationType.DELETE_LIST.getValue()) {
+                // do nothing
+            } else if (curOpType.getValue() == OHOperationType.DELETE.getValue()) {
+                curOpType = OHOperationType.DELETE_LIST;
+            } else {
+                curOpType = OHOperationType.BATCH;
+            }
+        }
+        return curOpType;
+    }
+
+    public void setOpType(OHOperationType opType) {
+        this.opType = opType;
     }
 
     @Override
