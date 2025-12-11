@@ -134,6 +134,17 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_READ_CONSISTENCY       = "hbase.htable.read.consistency";
 
+
+    /**
+     * use to specify whether to enable the hotkey get optimize when performing a query.
+     */
+    public static final String   HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE       = "hbase.htable.hotkey.get.optimize.enable";
+
+    /**
+     * 开启后不指定时间戳的读写都将以此时间戳进行写入和查询, 默认为兼容原行为
+     */
+    public static final String  HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL = "hbase.htable.hotkey.get.optimize.enable.global";
+
     /**
      * use to specify the idc when performing a query.
      */
