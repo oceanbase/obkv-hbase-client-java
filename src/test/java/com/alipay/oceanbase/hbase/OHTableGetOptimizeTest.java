@@ -27,6 +27,8 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.*;
 
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE;
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 /**
@@ -96,6 +98,7 @@ public class OHTableGetOptimizeTest {
         // Get with single column
         Get get = new Get(toBytes(key1));
         get.addColumn(family1.getBytes(), column1.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals(value3, Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -113,6 +116,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key1));
         get.addColumn(family1.getBytes(), column1.getBytes());
         get.setMaxVersions(10);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals(value3, Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -144,6 +148,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key2));
         get.addColumn(family2.getBytes(), column1.getBytes());
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals(value3, Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -163,6 +168,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key2));
         get.addColumn(family2.getBytes(), column1.getBytes());
         get.setMaxVersions(10);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertTrue(r.rawCells().length >= 3);
         Assert.assertEquals(value3, Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -216,6 +222,7 @@ public class OHTableGetOptimizeTest {
 
         Get get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), col1.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_c1_v3", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -234,6 +241,7 @@ public class OHTableGetOptimizeTest {
 
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), col2.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r2 = hTable.get(get);
         Assert.assertEquals(1, r2.rawCells().length);
         Assert.assertEquals("value_c2_v2", Bytes.toString(r2.rawCells()[0].getValueArray(), r2.rawCells()[0].getValueOffset(), r2.rawCells()[0].getValueLength()));
@@ -282,6 +290,10 @@ public class OHTableGetOptimizeTest {
             gets.add(get);
         }
 
+        for (Get get : gets) {
+            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        }
+
         Result[] results = hTable.get(gets);
         Assert.assertEquals(3, results.length);
         for (int i = 0; i < results.length; i++) {
@@ -320,6 +332,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), column.getBytes());
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -328,6 +341,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), column.getBytes());
         get.setMaxVersions(3);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(3, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -337,6 +351,7 @@ public class OHTableGetOptimizeTest {
         // Get with default MaxVersions
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), column.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -379,6 +394,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), column.getBytes());
         get.setTimeRange(t1, t2 + 1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         // With MaxVersions=1 at table level, should get only 1 version
         Assert.assertTrue(r.rawCells().length >= 1);
@@ -390,6 +406,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), column.getBytes());
         get.setTimeRange(t1, t3 + 1);
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_t3", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -436,6 +453,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addColumn(family1.getBytes(), column.getBytes());
         get.setTimeStamp(t2);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_t2", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -445,6 +463,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family1.getBytes(), column.getBytes());
         get.setTimeStamp(t1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_t1", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -454,6 +473,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family1.getBytes(), column.getBytes());
         get.setTimeStamp(t3);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_t3", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -478,6 +498,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family2.getBytes(), column.getBytes());
         get.setTimeStamp(t2);
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value2_t2", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -488,6 +509,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key2));
         get.addColumn(family2.getBytes(), column.getBytes());
         get.setTimeStamp(nonExistentTs);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
     }
@@ -522,6 +544,7 @@ public class OHTableGetOptimizeTest {
             Get get = new Get(toBytes(key));
             get.addColumn(family.getBytes(), column.getBytes());
             get.setTimeStamp(timestamps[i]);
+            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
             Result r = hTable.get(get);
             Assert.assertEquals(1, r.rawCells().length);
             Assert.assertEquals("value_" + i, Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -533,6 +556,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), column.getBytes());
         get.setTimeStamp(timestamps[2]);
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_2", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -543,6 +567,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), column.getBytes());
         get.setTimeStamp(betweenTs);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(0, r.rawCells().length);
     }
@@ -611,6 +636,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), col1.getBytes());
         get.addColumn(family.getBytes(), col2.getBytes());
         get.addColumn(family.getBytes(), col3.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(3, r.rawCells().length);
@@ -666,6 +692,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), col3.getBytes());
         get.addColumn(family.getBytes(), col4.getBytes());
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(4, r.rawCells().length);
@@ -687,6 +714,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), col1.getBytes());
         get.addColumn(family.getBytes(), col2.getBytes());
         get.setMaxVersions(3);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         
         Assert.assertEquals(6, r.rawCells().length);
@@ -740,6 +768,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), col2.getBytes());
         get.addColumn(family.getBytes(), col3.getBytes());
         get.setTimeStamp(t2);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(3, r.rawCells().length);
@@ -788,6 +817,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), col.getBytes());
         get.setMaxVersions(3);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -796,6 +826,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), col.getBytes());
         get.setMaxVersions(5);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -804,6 +835,7 @@ public class OHTableGetOptimizeTest {
         get = new Get(toBytes(key));
         get.addColumn(family.getBytes(), col.getBytes());
         get.setMaxVersions(10);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         r = hTable.get(get);
         Assert.assertEquals(1, r.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r.rawCells()[0].getValueArray(), r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
@@ -844,6 +876,7 @@ public class OHTableGetOptimizeTest {
         get.addColumn(family.getBytes(), col2.getBytes());
         get.addColumn(family.getBytes(), col3.getBytes());
         get.setMaxVersions(3);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(3, r.rawCells().length);
@@ -939,6 +972,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addFamily(family.getBytes());
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(4, r.rawCells().length);
@@ -999,6 +1033,7 @@ public class OHTableGetOptimizeTest {
         Get get = new Get(toBytes(key));
         get.addFamily(family.getBytes());
         get.setTimeStamp(t2);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(3, r.rawCells().length);
@@ -1051,6 +1086,7 @@ public class OHTableGetOptimizeTest {
         get.addFamily(family.getBytes());
         get.setTimeStamp(timestamps[2]);
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r = hTable.get(get);
         
         Assert.assertEquals(4, r.rawCells().length);
@@ -1074,6 +1110,7 @@ public class OHTableGetOptimizeTest {
         get.addFamily(family.getBytes());
         get.setTimeStamp(timestamps[4]);
         get.setMaxVersions(1);
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
         Result r2 = hTable.get(get);
         
         Assert.assertEquals(4, r2.rawCells().length);
@@ -1122,81 +1159,4 @@ public class OHTableGetOptimizeTest {
         Assert.assertEquals(1, r3.rawCells().length);
         Assert.assertEquals("value_5", Bytes.toString(r3.rawCells()[0].getValueArray(), r3.rawCells()[0].getValueOffset(), r3.rawCells()[0].getValueLength()));
     }
-
-
-    // test batch get single cf with global setting
-    @Test
-    public void testGetOptimizeBatchGetSingleCfWithGlobalSetting() throws Exception {
-        Configuration c = ObHTableTestUtil.newConfiguration();
-        c.set("rs.list.acquire.read.timeout", "10000");
-        c.set(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, "true");
-        hTable = new OHTable(c, "test_get_optimize");
-        
-        String family = "family_max_version_1";
-        String col = "col";
-
-        // Use different keys for batch get test
-        List<String> keys = Arrays.asList("batch_key_01", "batch_key_02", "batch_key_03", "batch_key_04", "batch_key_05");
-        long baseTime = System.currentTimeMillis();
-        
-        // Put multiple versions for each key
-        for (String key : keys) {
-            for (int i = 1; i <= 3; i++) {
-                Put put = new Put(toBytes(key));
-                put.addColumn(family.getBytes(), col.getBytes(), baseTime + i, toBytes(key + "_v" + i));
-                hTable.put(put);
-            }
-        }
-
-        List<Get> gets = new ArrayList<>();
-        for (String key : keys) {
-            Get get = new Get(toBytes(key));
-            get.addColumn(family.getBytes(), col.getBytes());
-            gets.add(get);
-        }
-
-        // Test with statement-level setting to false (should override global setting)
-        for (Get get : gets) {
-            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "false".getBytes());
-        }
-
-        Result[] results = hTable.get(gets);
-        Assert.assertEquals(5, results.length);
-        for (int i = 0; i < results.length; i++) {
-            Assert.assertEquals(1, results[i].rawCells().length);
-            // Should return latest version (v3) when optimize is disabled
-            Assert.assertEquals(keys.get(i) + "_v3", Bytes.toString(results[i].rawCells()[0].getValueArray(), results[i].rawCells()[0].getValueOffset(), results[i].rawCells()[0].getValueLength()));
-        }
-
-        // Test with statement-level setting to true (should override global setting)
-        for (Get get : gets) {
-            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
-        }
-
-        results = hTable.get(gets);
-        Assert.assertEquals(5, results.length);
-        for (int i = 0; i < results.length; i++) {
-            Assert.assertEquals(1, results[i].rawCells().length);
-            // Should return latest version (v3) when optimize is enabled
-            Assert.assertEquals(keys.get(i) + "_v3", Bytes.toString(results[i].rawCells()[0].getValueArray(), results[i].rawCells()[0].getValueOffset(), results[i].rawCells()[0].getValueLength()));
-        }
-
-        // Test without statement-level setting (should use global setting which is true)
-        gets = new ArrayList<>();
-        for (String key : keys) {
-            Get get = new Get(toBytes(key));
-            get.addColumn(family.getBytes(), col.getBytes());
-            // Don't set statement-level attribute, should use global setting
-            gets.add(get);
-        }
-
-        results = hTable.get(gets);
-        Assert.assertEquals(5, results.length);
-        for (int i = 0; i < results.length; i++) {
-            Assert.assertEquals(1, results[i].rawCells().length);
-            // Should return latest version (v3) using global setting
-            Assert.assertEquals(keys.get(i) + "_v3", Bytes.toString(results[i].rawCells()[0].getValueArray(), results[i].rawCells()[0].getValueOffset(), results[i].rawCells()[0].getValueLength()));
-        }
-    }
-
 }
