@@ -2903,7 +2903,7 @@ public class ObTableWeakReadTest {
         setZoneIdc(ZONE3, IDC3);
         // 3. Scan不设置READ_CONSISTENCY属性，使用全局配置
         Scan scan = new Scan();
-        scan.withStartRow(rowkey.getBytes());
+        scan.setStartRow(rowkey.getBytes());
         // 不设置 READ_CONSISTENCY 属性
         scan.addColumn(FAMILY_NAME.getBytes(), "c2".getBytes());
         ResultScanner resultScanner = table.getScanner(scan);
