@@ -2122,6 +2122,16 @@ public class OHTable implements HTableInterface {
         obTableQuery.setScanRangeColumns("K", "Q", "T");
         byte[] hotOnly = get.getAttribute(HBASE_HTABLE_QUERY_HOT_ONLY);
         obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
+        boolean hotKeyGetOptimizeEnableBool = false;
+        byte[] hotKeyGetOptimizeEnable = get.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
+        if (hotKeyGetOptimizeEnable == null) {
+            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+            hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
+        } else {
+            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
+        }
+
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
         return obTableQuery;
     }
 
