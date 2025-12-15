@@ -110,10 +110,6 @@ public final class OHConstants {
     public static final String   HBASE_HTABLE_POOL_OPERATION_TIMEOUT         = "hbase.htable.pool.operation.timeout";
 
     /**
-     * use to specify whether to query only the data in hot storage when performing a query.
-     */
-    public static final String   HBASE_HTABLE_QUERY_HOT_ONLY       = "hbase.htable.query.hot_only";
-    /**
      * internal attribute of ohtable pool which enable the test load
      */
     public static final String   HBASE_HTABLE_TEST_LOAD_ENABLE               = "hbase.htable.test.load.enable";
@@ -127,6 +123,26 @@ public final class OHConstants {
      * the default value of internal attribute of ohtable pool which specify the test load suffix
      */
     public static final String   DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX       = "_t";
+
+    /**
+     * use to specify whether to query only the data in hot storage when performing a query.
+     */
+    public static final String   HBASE_HTABLE_QUERY_HOT_ONLY       = "hbase.htable.query.hot_only";
+
+    /**
+     * use to specify the read consistency when performing a query.
+     */
+    public static final String   HBASE_HTABLE_READ_CONSISTENCY       = "hbase.htable.read.consistency";
+
+    /**
+     * use to specify the idc when performing a query.
+     */
+    public static final String   HBASE_HTABLE_CLIENT_IDC       = "hbase.htable.client.idc";
+
+    /**
+     * use to specify the route policy when performing a query.
+     */
+    public static final String   HBASE_HTABLE_CLIENT_ROUTE_POLICY       = "hbase.htable.client.route.policy";
 
     /*-------------------------------------------------------------------------------------------------------------*/
 

@@ -20,6 +20,9 @@ package com.alipay.oceanbase.hbase.util;
 import com.alipay.oceanbase.hbase.OHTable;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.constant.Constants;
+import com.alipay.oceanbase.rpc.location.model.ObRoutePolicy;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObReadConsistency;
+import com.alipay.oceanbase.hbase.OHTable;
 import com.google.common.base.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.TableName;
@@ -59,7 +62,7 @@ public class ObTableClientManager {
             obTableClientKey.setDatabase(connectionConfig.getDatabase());
         } else {
             checkArgument(isNotBlank(connectionConfig.getParamUrl()), HBASE_OCEANBASE_PARAM_URL
-                    + " is blank");
+                                                                      + " is blank");
             obTableClientKey = new ObTableClientKey();
             String paramUrl = connectionConfig.getParamUrl();
             if (!paramUrl.contains("database")) {
@@ -74,7 +77,7 @@ public class ObTableClientManager {
             }
         }
         checkArgument(isNotBlank(connectionConfig.getFullUsername()),
-                HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
+            HBASE_OCEANBASE_FULL_USER_NAME + " is blank");
         obTableClientKey.setFullUserName(connectionConfig.getFullUsername());
 
         if (connectionConfig.getPassword() == null) {
@@ -86,7 +89,7 @@ public class ObTableClientManager {
         for (Map.Entry<Object, Object> property : connectionConfig.getProperties().entrySet()) {
             obTableClientKey.getProperties().put(property.getKey(), property.getValue());
         }
-        
+
         return getOrCreateObTableClient(obTableClientKey, connectionConfig);
     }
 
@@ -118,6 +121,12 @@ public class ObTableClientManager {
                     obTableClient.setPassword(obTableClientKey.getPassword());
                     obTableClient.setRpcConnectTimeout(connectionConfig.getRpcConnectTimeout());
                     obTableClient.addProperty(RPC_OPERATION_TIMEOUT.getKey(), Integer.toString(connectionConfig.getServerOperationTimeout()));
+                    if (connectionConfig.getIdc() != null) {
+                        obTableClient.setCurrentIDC(connectionConfig.getIdc());
+                    }
+                    if (connectionConfig.getRoutePolicy() != null) {
+                        obTableClient.setRoutePolicy(ObRoutePolicy.getByName(connectionConfig.getRoutePolicy()));
+                    }
                     obTableClient.init();
                     OB_TABLE_CLIENT_INSTANCE.put(obTableClientKey, obTableClient);
                 }
@@ -131,7 +140,7 @@ public class ObTableClientManager {
     }
 
     public static ObTableClient getOrCreateObTableClientByTableName(TableName tableName, OHConnectionConfiguration connectionConfig) throws IllegalArgumentException,
-                                                                                                                            IOException {
+            IOException {
         String tableNameString = tableName.getNameAsString();
         ObTableClient obTableClient = getOrCreateObTableClient(
                 OHTable.setUserDefinedNamespace(tableNameString, connectionConfig));

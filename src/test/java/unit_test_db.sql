@@ -382,3 +382,77 @@ SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3
     PARTITION `p2` VALUES LESS THAN (200),
     PARTITION `p3` VALUES LESS THAN MAXVALUE
 );
+
+use test;
+
+CREATE TABLEGROUP test_get_optimize_secondary_key_range SHARDING = 'ADAPTIVE';
+CREATE TABLE IF NOT EXISTS `test_get_optimize_secondary_key_range$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `G` bigint(20) GENERATED ALWAYS AS (ABS(T)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize_secondary_key_range
+PARTITION BY KEY(`K`) PARTITIONS 3
+SUBPARTITION BY RANGE COLUMNS(`G`) SUBPARTITION TEMPLATE (
+    SUBPARTITION `p1` VALUES LESS THAN (100),
+    SUBPARTITION `p2` VALUES LESS THAN (200),
+    SUBPARTITION `p3` VALUES LESS THAN MAXVALUE
+);
+
+CREATE TABLEGROUP test_get_optimize_secondary_range_key SHARDING = 'ADAPTIVE';
+CREATE TABLE IF NOT EXISTS `test_get_optimize_secondary_range_key$family1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    `G` bigint(20) GENERATED ALWAYS AS (ABS(T)),
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize_secondary_range_key
+PARTITION BY RANGE COLUMNS(`G`)
+SUBPARTITION BY KEY(`K`) SUBPARTITIONS 3
+(    PARTITION `p1` VALUES LESS THAN (100),
+    PARTITION `p2` VALUES LESS THAN (200),
+    PARTITION `p3` VALUES LESS THAN MAXVALUE
+);
+
+CREATE TABLEGROUP test_get_optimize SHARDING = 'ADAPTIVE';
+CREATE TABLE `test_get_optimize$family_max_version_1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize
+KV_ATTRIBUTES ='{"Hbase": {"MaxVersions": 1}}'
+PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_get_optimize$family_max_version_default` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize
+PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLEGROUP test_get_optimize_t SHARDING = 'ADAPTIVE';
+CREATE TABLE `test_get_optimize_t$family_max_version_1` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize_t
+KV_ATTRIBUTES ='{"Hbase": {"MaxVersions": 1}}'
+PARTITION BY KEY(`K`) PARTITIONS 3;
+
+CREATE TABLE `test_get_optimize_t$family_max_version_default` (
+    `K` varbinary(1024) NOT NULL,
+    `Q` varbinary(256) NOT NULL,
+    `T` bigint(20) NOT NULL,
+    `V` varbinary(1024) DEFAULT NULL,
+    PRIMARY KEY (`K`, `Q`, `T`)
+) TABLEGROUP = test_get_optimize_t
+PARTITION BY KEY(`K`) PARTITIONS 3;
