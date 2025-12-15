@@ -1080,8 +1080,6 @@ public class OHTable implements Table {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00002"), tableNameString, Bytes.toString(family),
-                            e);
                     throw new IOException("query table:" + tableNameString + " family "
                             + Bytes.toString(family) + " error.", e);
                 }
@@ -1192,8 +1190,6 @@ public class OHTable implements Table {
                                 }
                             }
                         } catch (Exception e) {
-                            logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                                    e);
                             throw new IOException("scan table:" + tableNameString + " family "
                                     + Bytes.toString(family) + " error.", e);
                         }
@@ -1296,8 +1292,6 @@ public class OHTable implements Table {
                         }
                     }
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00003"), tableNameString, Bytes.toString(family),
-                            e);
                     throw new IOException("scan table:" + tableNameString + " family "
                             + Bytes.toString(family) + " error.", e);
                 }
@@ -1443,7 +1437,6 @@ public class OHTable implements Table {
             Object[] results = new Object[deletes.size()];
             innerBatchImpl(deletes, results, opType);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00004"), tableNameString, e);
             throw e;
         }
     }
@@ -1626,7 +1619,6 @@ public class OHTable implements Table {
                     }
                     return Result.create(keyValues);
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00006"), tableNameString, e);
                     throw new IOException("append table " + tableNameString + " error.", e);
                 }
             }
@@ -1683,7 +1675,6 @@ public class OHTable implements Table {
                     }
                     return Result.create(keyValues);
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00007"), tableNameString, e);
                     throw new IOException("increment table " + tableNameString + " error.", e);
                 }
             }
@@ -1734,7 +1725,6 @@ public class OHTable implements Table {
                     }
                     return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3).getValue());
                 } catch (Exception e) {
-                    logger.error(LCD.convert("01-00007"), tableNameString, e);
                     throw new IOException("increment table " + tableNameString + " error.", e);
                 }
             }
@@ -1755,9 +1745,10 @@ public class OHTable implements Table {
             Object[] results = new Object[puts.size()];
             innerBatchImpl(puts, results, opType);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00008"), tableNameString, null, puts.size(), e);
             if (e instanceof IOException) {
                 throw (IOException) e;
+            } else {
+                throw new IOException(tableNameString + " table occurred unexpected error.", e);
             }
         }
     }
@@ -1770,7 +1761,6 @@ public class OHTable implements Table {
             ObHbaseRequest request = buildHbaseRequest(puts, opType);
             ObHbaseResult result = (ObHbaseResult) obTableClient.execute(request);
         } catch (Exception e) {
-            logger.error(LCD.convert("01-00008"), tableNameString, null, puts.size(), e);
             if (e instanceof IOException) {
                 throw (IOException) e;
             } else {
@@ -2423,7 +2413,6 @@ public class OHTable implements Table {
                         allGetIsWeakRead = false;
                     }
                 } catch (Exception e) {
-                    logger.error("unexpected error occurs when set row key", e);
                     throw new IOException(e);
                 }
                 batch.addOperation(query);
