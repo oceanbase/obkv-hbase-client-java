@@ -60,6 +60,9 @@ public class OHConnectionConfiguration {
     private final long       writeBufferPeriodicFlushTimeoutMs;
     private final long       writeBufferPeriodicFlushTimerTickMs;
     private final int        numRetries;
+    private String           globalWeakRead = null;
+    private String           idc = null;
+    private String           routePolicy = null;
 
     public OHConnectionConfiguration(Configuration conf) {
         this.paramUrl = conf.get(HBASE_OCEANBASE_PARAM_URL);
@@ -111,6 +114,9 @@ public class OHConnectionConfiguration {
         this.scannerMaxResultSize = conf.getLong(
             HConstants.HBASE_CLIENT_SCANNER_MAX_RESULT_SIZE_KEY, WRITE_BUFFER_SIZE_DEFAULT);
         this.maxKeyValueSize = conf.getInt(MAX_KEYVALUE_SIZE_KEY, MAX_KEYVALUE_SIZE_DEFAULT);
+        this.idc = conf.get(HBASE_HTABLE_CLIENT_IDC);
+        this.routePolicy = conf.get(HBASE_HTABLE_CLIENT_ROUTE_POLICY);
+        this.globalWeakRead = conf.get(HBASE_HTABLE_READ_CONSISTENCY);
         properties = new Properties();
         for (Property property : Property.values()) {
             String value = conf.get(property.getKey());
@@ -222,5 +228,17 @@ public class OHConnectionConfiguration {
 
     public int getNumRetries() {
         return this.numRetries;
+    }
+
+    public String getIdc() {
+        return this.idc;
+    }
+
+    public String getRoutePolicy() {
+        return this.routePolicy;
+    }
+
+    public String getGlobalWeakRead() {
+        return this.globalWeakRead;
     }
 }
