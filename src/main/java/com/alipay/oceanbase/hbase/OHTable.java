@@ -205,8 +205,9 @@ public class OHTable implements Table {
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                           obTableClient.getDatabase()));
+                                                                            obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
@@ -263,6 +264,7 @@ public class OHTable implements Table {
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(ohConnectionConf.getClientOperationTimeout());
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
                                                                             obTableClient.getDatabase()));
         } else {
@@ -338,6 +340,7 @@ public class OHTable implements Table {
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
                                                                             obTableClient.getDatabase()));
         } else {
@@ -384,6 +387,7 @@ public class OHTable implements Table {
         this.obTableClient.setRuntimeRetryTimes(numRetries);
         setOperationTimeout(operationTimeout);
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
+            // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
                                                                             obTableClient.getDatabase()));
         } else {
@@ -501,6 +505,7 @@ public class OHTable implements Table {
 
     private <T> T execute(OperationExecuteCallback<T> callback) throws IOException {
         if (this.metrics != null) {
+            System.out.println("Thread_id: " + Thread.currentThread().getId() + ", with op: " + callback.getOpType());
             long startTimeMs = System.currentTimeMillis();
             MetricsImporter importer = new MetricsImporter();
             importer.setBatchSize(callback.getBatchSize());
