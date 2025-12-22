@@ -2543,7 +2543,7 @@ public class OHTable implements Table {
                 }
             } else {
                 throw new FeatureNotSupportedException(
-                    "not supported other type in batch yet,only support get, put and delete");
+                    "not supported other types in hbase request V2 yet, only support put for now");
             }
             ++keyIndex;
         }
