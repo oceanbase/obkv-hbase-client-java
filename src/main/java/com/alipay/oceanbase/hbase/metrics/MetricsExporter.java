@@ -1,27 +1,44 @@
+/*-
+ * #%L
+ * com.oceanbase:obkv-hbase-client
+ * %%
+ * Copyright (C) 2022 - 2025 OceanBase Group
+ * %%
+ * OBKV HBase Client Framework  is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan PSL v2.
+ * You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+ * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+ * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ * See the Mulan PSL v2 for more details.
+ * #L%
+ */
+
 package com.alipay.oceanbase.hbase.metrics;
 
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 
 public class MetricsExporter {
-    private final long totalOpCount;
+    private final long   totalOpCount;
     private final double averageOps;
     private final double oneMinuteAverageOps;
     private final double fiveMinuteAverageOps;
     private final double fifteenMinuteAverageOps;
-    private final double averageLatency; // ms
-    private final long maxLatency; // ms
-    private final long minLatency; // ms
-    private final double medianLatency; // ms
-    private final double P75thPercentile; // ms
-    private final double P95thPercentile; // ms
-    private final double P98thPercentile; // ms
-    private final double P99thPercentile; // ms
-    private final double P999thPercentile; // ms
-    private long failCount;
-    private long totalRuntime; // ms
-    private double failRate;
-    private double averageSingleOpCount;
+    private final double averageLatency;         // ms
+    private final long   maxLatency;             // ms
+    private final long   minLatency;             // ms
+    private final double medianLatency;          // ms
+    private final double P75thPercentile;        // ms
+    private final double P95thPercentile;        // ms
+    private final double P98thPercentile;        // ms
+    private final double P99thPercentile;        // ms
+    private final double P999thPercentile;       // ms
+    private long         failCount;
+    private long         totalRuntime;           // ms
+    private double       failRate;
+    private double       averageSingleOpCount;
 
     public MetricsExporter(Timer latencyHistogram) {
         this.totalOpCount = latencyHistogram.getCount();
