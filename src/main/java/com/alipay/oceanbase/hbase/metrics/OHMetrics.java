@@ -23,10 +23,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.codahale.metrics.MetricRegistry;
 import org.slf4j.Logger;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 public class OHMetrics {
     private static final Logger logger = TableHBaseLoggerFactory.getLogger(OHMetrics.class);

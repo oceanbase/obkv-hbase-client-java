@@ -139,14 +139,23 @@ public class ClientStreamScanner extends AbstractClientScanner {
             OHBaseFuncUtils.sortHBaseResult(keyValues);
             return Result.create(keyValues);
         } catch (Exception e) {
+            if (importer != null) {
+                importer.setIsFailedOp(true);
+            }
             throw new IOException(String.format("get table %s stream next result error ",
                 streamResult.getTableName()), e);
         } finally {
-            if (metrics != null) {
-                long duration = System.currentTimeMillis() - startTimeMs;
-                importer.setDuration(duration);
-                importer.setBatchSize(1);
-                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN, importer));
+            if (importer != null) {
+                // do not record cache operations, only record operations executed by remote rpc
+                if (streamResult instanceof ObTableClientQueryAsyncStreamResult) {
+                    ObTableClientQueryAsyncStreamResult asyncStreamResult = (ObTableClientQueryAsyncStreamResult) streamResult;
+                    if (asyncStreamResult.hasDoneRpc()) {
+                        long duration = System.currentTimeMillis() - startTimeMs;
+                        importer.setDuration(duration);
+                        importer.setBatchSize(1);
+                        metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN, importer));
+                    }
+                }
             }
         }
     }
