@@ -2106,8 +2106,17 @@ public class OHTable implements HTableInterface {
         } else {
             hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
         }
+        boolean queryWithSingleQualifierHintBool = false;
+        byte[] queryWithSingleQualifierHint = scan.getAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT);
+        if (queryWithSingleQualifierHint == null) {
+            boolean queryWithSingleQualifierHintGlobal = configuration.getBoolean(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL, false);
+            queryWithSingleQualifierHintBool = queryWithSingleQualifierHintGlobal;
+        } else {
+            queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
+        }
 
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
         return obTableQuery;
     }
 
@@ -2145,7 +2154,16 @@ public class OHTable implements HTableInterface {
             hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
         }
 
+        boolean queryWithSingleQualifierHintBool = false;
+        byte[] queryWithSingleQualifierHint = get.getAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT);
+        if (queryWithSingleQualifierHint == null) {
+            boolean queryWithSingleQualifierHintGlobal = configuration.getBoolean(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL, false);
+            queryWithSingleQualifierHintBool = queryWithSingleQualifierHintGlobal;
+        } else {
+            queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
+        }
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
         return obTableQuery;
     }
 
