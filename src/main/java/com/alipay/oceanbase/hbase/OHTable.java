@@ -2115,8 +2115,12 @@ public class OHTable implements HTableInterface {
             queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
         }
 
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        // Note: setQueryWithSingleQualifierHint may internally set/get optimized based on the hint.
+        // To ensure GET_OPTIMIZED is not affected by QueryWithSingleQualifierHint setting,
+        // we set QueryWithSingleQualifierHint first, then explicitly set GET_OPTIMIZED.
+        // Both parameters default to false.
         obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
         return obTableQuery;
     }
 
@@ -2162,8 +2166,12 @@ public class OHTable implements HTableInterface {
         } else {
             queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
         }
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        // Note: setQueryWithSingleQualifierHint may internally set/get optimized based on the hint.
+        // To ensure GET_OPTIMIZED is not affected by QueryWithSingleQualifierHint setting,
+        // we set QueryWithSingleQualifierHint first, then explicitly set GET_OPTIMIZED.
+        // Both parameters default to false.
         obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
         return obTableQuery;
     }
 
