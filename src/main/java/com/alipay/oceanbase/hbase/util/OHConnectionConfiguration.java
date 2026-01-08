@@ -31,7 +31,6 @@ import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFE
 import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS;
 import static org.apache.hadoop.hbase.client.ConnectionConfiguration.WRITE_BUFFER_PERIODIC_FLUSH_TIMERTICK_MS_DEFAULT;
 import static org.apache.commons.lang.StringUtils.isBlank;
-import static org.apache.hadoop.hbase.ipc.RpcClient.DEFAULT_SOCKET_TIMEOUT_CONNECT;
 import static org.apache.hadoop.hbase.ipc.RpcClient.SOCKET_TIMEOUT_CONNECT;
 
 @InterfaceAudience.Private
@@ -101,7 +100,7 @@ public class OHConnectionConfiguration {
             rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT_CONNECT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
         } else {
             if (conf.get(SOCKET_TIMEOUT) != null) {
-                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, DEFAULT_SOCKET_TIMEOUT);
+                rpcConnectTimeout = conf.getInt(SOCKET_TIMEOUT, DEFAULT_SOCKET_TIMEOUT_CONNECT);
             } else {
                 rpcConnectTimeout = RPC_CONNECT_TIMEOUT.getDefaultInt(); // use table default value
             }
