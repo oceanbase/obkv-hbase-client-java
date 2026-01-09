@@ -92,86 +92,92 @@ import static org.apache.hadoop.hbase.client.MetricsConnection.CLIENT_SIDE_METRI
 
 public class OHTable implements Table {
 
-    private static final Logger  logger                 = TableHBaseLoggerFactory
-                                                            .getLogger(OHTable.class);
+    private static final Logger logger                 = TableHBaseLoggerFactory
+                                                           .getLogger(OHTable.class);
     /**
      * the table client for oceanbase
      */
-    private final ObTableClient  obTableClient;
+    private final ObTableClient obTableClient;
 
     /**
      * the ohTable name in byte array
      */
-    private final byte[]         tableName;
+    private final byte[]        tableName;
 
     /**
      * the ohTable name in string
      */
-    private final String         tableNameString;
+    private final String        tableNameString;
 
     /**
      * operation timeout whose default value is <code>Integer.MaxValue</code> decide the timeout of executing in pool.
      * <p>
      * if operation timeout is not equal to the default value mean the <code>Get</code> execute in the pool
      */
-    private int                  operationTimeout;
+    private int                 operationTimeout;
 
     /**
      * timeout for each rpc request
      */
-    private int                  rpcTimeout;
+    private int                 rpcTimeout;
 
     /**
      * timeout for each read rpc request
      */
-    private int                  readRpcTimeout;
+    private int                 readRpcTimeout;
 
     /**
      * timeout for each write rpc request
      */
-    private int                  writeRpcTimeout;
+    private int                 writeRpcTimeout;
 
     /**
      * if the <code>Get</code> executing pool is specified by user cleanupPoolOnClose will be false ,
      * which means that user is responsible for the pool
      */
-    private boolean              cleanupPoolOnClose     = true;
+    private boolean             cleanupPoolOnClose     = true;
 
     /**
      * if the obTableClient is specified by user closeClientOnClose will be false ,
      * which means that user is responsible for obTableClient
      */
-    private boolean              closeClientOnClose     = true;
+    private boolean             closeClientOnClose     = true;
 
     /**
      * when the operationExecuteInPool is true the <code>Get</code>
      * will be executed in the pool.
      */
-    private ExecutorService      executePool;
+    private ExecutorService     executePool;
 
     /**
      * decide whether the <code>Get</code> request will be executed
      * in the pool.
      */
-    private boolean              operationExecuteInPool = false;
+    private boolean             operationExecuteInPool = false;
 
     /**
      * the max size of put key value
      */
-    private int                  maxKeyValueSize;
+    private int                 maxKeyValueSize;
 
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
      * <code>Configuration</code> extends from hbase configuration
      */
-    private final Configuration  configuration;
+    private final Configuration configuration;
 
-    private int                  scannerTimeout;
+    private int                 scannerTimeout;
 
-    private RegionLocator        regionLocator;
+    private RegionLocator       regionLocator;
 
-    private final OHMetrics      metrics;
+    private final OHMetrics     metrics;
+
+    /**
+     * whether to fill current system time when timestamp is not specified during write operations.
+     * Default is false (disabled).
+     */
+    private final boolean       fillTimestampInClient;
 
     /**
      * Creates an object to access a HBase table.
@@ -207,10 +213,12 @@ public class OHTable implements Table {
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase()));
+                obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
+        this.fillTimestampInClient = configuration.getBoolean(
+            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
 
         finishSetUp();
     }
@@ -266,10 +274,12 @@ public class OHTable implements Table {
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase()));
+                obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
+        this.fillTimestampInClient = configuration.getBoolean(
+            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
 
         finishSetUp();
     }
@@ -300,6 +310,7 @@ public class OHTable implements Table {
         this.obTableClient = obTableClient;
         this.configuration = new Configuration();
         this.metrics = null;
+        this.fillTimestampInClient = false; // default to false when no configuration available
         finishSetUp();
     }
 
@@ -342,10 +353,12 @@ public class OHTable implements Table {
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase()));
+                obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
+        this.fillTimestampInClient = configuration.getBoolean(
+            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
 
         finishSetUp();
     }
@@ -389,10 +402,12 @@ public class OHTable implements Table {
         if (configuration.getBoolean(CLIENT_SIDE_METRICS_ENABLED_KEY, false)) {
             // Use shared metrics name (tableName.database) to aggregate metrics across multiple OHTable instances
             this.metrics = new OHMetrics(OHBaseFuncUtils.metricsNameBuilder(tableNameString,
-                                                                            obTableClient.getDatabase()));
+                obTableClient.getDatabase()));
         } else {
             this.metrics = null;
         }
+        this.fillTimestampInClient = configuration.getBoolean(
+            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
 
         finishSetUp();
     }
@@ -487,11 +502,13 @@ public class OHTable implements Table {
 
     private abstract class OperationExecuteCallback<T> {
         private final OHOperationType opType;
-        private final long batchSize;
+        private final long            batchSize;
+
         OperationExecuteCallback(OHOperationType opType, long batchSize) {
             this.opType = opType;
             this.batchSize = batchSize;
         }
+
         abstract T execute() throws IOException;
 
         public OHOperationType getOpType() {
@@ -505,7 +522,8 @@ public class OHTable implements Table {
 
     private <T> T execute(OperationExecuteCallback<T> callback) throws IOException {
         if (this.metrics != null) {
-            System.out.println("Thread_id: " + Thread.currentThread().getId() + ", with op: " + callback.getOpType());
+            System.out.println("Thread_id: " + Thread.currentThread().getId() + ", with op: "
+                               + callback.getOpType());
             long startTimeMs = System.currentTimeMillis();
             MetricsImporter importer = new MetricsImporter();
             importer.setBatchSize(callback.getBatchSize());
@@ -518,7 +536,8 @@ public class OHTable implements Table {
             } finally {
                 long duration = System.currentTimeMillis() - startTimeMs;
                 importer.setDuration(duration);
-                this.metrics.update(new ObPair<OHOperationType, MetricsImporter>(callback.getOpType(), importer));
+                this.metrics.update(new ObPair<OHOperationType, MetricsImporter>(callback
+                    .getOpType(), importer));
             }
         } else {
             return callback.execute();
@@ -759,7 +778,7 @@ public class OHTable implements Table {
     @Override
     public void batch(final List<? extends Row> actions, final Object[] results) throws IOException {
         OHOperationType opType = OHOperationType.BATCH;
-         execute(new OperationExecuteCallback<Void>(opType, actions.size() /* batchSize */) {
+        execute(new OperationExecuteCallback<Void>(opType, actions.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
                 innerBatchImpl(actions, results, opType);
@@ -924,7 +943,8 @@ public class OHTable implements Table {
                     if (results != null) {
                         for (int i = 0; i < results.length; i++) {
                             if (!(results[i] instanceof ObTableException)) {
-                                callback.update(new byte[0], actions.get(i).getRow(), (R) results[i]);
+                                callback.update(new byte[0], actions.get(i).getRow(),
+                                    (R) results[i]);
                             }
                         }
                     }
@@ -999,10 +1019,12 @@ public class OHTable implements Table {
             byte[] family = entry.getKey();
             if (entry.getValue() != null) {
                 for (byte[] columnName : entry.getValue()) {
-                    byte[] newQualifier = new byte[family.length + 1/* length of "." */ + columnName.length];
+                    byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                                   + columnName.length];
                     System.arraycopy(family, 0, newQualifier, 0, family.length);
                     newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
-                    System.arraycopy(columnName, 0, newQualifier, family.length + 1, columnName.length);
+                    System.arraycopy(columnName, 0, newQualifier, family.length + 1,
+                        columnName.length);
                     columnFilters.add(newQualifier);
                 }
             } else {
@@ -1427,7 +1449,8 @@ public class OHTable implements Table {
                                                                                         throws IOException {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(put);
-        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations, OHOperationType.CHECK_AND_PUT);
+        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations,
+            OHOperationType.CHECK_AND_PUT);
     }
 
     @Override
@@ -1493,7 +1516,8 @@ public class OHTable implements Table {
                                                                                                  throws IOException {
         RowMutations rowMutations = new RowMutations(row);
         rowMutations.add(delete);
-        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations, OHOperationType.CHECK_AND_DELETE);
+        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations,
+            OHOperationType.CHECK_AND_DELETE);
 
     }
 
@@ -1508,7 +1532,8 @@ public class OHTable implements Table {
     public boolean checkAndMutate(byte[] row, byte[] family, byte[] qualifier,
                                   CompareFilter.CompareOp compareOp, byte[] value,
                                   RowMutations rowMutations) throws IOException {
-        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations, OHOperationType.CHECK_AND_MUTATE);
+        return checkAndMutation(row, family, qualifier, compareOp, value, null, rowMutations,
+            OHOperationType.CHECK_AND_MUTATE);
     }
 
     @Override
@@ -1524,43 +1549,49 @@ public class OHTable implements Table {
 
     private boolean checkAndMutation(byte[] row, byte[] family, byte[] qualifier,
                                      CompareFilter.CompareOp compareOp, byte[] value,
-                                     TimeRange timeRange, RowMutations rowMutations, OHOperationType opType)
-                                                                                    throws IOException {
-        return execute(new OperationExecuteCallback<Boolean>(opType, rowMutations.getMutations().size() /* batchSize */) {
+                                     TimeRange timeRange, RowMutations rowMutations,
+                                     OHOperationType opType) throws IOException {
+        return execute(new OperationExecuteCallback<Boolean>(opType, rowMutations.getMutations()
+            .size() /* batchSize */) {
             @Override
             Boolean execute() throws IOException {
                 try {
                     checkArgument(row != null, "row is null");
                     checkArgument(isNotBlank(Bytes.toString(family)), "family is blank");
                     checkArgument(Bytes.equals(row, rowMutations.getRow()),
-                            "mutation row is not equal check row");
+                        "mutation row is not equal check row");
                     checkArgument(!rowMutations.getMutations().isEmpty(), "mutation is empty");
                     List<Mutation> mutations = rowMutations.getMutations();
                     // only one family operation is allowed
                     for (Mutation mutation : mutations) {
                         if (!(mutation instanceof Put || mutation instanceof Delete)) {
-                            throw new DoNotRetryIOException("RowMutations supports only put and delete, not "
-                                    + mutation.getClass().getName());
+                            throw new DoNotRetryIOException(
+                                "RowMutations supports only put and delete, not "
+                                        + mutation.getClass().getName());
                         }
                         checkFamilyViolationForOneFamily(mutation.getFamilyCellMap().keySet());
-                        checkArgument(Arrays.equals(family, mutation.getFamilyCellMap().firstEntry().getKey()),
-                                "mutation family is not equal check family");
+                        checkArgument(Arrays.equals(family, mutation.getFamilyCellMap()
+                            .firstEntry().getKey()), "mutation family is not equal check family");
                     }
-                    byte[] filterString = buildCheckAndMutateFilterString(family, qualifier, compareOp, value);
-                    ObHTableFilter filter = buildObHTableFilter(filterString, timeRange, 1, qualifier);
-                    ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false,
-                            new TimeRange());
+                    byte[] filterString = buildCheckAndMutateFilterString(family, qualifier,
+                        compareOp, value);
+                    ObHTableFilter filter = buildObHTableFilter(filterString, timeRange, 1,
+                        qualifier);
+                    ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true,
+                        false, new TimeRange());
                     ObTableBatchOperation batch = buildObTableBatchOperation(mutations, null);
 
-                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                            batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration), opType);
+                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
+                        obTableQuery, batch,
+                        getTargetTableName(tableNameString, Bytes.toString(family), configuration),
+                        opType);
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                            .execute(request);
+                        .execute(request);
                     return result.getAffectedRows() > 0;
                 } catch (Exception e) {
                     logger.error(LCD.convert("01-00005"), rowMutations, tableNameString, e);
-                    throw new IOException(opType.toCamelCase() + " type table:" + tableNameString + " e.msg:"
-                            + e.getMessage() + " error.", e);
+                    throw new IOException(opType.toCamelCase() + " type table:" + tableNameString
+                                          + " e.msg:" + e.getMessage() + " error.", e);
                 }
             }
         });
@@ -1585,29 +1616,30 @@ public class OHTable implements Table {
             @Override
             Result execute() throws IOException {
                 checkArgument(!append.isEmpty(), "Invalid arguments to %s, zero columns specified",
-                        append.toString());
+                    append.toString());
                 checkFamilyViolationForOneFamily(append.getFamilyCellMap().keySet());
                 try {
                     byte[] r = append.getRow();
-                    Map.Entry<byte[], List<Cell>> entry = append.getFamilyCellMap().entrySet().iterator()
-                            .next();
+                    Map.Entry<byte[], List<Cell>> entry = append.getFamilyCellMap().entrySet()
+                        .iterator().next();
                     byte[] f = entry.getKey();
                     List<byte[]> qualifiers = new ArrayList<byte[]>();
                     ObTableBatchOperation batchOperation = buildObTableBatchOperation(
-                            Collections.singletonList(append), qualifiers);
+                        Collections.singletonList(append), qualifiers);
                     // the later hbase has supported timeRange
                     ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
                     ObTableQuery obTableQuery = buildObTableQuery(filter, r, true, r, true, false,
-                            new TimeRange());
+                        new TimeRange());
                     ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
                     queryAndMutate.setTableQuery(obTableQuery);
                     queryAndMutate.setMutations(batchOperation);
-                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                            batchOperation,
-                            getTargetTableName(tableNameString, Bytes.toString(f), configuration), opType);
+                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
+                        obTableQuery, batchOperation,
+                        getTargetTableName(tableNameString, Bytes.toString(f), configuration),
+                        opType);
                     request.setReturningAffectedEntity(append.isReturnResults());
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                            .execute(request);
+                        .execute(request);
                     if (!append.isReturnResults()) {
                         return null;
                     }
@@ -1708,27 +1740,31 @@ public class OHTable implements Table {
 
                     ObTableBatchOperation batch = new ObTableBatchOperation();
                     batch.addTableOperation(getInstance(INCREMENT, new Object[] { row, qualifier,
-                            Long.MAX_VALUE }, V_COLUMNS, new Object[] { Bytes.toBytes(amount) }));
+                            getEffectiveTimestampForWrite(Long.MAX_VALUE) }, V_COLUMNS,
+                        new Object[] { Bytes.toBytes(amount) }));
 
                     ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
 
-                    ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true, false,
-                            new TimeRange());
+                    ObTableQuery obTableQuery = buildObTableQuery(filter, row, true, row, true,
+                        false, new TimeRange());
                     ObTableQueryAndMutate queryAndMutate = new ObTableQueryAndMutate();
                     queryAndMutate.setMutations(batch);
                     queryAndMutate.setTableQuery(obTableQuery);
 
-                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                            batch, getTargetTableName(tableNameString, Bytes.toString(family), configuration), opType);
+                    ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
+                        obTableQuery, batch,
+                        getTargetTableName(tableNameString, Bytes.toString(family), configuration),
+                        opType);
                     request.setReturningAffectedEntity(true);
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
-                            .execute(request);
+                        .execute(request);
                     ObTableQueryResult queryResult = result.getAffectedEntity();
                     if (queryResult.getPropertiesRows().size() != 1) {
                         throw new IllegalStateException("the increment result size illegal "
-                                + queryResult.getPropertiesRows().size());
+                                                        + queryResult.getPropertiesRows().size());
                     }
-                    return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3).getValue());
+                    return Bytes.toLong((byte[]) queryResult.getPropertiesRows().get(0).get(3)
+                        .getValue());
                 } catch (Exception e) {
                     throw new IOException("increment table " + tableNameString + " error.", e);
                 }
@@ -2077,10 +2113,12 @@ public class OHTable implements Table {
         boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = scan.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
         if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(
+                HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
             hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
         } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
+            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes
+                .toString(hotKeyGetOptimizeEnable));
         }
 
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
@@ -2106,10 +2144,12 @@ public class OHTable implements Table {
         boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = get.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
         if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(
+                HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
             hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
         } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
+            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes
+                .toString(hotKeyGetOptimizeEnable));
         }
 
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
@@ -2149,7 +2189,7 @@ public class OHTable implements Table {
         return "weak".equalsIgnoreCase(consistencyStr);
     }
 
-    public static ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
+    private ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
                                                                    List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
         ObTableOperationType opType;
@@ -2199,7 +2239,8 @@ public class OHTable implements Table {
         if (isTableGroup) {
             // construct new_kv otherwise filter will fail to match targeted columns
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2253,7 +2294,8 @@ public class OHTable implements Table {
                     if (!isTableGroup) {
                         filter = buildObHTableFilter(null, null, Integer.MAX_VALUE);
                     } else {
-                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE, CellUtil.cloneQualifier(kv));
+                        filter = buildObHTableFilter(null, null, Integer.MAX_VALUE,
+                            CellUtil.cloneQualifier(kv));
                     }
                 } else {
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2276,7 +2318,8 @@ public class OHTable implements Table {
                     range.setEndKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMax(),
                         ObObj.getMax()));
                     // [MAX_VALUE, MAX_VALUE), delete nothing
-                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE), Integer.MAX_VALUE);
+                    filter = buildObHTableFilter(null, new TimeRange(Long.MAX_VALUE),
+                        Integer.MAX_VALUE);
                 } else {
                     TimeRange timeRange = new TimeRange(kv.getTimestamp(), kv.getTimestamp() + 1);
                     range.setStartKey(ObRowKey.getInstance(CellUtil.cloneRow(kv), ObObj.getMin(),
@@ -2299,6 +2342,21 @@ public class OHTable implements Table {
         return new QueryAndMutate(tableQuery, tableMutation);
     }
 
+    /**
+     * Get effective timestamp for write operations (Put, Increment, Append).
+     * If fillTimestampInClient is enabled and timestamp is Long.MAX_VALUE,
+     * returns current system time, otherwise returns the original timestamp.
+     *
+     * @param timestamp the original timestamp
+     * @return effective timestamp to use
+     */
+    private long getEffectiveTimestampForWrite(long timestamp) {
+        if (fillTimestampInClient && timestamp == Long.MAX_VALUE) {
+            return System.currentTimeMillis();
+        }
+        return timestamp;
+    }
+
     private com.alipay.oceanbase.rpc.mutation.Mutation buildMutation(Cell kv,
                                                                      ObTableOperationType operationType,
                                                                      boolean isTableGroup,
@@ -2306,7 +2364,8 @@ public class OHTable implements Table {
         Cell newCell = kv;
         if (isTableGroup && family != null) {
             byte[] oldQualifier = CellUtil.cloneQualifier(kv);
-            byte[] newQualifier = new byte[family.length + 1/* length of "." */ + oldQualifier.length];
+            byte[] newQualifier = new byte[family.length + 1/* length of "." */
+                                           + oldQualifier.length];
             System.arraycopy(family, 0, newQualifier, 0, family.length);
             newQualifier[family.length] = 0x2E; // 0x2E in utf-8 is "."
             System.arraycopy(oldQualifier, 0, newQualifier, family.length + 1, oldQualifier.length);
@@ -2324,7 +2383,8 @@ public class OHTable implements Table {
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
-                            newCell.getTimestamp() }, propertyColumns, property);
+                            getEffectiveTimestampForWrite(newCell.getTimestamp()) },
+                    propertyColumns, property);
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
@@ -2537,7 +2597,7 @@ public class OHTable implements Table {
                     for (Cell kv : keyValueList) {
                         ObHbaseCell cell = new ObHbaseCell(isCellTTL);
                         cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
-                        cell.setT(ObObj.getInstance(-kv.getTimestamp())); // set timestamp as negative
+                        cell.setT(ObObj.getInstance(-getEffectiveTimestampForWrite(kv.getTimestamp()))); // set timestamp as negative
                         cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
                         if (isCellTTL) {
                             cell.setTTL(ObObj.getInstance(ttl));
@@ -2561,9 +2621,8 @@ public class OHTable implements Table {
         return request;
     }
 
-    public static ObTableOperation buildObTableOperation(Cell kv,
-                                                         ObTableOperationType operationType,
-                                                         Long TTL) {
+    private ObTableOperation buildObTableOperation(Cell kv, ObTableOperationType operationType,
+                                                   Long TTL) {
         Cell.Type kvType = kv.getType();
         String[] propertyColumns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
@@ -2573,10 +2632,10 @@ public class OHTable implements Table {
         }
         switch (kvType) {
             case Put:
-                return getInstance(
-                    operationType,
+                return getInstance(operationType,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            kv.getTimestamp() }, propertyColumns, property);
+                            getEffectiveTimestampForWrite(kv.getTimestamp()) }, propertyColumns,
+                    property);
             case Delete:
                 return getInstance(
                     DEL,
@@ -2597,8 +2656,7 @@ public class OHTable implements Table {
 
     private ObTableQueryRequest buildObTableQueryRequest(ObTableQuery obTableQuery,
                                                          String targetTableName,
-                                                         Boolean isWeakRead,
-                                                         OHOperationType opType) {
+                                                         Boolean isWeakRead, OHOperationType opType) {
         ObTableQueryRequest request = new ObTableQueryRequest();
         request.setEntityType(ObTableEntityType.HKV);
         request.setTableQuery(obTableQuery);
@@ -2702,7 +2760,8 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getStartKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
+                    obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             startKeys = regionLocator.getStartKeys();
@@ -2711,10 +2770,12 @@ public class OHTable implements Table {
             try {
                 startKeys = obTableClient.getHBaseTableStartKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
+                    e);
             }
         } else {
-            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException(
+                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return startKeys;
@@ -2725,7 +2786,8 @@ public class OHTable implements Table {
         if (ObGlobal.isHBaseAdminSupport()) {
             // 4.3.5.3 and above, OCP and ODP mode use regionLocator to getEndKeys
             if (regionLocator == null) {
-                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString, obTableClient);
+                OHRegionLocatorExecutor executor = new OHRegionLocatorExecutor(tableNameString,
+                    obTableClient);
                 regionLocator = executor.getRegionLocator(tableNameString);
             }
             endKeys = regionLocator.getEndKeys();
@@ -2734,10 +2796,12 @@ public class OHTable implements Table {
             try {
                 endKeys = obTableClient.getHBaseTableEndKeys(tableNameString);
             } catch (Exception e) {
-                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString, e);
+                throw new IOException("Fail to get start keys of HBase Table: " + tableNameString,
+                    e);
             }
         } else {
-            throw new IOException("not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
+            throw new IOException(
+                "not supported yet in odp mode, only support in ObServer 4.3.5.3 and above");
         }
 
         return endKeys;
@@ -2825,8 +2889,8 @@ public class OHTable implements Table {
             checkCmpOp();
             RowMutations rowMutations = new RowMutations(row);
             rowMutations.add(put);
-            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                timeRange, rowMutations, OHOperationType.CHECK_AND_PUT);
+            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange,
+                rowMutations, OHOperationType.CHECK_AND_PUT);
         }
 
         @Override
@@ -2834,15 +2898,15 @@ public class OHTable implements Table {
             checkCmpOp();
             RowMutations rowMutations = new RowMutations(row);
             rowMutations.add(delete);
-            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                timeRange, rowMutations, OHOperationType.CHECK_AND_DELETE);
+            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange,
+                rowMutations, OHOperationType.CHECK_AND_DELETE);
         }
 
         @Override
         public boolean thenMutate(RowMutations mutation) throws IOException {
             checkCmpOp();
-            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value,
-                timeRange, mutation, OHOperationType.CHECK_AND_MUTATE);
+            return checkAndMutation(row, family, qualifier, getCompareOp(cmpOp), value, timeRange,
+                mutation, OHOperationType.CHECK_AND_MUTATE);
         }
 
         private void checkCmpOp() {
