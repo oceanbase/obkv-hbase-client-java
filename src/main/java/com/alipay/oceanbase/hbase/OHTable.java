@@ -180,6 +180,12 @@ public class OHTable implements Table {
     private final boolean       fillTimestampInClient;
 
     /**
+     * whether to fill current system time when timestamp is not specified during write operations.
+     * Default is false (disabled).
+     */
+    private final boolean       fillTimestampInClient;
+
+    /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
      * created with the same <code>configuration</code> instance.  Uses already-populated
@@ -217,9 +223,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(
-            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -278,9 +282,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(
-            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -357,9 +359,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(
-            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -406,9 +406,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(
-            HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -1740,8 +1738,7 @@ public class OHTable implements Table {
 
                     ObTableBatchOperation batch = new ObTableBatchOperation();
                     batch.addTableOperation(getInstance(INCREMENT, new Object[] { row, qualifier,
-                            getEffectiveTimestampForWrite(Long.MAX_VALUE) }, V_COLUMNS,
-                        new Object[] { Bytes.toBytes(amount) }));
+                        getEffectiveTimestampForWrite(Long.MAX_VALUE) }, V_COLUMNS, new Object[] { Bytes.toBytes(amount) }));
 
                     ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
 
@@ -2383,8 +2380,7 @@ public class OHTable implements Table {
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
-                            getEffectiveTimestampForWrite(newCell.getTimestamp()) },
-                    propertyColumns, property);
+                        getEffectiveTimestampForWrite(newCell.getTimestamp()) }, propertyColumns, property);
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
                     new Object[] { CellUtil.cloneRow(newCell), CellUtil.cloneQualifier(newCell),
@@ -2621,8 +2617,9 @@ public class OHTable implements Table {
         return request;
     }
 
-    private ObTableOperation buildObTableOperation(Cell kv, ObTableOperationType operationType,
-                                                   Long TTL) {
+    private ObTableOperation buildObTableOperation(Cell kv,
+                                                         ObTableOperationType operationType,
+                                                         Long TTL) {
         Cell.Type kvType = kv.getType();
         String[] propertyColumns = V_COLUMNS;
         Object[] property = new Object[] { CellUtil.cloneValue(kv) };
@@ -2634,8 +2631,7 @@ public class OHTable implements Table {
             case Put:
                 return getInstance(operationType,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            getEffectiveTimestampForWrite(kv.getTimestamp()) }, propertyColumns,
-                    property);
+                            getEffectiveTimestampForWrite(kv.getTimestamp()) }, propertyColumns, property);
             case Delete:
                 return getInstance(
                     DEL,

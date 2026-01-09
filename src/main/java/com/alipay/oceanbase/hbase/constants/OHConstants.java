@@ -152,14 +152,12 @@ public final class OHConstants {
     /**
      * use to specify the route policy when performing a query.
      */
-    public static final String   HBASE_HTABLE_CLIENT_ROUTE_POLICY               = "hbase.htable.client.route.policy";
-
+    public static final String   HBASE_HTABLE_CLIENT_ROUTE_POLICY       = "hbase.htable.client.route.policy";
     /**
      * use to specify whether to fill current system time in client when timestamp is not specified during write operations.
      * Default is false (disabled).
      */
     public static final String   HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT          = "hbase.htable.fill.timestamp.in.client";
-
     /*-------------------------------------------------------------------------------------------------------------*/
 
     /**
