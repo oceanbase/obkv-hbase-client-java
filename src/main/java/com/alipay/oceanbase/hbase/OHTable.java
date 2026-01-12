@@ -2155,7 +2155,7 @@ public class OHTable implements Table {
         return "weak".equalsIgnoreCase(consistencyStr);
     }
 
-    public static ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
+    public ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
                                                                    List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
         ObTableOperationType opType;
@@ -2558,7 +2558,7 @@ public class OHTable implements Table {
                     for (Cell kv : keyValueList) {
                         ObHbaseCell cell = new ObHbaseCell(isCellTTL);
                         cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
-                        cell.setT(ObObj.getInstance(-kv.getTimestamp())); // set timestamp as negative
+                        cell.setT(ObObj.getInstance(-getEffectiveTimestampForWrite(kv.getTimestamp()))); // set timestamp as negative
                         cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
                         if (isCellTTL) {
                             cell.setTTL(ObObj.getInstance(ttl));
