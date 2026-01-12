@@ -2106,7 +2106,20 @@ public class OHTable implements HTableInterface {
         } else {
             hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
         }
+        boolean queryWithSingleQualifierHintBool = false;
+        byte[] queryWithSingleQualifierHint = scan.getAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT);
+        if (queryWithSingleQualifierHint == null) {
+            boolean queryWithSingleQualifierHintGlobal = configuration.getBoolean(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL, false);
+            queryWithSingleQualifierHintBool = queryWithSingleQualifierHintGlobal;
+        } else {
+            queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
+        }
 
+        // Note: setQueryWithSingleQualifierHint may internally set/get optimized based on the hint.
+        // To ensure GET_OPTIMIZED is not affected by QueryWithSingleQualifierHint setting,
+        // we set QueryWithSingleQualifierHint first, then explicitly set GET_OPTIMIZED.
+        // Both parameters default to false.
+        obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
         return obTableQuery;
     }
@@ -2145,6 +2158,19 @@ public class OHTable implements HTableInterface {
             hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
         }
 
+        boolean queryWithSingleQualifierHintBool = false;
+        byte[] queryWithSingleQualifierHint = get.getAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT);
+        if (queryWithSingleQualifierHint == null) {
+            boolean queryWithSingleQualifierHintGlobal = configuration.getBoolean(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL, false);
+            queryWithSingleQualifierHintBool = queryWithSingleQualifierHintGlobal;
+        } else {
+            queryWithSingleQualifierHintBool = Boolean.parseBoolean(Bytes.toString(queryWithSingleQualifierHint));
+        }
+        // Note: setQueryWithSingleQualifierHint may internally set/get optimized based on the hint.
+        // To ensure GET_OPTIMIZED is not affected by QueryWithSingleQualifierHint setting,
+        // we set QueryWithSingleQualifierHint first, then explicitly set GET_OPTIMIZED.
+        // Both parameters default to false.
+        obTableQuery.setQueryWithSingleQualifierHint(queryWithSingleQualifierHintBool);
         obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
         return obTableQuery;
     }

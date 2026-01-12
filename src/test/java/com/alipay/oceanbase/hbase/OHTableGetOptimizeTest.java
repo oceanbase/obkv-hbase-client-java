@@ -29,6 +29,8 @@ import java.util.*;
 
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL;
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT;
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
 /**
@@ -1234,6 +1236,288 @@ public class OHTableGetOptimizeTest {
             // Should return latest version (v3) using global setting
             Assert.assertEquals(keys.get(i) + "_v3", Bytes.toString(results[i].rawCells()[0].getValueArray(), results[i].rawCells()[0].getValueOffset(), results[i].rawCells()[0].getValueLength()));
         }
+    }
+
+    /**
+     * Test query with single qualifier hint - basic functionality
+     * Verifies: When hint is enabled, only returns the lexicographically smallest qualifier
+     */
+    @Test
+    public void testQueryWithSingleQualifierHintBasic() throws Exception {
+        Configuration c = ObHTableTestUtil.newConfiguration();
+        c.set("rs.list.acquire.read.timeout", "10000");
+        hTable = new OHTable(c, "test_get_optimize");
+
+        String family = "family_max_version_default";
+        String key = "single_qualifier_hint_key";
+        // Multiple qualifiers with different lexicographic order
+        String colA = "aaa_qualifier";
+        String colB = "bbb_qualifier";
+        String colC = "ccc_qualifier";
+        String colD = "ddd_qualifier";
+
+        long t1 = System.currentTimeMillis();
+
+        // Insert multiple qualifiers
+        Put put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), colA.getBytes(), t1, toBytes("value_a"));
+        put.addColumn(family.getBytes(), colB.getBytes(), t1, toBytes("value_b"));
+        put.addColumn(family.getBytes(), colC.getBytes(), t1, toBytes("value_c"));
+        put.addColumn(family.getBytes(), colD.getBytes(), t1, toBytes("value_d"));
+        hTable.put(put);
+
+        // Query without the hint - should return all qualifiers
+        Get get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        Result r = hTable.get(get);
+        Assert.assertEquals(4, r.rawCells().length);
+
+        // Query with the hint enabled - should return only lexicographically smallest qualifier (colA)
+        get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "true".getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+
+        String returnedQualifier = Bytes.toString(r.rawCells()[0].getQualifierArray(),
+                r.rawCells()[0].getQualifierOffset(), r.rawCells()[0].getQualifierLength());
+        Assert.assertEquals(colA, returnedQualifier);
+        Assert.assertEquals("value_a", Bytes.toString(r.rawCells()[0].getValueArray(),
+                r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
+
+        // Query with hint disabled - should return all qualifiers
+        get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "false".getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(4, r.rawCells().length);
+    }
+
+    /**
+     * Test query with single qualifier hint with multiple versions
+     * Verifies: Hint works correctly with multiple versions, returning smallest qualifier with latest version
+     */
+    @Test
+    public void testQueryWithSingleQualifierHintWithMultipleVersions() throws Exception {
+        Configuration c = ObHTableTestUtil.newConfiguration();
+        c.set("rs.list.acquire.read.timeout", "10000");
+        hTable = new OHTable(c, "test_get_optimize");
+
+        String family = "family_max_version_default";
+        String key = "single_qual_hint_mv_key";
+        String colA = "aaa_qualifier";
+        String colZ = "zzz_qualifier";
+
+        long t1 = System.currentTimeMillis();
+        Thread.sleep(10);
+        long t2 = System.currentTimeMillis();
+        Thread.sleep(10);
+        long t3 = System.currentTimeMillis();
+
+        // Insert multiple versions for each qualifier
+        Put put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), colA.getBytes(), t1, toBytes("a_v1"));
+        put.addColumn(family.getBytes(), colZ.getBytes(), t1, toBytes("z_v1"));
+        hTable.put(put);
+
+        put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), colA.getBytes(), t2, toBytes("a_v2"));
+        put.addColumn(family.getBytes(), colZ.getBytes(), t2, toBytes("z_v2"));
+        hTable.put(put);
+
+        put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), colA.getBytes(), t3, toBytes("a_v3"));
+        put.addColumn(family.getBytes(), colZ.getBytes(), t3, toBytes("z_v3"));
+        hTable.put(put);
+
+        // Query with hint enabled - should return only colA (lexicographically smallest)
+        Get get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "true".getBytes());
+        Result r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+
+        String returnedQualifier = Bytes.toString(r.rawCells()[0].getQualifierArray(),
+                r.rawCells()[0].getQualifierOffset(), r.rawCells()[0].getQualifierLength());
+        Assert.assertEquals(colA, returnedQualifier);
+        Assert.assertEquals(t3, r.rawCells()[0].getTimestamp());
+        Assert.assertEquals("a_v3", Bytes.toString(r.rawCells()[0].getValueArray(),
+                r.rawCells()[0].getValueOffset(), r.rawCells()[0].getValueLength()));
+
+        // Query with hint disabled - should return all qualifiers (latest version of each)
+        get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "false".getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.rawCells().length); // 2 qualifiers, each with latest version
+    }
+
+    /**
+     * Test query with single qualifier hint with batch Get operations
+     * Verifies: Hint works correctly for batch get, each row returns its smallest qualifier
+     */
+    @Test
+    public void testQueryWithSingleQualifierHintBatchGet() throws Exception {
+        Configuration c = ObHTableTestUtil.newConfiguration();
+        c.set("rs.list.acquire.read.timeout", "10000");
+        hTable = new OHTable(c, "test_get_optimize");
+
+        String family = "family_max_version_default";
+        List<String> keys = Arrays.asList("batch_sq_hint_01", "batch_sq_hint_02", "batch_sq_hint_03");
+        String colA = "aaa_col";
+        String colB = "bbb_col";
+        String colC = "ccc_col";
+        long t1 = System.currentTimeMillis();
+
+        // Insert multiple qualifiers for each key
+        for (String key : keys) {
+            Put put = new Put(toBytes(key));
+            put.addColumn(family.getBytes(), colA.getBytes(), t1, toBytes(key + "_a"));
+            put.addColumn(family.getBytes(), colB.getBytes(), t1, toBytes(key + "_b"));
+            put.addColumn(family.getBytes(), colC.getBytes(), t1, toBytes(key + "_c"));
+            hTable.put(put);
+        }
+
+        // Batch get with hint enabled
+        List<Get> gets = new ArrayList<>();
+        for (String key : keys) {
+            Get get = new Get(toBytes(key));
+            get.addFamily(family.getBytes());
+            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+            get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "true".getBytes());
+            gets.add(get);
+        }
+
+        Result[] results = hTable.get(gets);
+        Assert.assertEquals(3, results.length);
+        for (int i = 0; i < results.length; i++) {
+            System.out.println("result " + i + " : " + Arrays.toString(results[i].rawCells()));
+        }
+        for (int i = 0; i < results.length; i++) {
+            System.out.println("result " + i + " : " + Arrays.toString(results[i].rawCells()));
+            Assert.assertEquals(1, results[i].rawCells().length);
+            String returnedQualifier = Bytes.toString(results[i].rawCells()[0].getQualifierArray(),
+                    results[i].rawCells()[0].getQualifierOffset(), results[i].rawCells()[0].getQualifierLength());
+            Assert.assertEquals(colA, returnedQualifier);
+            Assert.assertEquals(keys.get(i) + "_a", Bytes.toString(results[i].rawCells()[0].getValueArray(),
+                    results[i].rawCells()[0].getValueOffset(), results[i].rawCells()[0].getValueLength()));
+        }
+
+        // Batch get without hint
+        gets = new ArrayList<>();
+        for (String key : keys) {
+            Get get = new Get(toBytes(key));
+            get.addFamily(family.getBytes());
+            get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+            get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "false".getBytes());
+            gets.add(get);
+        }
+
+        results = hTable.get(gets);
+        Assert.assertEquals(3, results.length);
+        for (int i = 0; i < results.length; i++) {
+            Assert.assertEquals(3, results[i].rawCells().length); // All 3 qualifiers
+        }
+    }
+
+    /**
+     * Test query with single qualifier hint with global setting
+     * Verifies: Global setting works correctly, can be overridden by statement-level setting
+     */
+    @Test
+    public void testQueryWithSingleQualifierHintGlobalSetting() throws Exception {
+        Configuration c = ObHTableTestUtil.newConfiguration();
+        c.set("rs.list.acquire.read.timeout", "10000");
+        c.set(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL, "true");
+        hTable = new OHTable(c, "test_get_optimize");
+
+        String family = "family_max_version_default";
+        String key = "global_sq_hint_key";
+        String colFirst = "first_col";
+        String colSecond = "second_col";
+
+        long t1 = System.currentTimeMillis();
+
+        Put put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), colFirst.getBytes(), t1, toBytes("value_first"));
+        put.addColumn(family.getBytes(), colSecond.getBytes(), t1, toBytes("value_second"));
+        hTable.put(put);
+
+        // Test with global setting enabled (no statement-level override)
+        Get get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        Result r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+        String returnedQualifier = Bytes.toString(r.rawCells()[0].getQualifierArray(),
+                r.rawCells()[0].getQualifierOffset(), r.rawCells()[0].getQualifierLength());
+        Assert.assertEquals(colFirst, returnedQualifier);
+
+        // Test with statement-level override to false
+        get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "false".getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(2, r.rawCells().length);
+
+        // Test with statement-level override to true (redundant but should work)
+        get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "true".getBytes());
+        r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+        returnedQualifier = Bytes.toString(r.rawCells()[0].getQualifierArray(),
+                r.rawCells()[0].getQualifierOffset(), r.rawCells()[0].getQualifierLength());
+        Assert.assertEquals(colFirst, returnedQualifier);
+    }
+
+    /**
+     * Test query with single qualifier hint - edge case with special characters in qualifier
+     * Verifies: Hint correctly identifies lexicographically smallest qualifier with special characters
+     */
+    @Test
+    public void testQueryWithSingleQualifierHintSpecialCharacters() throws Exception {
+        Configuration c = ObHTableTestUtil.newConfiguration();
+        c.set("rs.list.acquire.read.timeout", "10000");
+        hTable = new OHTable(c, "test_get_optimize");
+
+        String family = "family_max_version_default";
+        String key = "sq_hint_special_key";
+        // Qualifiers with numbers and special characters
+        String col1 = "1_column";
+        String col2 = "2_column";
+        String colA = "a_column";
+        String colAA = "aa_column";
+        String colB = "b_column";
+
+        long t1 = System.currentTimeMillis();
+
+        Put put = new Put(toBytes(key));
+        put.addColumn(family.getBytes(), col1.getBytes(), t1, toBytes("value_1"));
+        put.addColumn(family.getBytes(), col2.getBytes(), t1, toBytes("value_2"));
+        put.addColumn(family.getBytes(), colA.getBytes(), t1, toBytes("value_a"));
+        put.addColumn(family.getBytes(), colAA.getBytes(), t1, toBytes("value_aa"));
+        put.addColumn(family.getBytes(), colB.getBytes(), t1, toBytes("value_b"));
+        hTable.put(put);
+
+        // Lexicographic order should be: 1_column < 2_column < a_column < aa_column < b_column
+        // So 1_column should be returned
+        Get get = new Get(toBytes(key));
+        get.addFamily(family.getBytes());
+        get.setAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE, "true".getBytes());
+        get.setAttribute(HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT, "true".getBytes());
+        Result r = hTable.get(get);
+        Assert.assertEquals(1, r.rawCells().length);
+
+        String returnedQualifier = Bytes.toString(r.rawCells()[0].getQualifierArray(),
+                r.rawCells()[0].getQualifierOffset(), r.rawCells()[0].getQualifierLength());
+        Assert.assertEquals(col1, returnedQualifier);
     }
 
 }

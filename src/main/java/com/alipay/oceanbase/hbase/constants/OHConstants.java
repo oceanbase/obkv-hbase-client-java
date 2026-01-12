@@ -141,9 +141,16 @@ public final class OHConstants {
     public static final String   HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE       = "hbase.htable.hotkey.get.optimize.enable";
 
     /**
-     * 开启后不指定时间戳的读写都将以此时间戳进行写入和查询, 默认为兼容原行为
+     * use to specify whether to enable the hotkey get optimize when performing a query.
      */
     public static final String  HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL = "hbase.htable.hotkey.get.optimize.enable.global";
+
+    /**
+     * use to specify whether to enable the query with single qualifier hint when performing a query.
+     */
+    public static final String  HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT = "hbase.htable.query.with.single.qualifier.hint";
+
+    public static final String  HBASE_HTABLE_QUERY_WITH_SINGLE_QUALIFIER_HINT_GLOBAL = "hbase.htable.query.with.single.qualifier.hint.global";
 
     /**
      * use to specify the idc when performing a query.
