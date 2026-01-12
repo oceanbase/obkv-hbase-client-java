@@ -2358,6 +2358,21 @@ public class OHTable implements Table {
         }
     }
 
+    /**
+     * Get effective timestamp for write operations (Put, Increment, Append).
+     * If fillTimestampInClient is enabled and timestamp is Long.MAX_VALUE,
+     * returns current system time, otherwise returns the original timestamp.
+     *
+     * @param timestamp the original timestamp
+     * @return effective timestamp to use
+     */
+    private long getEffectiveTimestampForWrite(long timestamp) {
+        if (fillTimestampInClient && timestamp == Long.MAX_VALUE) {
+            return System.currentTimeMillis();
+        }
+        return timestamp;
+    }
+
     private KeyValue modifyQualifier(Cell original, byte[] newQualifier) {
         // Extract existing components
         byte[] row = CellUtil.cloneRow(original);
