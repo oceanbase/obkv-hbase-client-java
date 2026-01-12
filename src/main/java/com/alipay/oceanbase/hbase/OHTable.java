@@ -217,7 +217,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -276,7 +276,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -352,7 +352,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -399,7 +399,7 @@ public class OHTable implements Table {
         } else {
             this.metrics = null;
         }
-        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 

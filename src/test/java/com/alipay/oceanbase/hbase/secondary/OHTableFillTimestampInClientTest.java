@@ -32,7 +32,7 @@ import java.sql.Connection;
 import java.sql.SQLSyntaxErrorException;
 import java.util.*;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT;
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.*;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
 
@@ -148,7 +148,7 @@ public class OHTableFillTimestampInClientTest {
      */
     private static OHTableClient newOHTableClientWithConfig(boolean fillTimestamp) throws Exception {
         Configuration conf = ObHTableTestUtil.newConfiguration();
-        conf.setBoolean(HBASE_HTABLE_FILL_TIMESTAMP_IN_CLIENT, fillTimestamp);
+        conf.setBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, fillTimestamp);
         OHTableClient client = new OHTableClient(TABLE_NAME, conf);
         client.init();
         return client;
