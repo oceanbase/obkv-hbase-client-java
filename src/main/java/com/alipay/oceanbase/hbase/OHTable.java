@@ -464,8 +464,8 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
-        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_PUT_OPTIMIZATION_ENABLE,
-          HBASE_HTABLE_PUT_OPTIMIZATION_DEFAULT);
+        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
+          HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
