@@ -131,7 +131,7 @@ public final class OHConstants {
 
     /**
      * use to specify whether to enable put optimization path.
-     * Default is false (disabled).
+     * Default is true (enabled).
      */
     public static final String   HBASE_HTABLE_PUT_OPTIMIZATION_ENABLE = "hbase.htable.put.optimization.enable";
 
