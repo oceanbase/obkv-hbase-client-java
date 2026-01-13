@@ -187,6 +187,11 @@ public class OHTable implements Table {
      */
     private int                  maxKeyValueSize;
 
+    /**
+     * whether to enable put optimization path
+     */
+    private boolean              enablePutOptimization;
+
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
@@ -459,6 +464,8 @@ public class OHTable implements Table {
             DEFAULT_HBASE_HTABLE_PUT_WRITE_BUFFER_CHECK);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
+        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
+          HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -722,7 +729,7 @@ public class OHTable implements Table {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+        } else if (OHBaseFuncUtils.isAllPut(actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions);
             try {
@@ -1253,7 +1260,7 @@ public class OHTable implements Table {
             // we need to periodically see if the writebuffer is full instead of waiting until the end of the List
             n++;
             if (n % putWriteBufferCheck == 0 && currentWriteBufferSize.get() > writeBufferSize) {
-                if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+                if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
                     flushCommitsV2();
                 } else {
                     flushCommits();
@@ -1261,7 +1268,7 @@ public class OHTable implements Table {
             }
         }
         if (autoFlush || currentWriteBufferSize.get() > writeBufferSize) {
-            if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+            if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
                 flushCommitsV2();
             } else {
                 flushCommits();

@@ -51,7 +51,12 @@ public class OHBaseFuncUtils {
         return new byte[][] { family, newQualifier };
     }
 
-    public static boolean isHBasePutPefSupport(ObTableClient tableClient) {
+    public static boolean isHBasePutPefSupport(ObTableClient tableClient, boolean enablePutOptimization) {
+        // If client-side optimization is disabled, return false directly
+        if (!enablePutOptimization) {
+            return false;
+        }
+        
         if (tableClient.isOdpMode()) {
             // server version support and distributed capacity is enabled and odp version support
             return ObGlobal.isHBasePutPerfSupport()

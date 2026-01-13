@@ -129,6 +129,12 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_QUERY_HOT_ONLY       = "hbase.htable.query.hot_only";
 
+    /**
+     * use to specify whether to enable put optimization path.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_USE_PUT_OPTIMIZATION = "hbase.htable.use.put.optimization";
+
     /*-------------------------------------------------------------------------------------------------------------*/
 
     /**
@@ -159,5 +165,7 @@ public final class OHConstants {
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
+
+    public static final boolean  HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT   = true;
 
 }
