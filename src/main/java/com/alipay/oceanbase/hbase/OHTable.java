@@ -306,6 +306,7 @@ public class OHTable implements Table {
         this.obTableClient = obTableClient;
         this.configuration = new Configuration();
         this.metrics = null;
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
