@@ -160,6 +160,13 @@ public final class OHConstants {
      * Default is false (disabled).
      */
     public static final String   HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT          = "hbase.htable.auto.fill.timestamp.in.client";
+    
+    /**
+     * use to specify whether to enable put optimization path.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_USE_PUT_OPTIMIZATION = "hbase.htable.use.put.optimization";
+
     /*-------------------------------------------------------------------------------------------------------------*/
 
     /**
@@ -186,5 +193,7 @@ public final class OHConstants {
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
+
+    public static final boolean  HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT   = true;
 
 }

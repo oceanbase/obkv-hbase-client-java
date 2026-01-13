@@ -162,6 +162,11 @@ public class OHTable implements HTableInterface {
      */
     private int                   maxKeyValueSize;
 
+    /**
+     * whether to enable put optimization path
+     */
+    private boolean              enablePutOptimization;
+
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
@@ -414,6 +419,8 @@ public class OHTable implements HTableInterface {
             MAX_KEYVALUE_SIZE_DEFAULT);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
+        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
+          HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -750,7 +757,7 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions, opType);
             try {
