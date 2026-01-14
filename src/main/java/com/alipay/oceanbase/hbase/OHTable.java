@@ -160,6 +160,11 @@ public class OHTable implements Table {
      */
     private int                  maxKeyValueSize;
 
+    /**
+     * whether to enable put optimization path
+     */
+    private boolean              enablePutOptimization;
+
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
@@ -460,6 +465,8 @@ public class OHTable implements Table {
             (this.operationTimeout != HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT));
         this.maxKeyValueSize = this.configuration.getInt(MAX_KEYVALUE_SIZE_KEY,
             MAX_KEYVALUE_SIZE_DEFAULT);
+        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
+          HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -793,7 +800,7 @@ public class OHTable implements Table {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions, opType);
             try {
@@ -1357,7 +1364,7 @@ public class OHTable implements Table {
             validatePut(put);
             checkFamilyViolation(put.getFamilyCellMap().keySet(), true);
         }
-        if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+        if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             flushCommitsV2(puts, opType);
         } else {
             flushCommits(puts, opType);
