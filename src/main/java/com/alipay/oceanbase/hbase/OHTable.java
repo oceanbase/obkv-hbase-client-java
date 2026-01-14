@@ -162,6 +162,11 @@ public class OHTable implements HTableInterface {
      */
     private int                   maxKeyValueSize;
 
+    /**
+     * whether to enable put optimization path
+     */
+    private boolean              enablePutOptimization;
+
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
@@ -185,6 +190,12 @@ public class OHTable implements HTableInterface {
     private boolean               isClosed               = false;
 
     private final OHMetrics       metrics;
+
+    /**
+     * whether to fill current system time when timestamp is not specified during write operations.
+     * Default is false (disabled).
+     */
+    private final boolean       fillTimestampInClient;
 
     /**
      * Creates an object to access a HBase table.
@@ -222,7 +233,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.metrics = null;
         }
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -279,7 +290,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.metrics = null;
         }
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -309,6 +320,7 @@ public class OHTable implements HTableInterface {
         this.obTableClient = obTableClient;
         this.configuration = new Configuration();
         this.metrics = null;
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -353,7 +365,7 @@ public class OHTable implements HTableInterface {
         } else {
             this.metrics = null;
         }
-
+        this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         finishSetUp();
     }
 
@@ -407,6 +419,8 @@ public class OHTable implements HTableInterface {
             MAX_KEYVALUE_SIZE_DEFAULT);
         this.writeBufferSize = this.configuration.getLong(WRITE_BUFFER_SIZE_KEY,
             WRITE_BUFFER_SIZE_DEFAULT);
+        this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
+          HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -743,7 +757,7 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient)) {
+        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions, opType);
             try {
@@ -1667,7 +1681,7 @@ public class OHTable implements HTableInterface {
 
                     ObTableBatchOperation batch = new ObTableBatchOperation();
                     batch.addTableOperation(getInstance(INCREMENT, new Object[] { row, qualifier,
-                            Long.MAX_VALUE }, V_COLUMNS, new Object[] { Bytes.toBytes(amount) }));
+                        getEffectiveTimestampForWrite(Long.MAX_VALUE) }, V_COLUMNS, new Object[] { Bytes.toBytes(amount) }));
 
                     ObHTableFilter filter = buildObHTableFilter(null, null, 1, qualifiers);
 
@@ -2182,7 +2196,7 @@ public class OHTable implements HTableInterface {
         return "weak".equalsIgnoreCase(consistencyStr);
     }
 
-    public static ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
+    public ObTableBatchOperation buildObTableBatchOperation(List<Mutation> rowList,
                                                                    List<byte[]> qualifiers) {
         ObTableBatchOperation batch = new ObTableBatchOperation();
         ObTableOperationType opType;
@@ -2341,7 +2355,7 @@ public class OHTable implements HTableInterface {
                 }
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
-                    new Object[] { kv.getRow(), kv.getQualifier(), kv.getTimestamp() },
+                    new Object[] { kv.getRow(), kv.getQualifier(), getEffectiveTimestampForWrite(kv.getTimestamp()) },
                     property_columns, property);
             case Delete:
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(DEL, ROW_KEY_COLUMNS,
@@ -2369,6 +2383,22 @@ public class OHTable implements HTableInterface {
             default:
                 throw new IllegalArgumentException("illegal mutation type " + operationType);
         }
+    }
+
+
+    /**
+     * Get effective timestamp for write operations (Put, Increment, Append).
+     * If fillTimestampInClient is enabled and timestamp is Long.MAX_VALUE,
+     * returns current system time, otherwise returns the original timestamp.
+     *
+     * @param timestamp the original timestamp
+     * @return effective timestamp to use
+     */
+    private long getEffectiveTimestampForWrite(long timestamp) {
+        if (fillTimestampInClient && timestamp == Long.MAX_VALUE) {
+            return System.currentTimeMillis();
+        }
+        return timestamp;
     }
 
     private KeyValue modifyQualifier(KeyValue original, byte[] newQualifier) {
@@ -2579,7 +2609,7 @@ public class OHTable implements HTableInterface {
                     for (Cell kv : keyValueList) {
                         ObHbaseCell cell = new ObHbaseCell(isCellTTL);
                         cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
-                        cell.setT(ObObj.getInstance(-kv.getTimestamp())); // set timestamp as negative
+                        cell.setT(ObObj.getInstance(-getEffectiveTimestampForWrite(kv.getTimestamp()))); // set timestamp as negative
                         cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
                         if (isCellTTL) {
                             cell.setTTL(ObObj.getInstance(ttl));
@@ -2603,7 +2633,7 @@ public class OHTable implements HTableInterface {
         return request;
     }
 
-    public static ObTableOperation buildObTableOperation(KeyValue kv,
+    public ObTableOperation buildObTableOperation(KeyValue kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
@@ -2618,7 +2648,7 @@ public class OHTable implements HTableInterface {
                 return getInstance(
                     operationType,
                     new Object[] { CellUtil.cloneRow(kv), CellUtil.cloneQualifier(kv),
-                            kv.getTimestamp() }, property_columns, property);
+                            getEffectiveTimestampForWrite(kv.getTimestamp()) }, property_columns, property);
             case Delete:
                 return getInstance(
                     DEL,
