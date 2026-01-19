@@ -681,6 +681,14 @@
             <snapshots>
                 <enabled>true</enabled>
             </snapshots>
+            <id>ant-artifactory</id>
+            <name>Alipay Artifactory</name>
+            <url>http://mvn.test.alipay.net/artifactory/content/groups/public/</url>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
             <id>central_prod</id>
             <url>http://mvn.dev.alipay.net:8080/artifactory/repo</url>
         </repository>
@@ -699,10 +707,10 @@
             <url>http://mvn.dev.alipay.net:8080/artifactory/repo</url>
         </repository>
         <repository>
-            <snapshots>
+            <releases>
                 <enabled>true</enabled>
-            </snapshots>
-            <id>ant-artifactory</id>
+            </releases>
+            <id>alipay-artifactory</id>
             <name>Alipay Artifactory</name>
             <url>http://mvn.test.alipay.net/artifactory/content/groups/public/</url>
         </repository>
