@@ -53,11 +53,6 @@ public class OHTableFillTimestampInClientTest {
         dropTable();
     }
 
-    @Before
-    public void prepareCase() throws Exception {
-        truncateTable();
-    }
-
     /**
      * Create dynamic partition table for testing
      */
