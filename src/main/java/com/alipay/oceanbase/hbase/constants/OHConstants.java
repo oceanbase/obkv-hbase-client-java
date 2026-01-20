@@ -154,6 +154,18 @@ public final class OHConstants {
      * use to specify the route policy when performing a query.
      */
     public static final String   HBASE_HTABLE_CLIENT_ROUTE_POLICY       = "hbase.htable.client.route.policy";
+    
+    /**
+     * use to specify whether to automatically fill current system time in client when timestamp is not specified during write operations.
+     * Default is false (disabled).
+     */
+    public static final String   HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT          = "hbase.htable.auto.fill.timestamp.in.client";
+    
+    /**
+     * use to specify whether to enable put optimization path.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_USE_PUT_OPTIMIZATION = "hbase.htable.use.put.optimization";
 
     /*-------------------------------------------------------------------------------------------------------------*/
 
@@ -181,5 +193,7 @@ public final class OHConstants {
     public static final String   SOCKET_TIMEOUT                              = "ipc.socket.timeout";
 
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
+
+    public static final boolean  HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT   = true;
 
 }
