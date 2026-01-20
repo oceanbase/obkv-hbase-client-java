@@ -198,6 +198,12 @@ public class OHTable implements HTableInterface {
     private final boolean       fillTimestampInClient;
 
     /**
+     * whether to enable hotkey get optimization globally.
+     * Cached at construction time to avoid repeated configuration lookups.
+     */
+    private final boolean       hotKeyGetOptimizeEnableGlobal;
+
+    /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
      * created with the same <code>configuration</code> instance.  Uses already-populated
@@ -234,6 +240,7 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
         finishSetUp();
     }
 
@@ -291,6 +298,7 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
         finishSetUp();
     }
 
@@ -321,6 +329,7 @@ public class OHTable implements HTableInterface {
         this.configuration = new Configuration();
         this.metrics = null;
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
         finishSetUp();
     }
 
@@ -366,6 +375,7 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
         finishSetUp();
     }
 
@@ -2110,18 +2120,12 @@ public class OHTable implements HTableInterface {
         obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
         // HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE is a statement-level setting, while HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL is a global setting.
         // The statement-level setting takes precedence over the global setting.
-        // If the statement-level setting is not configured, use the global setting.
+        // If the statement-level setting is not configured, use the global setting (cached at construction time).
         // If the statement-level setting is configured, use the statement-level setting.
-        boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = scan.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
-        if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
-            hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
-        } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
-        }
-
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnable != null
+            ? Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable))
+            : hotKeyGetOptimizeEnableGlobal);
         return obTableQuery;
     }
 
@@ -2150,16 +2154,10 @@ public class OHTable implements HTableInterface {
         obTableQuery.setScanRangeColumns("K", "Q", "T");
         byte[] hotOnly = get.getAttribute(HBASE_HTABLE_QUERY_HOT_ONLY);
         obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
-        boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = get.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
-        if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
-            hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
-        } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
-        }
-
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnable != null
+            ? Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable))
+            : hotKeyGetOptimizeEnableGlobal);
         return obTableQuery;
     }
 
