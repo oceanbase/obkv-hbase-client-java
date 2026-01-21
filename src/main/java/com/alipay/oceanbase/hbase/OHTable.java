@@ -1137,6 +1137,9 @@ public class OHTable implements Table {
         return execute(new OperationExecuteCallback<ResultScanner>(OHOperationType.SCAN, 1 /* batchSize */) {
             @Override
             ResultScanner execute() throws IOException {
+                if (!scan.getCacheBlocks()) {
+                    throw new FeatureNotSupportedException("scan setCacheBlocks interface not supported");
+                }
                 if (scan.getFamilyMap().keySet().isEmpty()) {
                     if (!FeatureSupport.isEmptyFamilySupported()) {
                         throw new FeatureNotSupportedException("empty family scan not supported yet within observer version: " + ObGlobal.obVsnString());
