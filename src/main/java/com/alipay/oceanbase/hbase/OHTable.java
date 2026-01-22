@@ -198,6 +198,24 @@ public class OHTable implements HTableInterface {
     private final boolean       fillTimestampInClient;
 
     /**
+     * whether to enable hotkey get optimization globally.
+     * Cached at construction time to avoid repeated configuration lookups.
+     */
+    private final boolean       hotKeyGetOptimizeEnableGlobal;
+
+    /**
+     * whether test load is enabled.
+     * Cached at construction time to avoid repeated configuration lookups.
+     */
+    private final boolean       testLoadEnable;
+
+    /**
+     * test load suffix if test load is enabled.
+     * Cached at construction time to avoid repeated configuration lookups.
+     */
+    private final String        testLoadSuffix;
+
+    /**
      * Creates an object to access a HBase table.
      * Shares oceanbase table obTableClient and other resources with other OHTable instances
      * created with the same <code>configuration</code> instance.  Uses already-populated
@@ -234,6 +252,11 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
+        this.testLoadSuffix = testLoadEnable
+            ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
+            : null;
         finishSetUp();
     }
 
@@ -291,6 +314,11 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
+        this.testLoadSuffix = testLoadEnable
+            ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
+            : null;
         finishSetUp();
     }
 
@@ -321,6 +349,11 @@ public class OHTable implements HTableInterface {
         this.configuration = new Configuration();
         this.metrics = null;
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
+        this.testLoadSuffix = testLoadEnable
+            ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
+            : null;
         finishSetUp();
     }
 
@@ -366,6 +399,11 @@ public class OHTable implements HTableInterface {
             this.metrics = null;
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
+        this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
+        this.testLoadSuffix = testLoadEnable
+            ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
+            : null;
         finishSetUp();
     }
 
@@ -603,8 +641,7 @@ public class OHTable implements HTableInterface {
                     break;
                 }
             }
-            String realTableName = getTargetTableName(tableNameString, family,
-                    configuration);
+            String realTableName = getTargetTableName(tableNameString, family);
             BatchOperation batch = buildBatchOperation(realTableName, puts, false,
                     resultMapSingleOp);
             tmpResults = batch.execute();
@@ -659,8 +696,8 @@ public class OHTable implements HTableInterface {
                 for (Map.Entry<byte[], List<Cell>> entry : delete.getFamilyCellMap()
                         .entrySet()) {
                     byte[] family = entry.getKey();
-                    String realTableName = getTargetTableName(tableNameString,
-                            Bytes.toString(family), configuration);
+            String realTableName = getTargetTableName(tableNameString,
+                    Bytes.toString(family));
                     // split delete
                     List<Cell> cells = entry.getValue();
                     Delete del = new Delete(delete.getRow());
@@ -683,7 +720,7 @@ public class OHTable implements HTableInterface {
             }
         } else {
             byte[] family = delete.getFamilyCellMap().firstKey();
-            String realTableName = getTargetTableName(tableNameString, Bytes.toString(family), configuration);
+            String realTableName = getTargetTableName(tableNameString, Bytes.toString(family));
             return buildBatchOperation(realTableName,
                     Collections.singletonList(delete),
                     false, resultMapSingleOp);
@@ -877,7 +914,7 @@ public class OHTable implements HTableInterface {
                 }
             }
         }
-        return getTargetTableName(tableNameString, Bytes.toString(family), configuration);
+        return getTargetTableName(tableNameString, Bytes.toString(family));
     }
 
     @Override
@@ -970,12 +1007,20 @@ public class OHTable implements HTableInterface {
     }
 
     private String getTargetTableName(String tableNameString) {
-        if (configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false)) {
-            return tableNameString
-                   + configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX,
-                       DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX);
+        return testLoadEnable ? tableNameString + testLoadSuffix : tableNameString;
+    }
+
+    /**
+     * Get target table name with family, using cached configuration values.
+     * This is an optimized instance method that avoids repeated configuration lookups.
+     */
+    private String getTargetTableName(String tableNameString, String familyString) {
+        checkArgument(tableNameString != null, "tableNameString is null");
+        checkArgument(familyString != null, "familyString is null");
+        if (testLoadEnable) {
+            return tableNameString + testLoadSuffix + "$" + familyString;
         }
-        return tableNameString;
+        return tableNameString + "$" + familyString;
     }
 
     // To enable the server to identify the column family to which a qualifier belongs,
@@ -1066,8 +1111,7 @@ public class OHTable implements HTableInterface {
                             }
                             obTableQuery = buildObTableQuery(get, entry.getValue());
                             ObTableQueryRequest request = buildObTableQueryRequest(obTableQuery,
-                                getTargetTableName(tableNameString, Bytes.toString(family),
-                                    configuration), opType, isWeakRead(get));
+                                getTargetTableName(tableNameString, Bytes.toString(family)), opType, isWeakRead(get));
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                     .execute(request);
                             getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
@@ -1195,8 +1239,7 @@ public class OHTable implements HTableInterface {
 
                                     request = buildObTableQueryAsyncRequest(
                                         obTableQuery,
-                                        getTargetTableName(tableNameString, Bytes.toString(family),
-                                            configuration), OHOperationType.SCAN, isWeakRead(scan));
+                                        getTargetTableName(tableNameString, Bytes.toString(family)), OHOperationType.SCAN, isWeakRead(scan));
                                     clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                         .execute(request);
                                     return new ClientStreamScanner(clientQueryAsyncStreamResult,
@@ -1273,8 +1316,7 @@ public class OHTable implements HTableInterface {
                             obTableQuery = buildObTableQuery(filter, scan);
 
                             List<ResultScanner> resultScanners = new ArrayList<ResultScanner>();
-                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family),
-                                    configuration);
+                            String targetTableName = getTargetTableName(tableNameString, Bytes.toString(family));
                             request = buildObTableQueryAsyncRequest(obTableQuery, targetTableName, OHOperationType.SCAN, isWeakRead(scan));
                             request.setNeedTabletId(false);
                             request.setAllowDistributeScan(false);
@@ -1525,7 +1567,7 @@ public class OHTable implements HTableInterface {
 
                     ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
                         obTableQuery, batch,
-                        getTargetTableName(tableNameString, Bytes.toString(family), configuration),
+                        getTargetTableName(tableNameString, Bytes.toString(family)),
                         opType);
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                         .execute(request);
@@ -1576,8 +1618,7 @@ public class OHTable implements HTableInterface {
                     queryAndMutate.setMutations(batchOperation);
                     ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
                         obTableQuery, batchOperation,
-                        getTargetTableName(tableNameString, Bytes.toString(f), configuration),
-                        opType);
+                        getTargetTableName(tableNameString, Bytes.toString(f)), opType);
                     request.setReturningAffectedEntity(append.isReturnResults());
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                         .execute(request);
@@ -1634,7 +1675,7 @@ public class OHTable implements HTableInterface {
                     ObTableQuery obTableQuery = buildObTableQuery(filter, rowKey, true, rowKey, true, false, increment.getTimeRange());
 
                     ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(obTableQuery,
-                            batch, getTargetTableName(tableNameString, Bytes.toString(f), configuration), opType);
+                            batch, getTargetTableName(tableNameString, Bytes.toString(f)), opType);
                     request.setReturningAffectedEntity(increment.isReturnResults());
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
                             .execute(request);
@@ -1693,7 +1734,7 @@ public class OHTable implements HTableInterface {
 
                     ObTableQueryAndMutateRequest request = buildObTableQueryAndMutateRequest(
                         obTableQuery, batch,
-                        getTargetTableName(tableNameString, Bytes.toString(family), configuration),
+                        getTargetTableName(tableNameString, Bytes.toString(family)),
                         opType);
                     request.setReturningAffectedEntity(true);
                     ObTableQueryAndMutateResult result = (ObTableQueryAndMutateResult) obTableClient
@@ -2110,18 +2151,12 @@ public class OHTable implements HTableInterface {
         obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
         // HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE is a statement-level setting, while HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL is a global setting.
         // The statement-level setting takes precedence over the global setting.
-        // If the statement-level setting is not configured, use the global setting.
+        // If the statement-level setting is not configured, use the global setting (cached at construction time).
         // If the statement-level setting is configured, use the statement-level setting.
-        boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = scan.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
-        if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
-            hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
-        } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
-        }
-
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnable != null
+            ? Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable))
+            : hotKeyGetOptimizeEnableGlobal);
         return obTableQuery;
     }
 
@@ -2150,16 +2185,10 @@ public class OHTable implements HTableInterface {
         obTableQuery.setScanRangeColumns("K", "Q", "T");
         byte[] hotOnly = get.getAttribute(HBASE_HTABLE_QUERY_HOT_ONLY);
         obTableQuery.setHotOnly(hotOnly != null && Arrays.equals(hotOnly, "true".getBytes()));
-        boolean hotKeyGetOptimizeEnableBool = false;
         byte[] hotKeyGetOptimizeEnable = get.getAttribute(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE);
-        if (hotKeyGetOptimizeEnable == null) {
-            boolean hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
-            hotKeyGetOptimizeEnableBool = hotKeyGetOptimizeEnableGlobal;
-        } else {
-            hotKeyGetOptimizeEnableBool = Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable));
-        }
-
-        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnableBool);
+        obTableQuery.setGetOptimized(hotKeyGetOptimizeEnable != null
+            ? Boolean.parseBoolean(Bytes.toString(hotKeyGetOptimizeEnable))
+            : hotKeyGetOptimizeEnableGlobal);
         return obTableQuery;
     }
 
@@ -2599,7 +2628,7 @@ public class OHTable implements HTableInterface {
                     ObHbaseCfRows sameCfRows = cfRowsMap.get(family);
                     if (sameCfRows == null) {
                         sameCfRows = new ObHbaseCfRows();
-                        String realTableName = getTargetTableName(tableNameString, family, configuration);
+                        String realTableName = getTargetTableName(tableNameString, family);
                         sameCfRows.setRealTableName(realTableName);
                         cfRowsMap.put(family, sameCfRows);
                         cfRowsArray.add(sameCfRows);
