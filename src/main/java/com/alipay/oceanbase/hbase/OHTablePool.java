@@ -49,6 +49,7 @@ import java.util.concurrent.ExecutorService;
 import static com.alipay.oceanbase.hbase.constants.OHConstants.*;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.apache.hadoop.hbase.HConstants.DEFAULT_HBASE_CLIENT_OPERATION_TIMEOUT;
+import static com.alipay.oceanbase.hbase.util.Preconditions.checkArgument;
 
 public class OHTablePool implements Closeable {
 
@@ -346,6 +347,30 @@ public class OHTablePool implements Closeable {
 
     int getCurrentPoolSize(String tableName) {
         return tables.size(tableName);
+    }
+
+        /**
+     * load sharding conf for {@link org.apache.hadoop.hbase.client.HTableInterface}
+     * This method indicate that we will use sharding-mode htable pool and it is mutually exclusive with the following methods
+     * {@link  OHTablePool#load(java.lang.String, java.lang.String)}
+     * {@link  OHTablePool#setParamUrl(java.lang.String, java.lang.String)}
+     * {@link  OHTablePool#setFullUserName(java.lang.String, java.lang.String)}
+     * {@link  OHTablePool#setPassword(java.lang.String, java.lang.String)}
+     *
+     * Generally , we should not mix the below methods with this method . If you do mix the methods you should be clearly aware of
+     * that you will get the sharding client when the specific table is not declared。
+     * @param appName the app name
+     * @param appDsName the app dataSource name
+     * @param version the version
+     */
+    public void loadSharding(final String appName, String appDsName, String version) {
+
+        checkArgument(isNotBlank(appName), "appName is blank");
+        checkArgument(isNotBlank(appDsName), "appDsName is blank");
+        checkArgument(isNotBlank(version), "version is blank");
+        config.set(HBASE_OCEANBASE_DDS_APP_NAME, appName);
+        config.set(HBASE_OCEANBASE_DDS_APP_DS_NAME, appDsName);
+        config.set(HBASE_OCEANBASE_DDS_VERSION, version);
     }
 
     /**
