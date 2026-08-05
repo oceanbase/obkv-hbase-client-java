@@ -26,9 +26,12 @@ import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellBatch;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellRow;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.AbstractClientScanner;
 import org.apache.hadoop.hbase.client.Result;
@@ -37,6 +40,7 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.*;
 
+import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
 @InterfaceAudience.Private
@@ -57,24 +61,42 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private boolean                         isTableGroup = false;
 
+    private final boolean                   lightweightResultCellEnabled;
+
     private OHMetrics                       metrics;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup, OHMetrics metrics) {
+        this(streamResult, tableName, family, isTableGroup, metrics,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+    }
+
+    public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
+                               byte[] family, boolean isTableGroup, OHMetrics metrics,
+                               boolean lightweightResultCellEnabled) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.family = family;
         this.isTableGroup = isTableGroup;
         this.metrics = metrics;
+        this.lightweightResultCellEnabled = lightweightResultCellEnabled;
     }
 
     public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup, OHMetrics metrics) {
+        this(streamResult, tableName, family, isTableGroup, metrics,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+    }
+
+    public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
+                               byte[] family, boolean isTableGroup, OHMetrics metrics,
+                               boolean lightweightResultCellEnabled) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.family = family;
         this.isTableGroup = isTableGroup;
         this.metrics = metrics;
+        this.lightweightResultCellEnabled = lightweightResultCellEnabled;
     }
 
     @Override
@@ -83,14 +105,70 @@ public class ClientStreamScanner extends AbstractClientScanner {
         MetricsImporter importer = metrics == null ? null : new MetricsImporter();
         try {
             checkStatus();
-            List<ObObj> startRow;
-            if (streamResult.next()) {
-                startRow = streamResult.getRow();
-            } else {
+            if (!streamResult.next()) {
                 return null;
             }
+            if (streamResult.isCurrentHBaseCell()) {
+                return buildCompactResult(streamResult.drainCurrentHBaseRow());
+            }
+            return buildLegacyResult(streamResult.getRow());
+        } catch (Exception e) {
+            throw new IOException(String.format("get table %s stream next result error ",
+                streamResult.getTableName()), e);
+        } finally {
+            if (metrics != null) {
+                long duration = System.currentTimeMillis() - startTimeMs;
+                importer.setDuration(duration);
+                importer.setBatchSize(1);
+                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN,
+                    importer));
+            }
+        }
+    }
 
-            byte[][] familyAndQualifier = new byte[2][];
+    private Result buildCompactResult(ObHBaseCellRow hbaseRow) {
+        List<Cell> cells = new ArrayList<Cell>(hbaseRow.getCellCount());
+        byte[] rowKey = hbaseRow.getRowKey();
+        for (int sliceIndex = 0; sliceIndex < hbaseRow.getSliceCount(); sliceIndex++) {
+            ObHBaseCellBatch batch = hbaseRow.getBatch(sliceIndex);
+            int toIndex = hbaseRow.getToIndex(sliceIndex);
+            for (int index = hbaseRow.getFromIndex(sliceIndex); index < toIndex; index++) {
+                addCompactResultCell(cells, rowKey, batch.getQualifier(index),
+                    batch.getTimestamp(index), batch.getValue(index));
+            }
+        }
+        OHBaseFuncUtils.sortHBaseResult(cells);
+        return createCompactResult(cells);
+    }
+
+    private void addCompactResultCell(List<Cell> cells, byte[] rowKey, byte[] qualifier,
+                                      long timestamp, byte[] value) {
+        if (lightweightResultCellEnabled) {
+            if (isTableGroup) {
+                cells.add(OHBaseResultCell.createTableGroup(rowKey, qualifier, timestamp, value));
+            } else {
+                cells.add(OHBaseResultCell.create(rowKey, family, qualifier, timestamp, value));
+            }
+            return;
+        }
+        if (isTableGroup) {
+            cells
+                .add(OHBaseFuncUtils.createTableGroupKeyValue(rowKey, qualifier, timestamp, value));
+        } else {
+            cells.add(new KeyValue(rowKey, family, qualifier, timestamp, value));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Result createCompactResult(List<Cell> cells) {
+        if (lightweightResultCellEnabled) {
+            return Result.create(cells);
+        }
+        return new Result((List<KeyValue>) (List<?>) cells);
+    }
+
+    private Result buildLegacyResult(List<ObObj> startRow) throws Exception {
+        byte[][] familyAndQualifier = new byte[2][];
             if (this.isTableGroup) {
                 // split family and qualifier
                 familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow
@@ -130,21 +208,8 @@ public class ClientStreamScanner extends AbstractClientScanner {
                     break;
                 }
             }
-            // sort keyValues
-            OHBaseFuncUtils.sortHBaseResult(keyValues);
+        OHBaseFuncUtils.sortHBaseResult(keyValues);
             return new Result(keyValues);
-        } catch (Exception e) {
-            throw new IOException(String.format("get table %s stream next result error ",
-                streamResult.getTableName()), e);
-        } finally {
-            if (metrics != null) {
-                long duration = System.currentTimeMillis() - startTimeMs;
-                importer.setDuration(duration);
-                importer.setBatchSize(1);
-                metrics.update(new ObPair<OHOperationType, MetricsImporter>(OHOperationType.SCAN,
-                    importer));
-            }
-        }
     }
 
     @Override

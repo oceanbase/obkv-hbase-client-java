@@ -24,6 +24,7 @@ import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.metrics.MetricsImporter;
 import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
+import com.alipay.oceanbase.hbase.result.OHBaseResultCell;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
@@ -204,6 +205,16 @@ public class OHTable implements HTableInterface {
     private final boolean       hotKeyGetOptimizeEnableGlobal;
 
     /**
+     * whether point read results use field-backed lightweight cells.
+     */
+    private final boolean         getLightweightResultCellEnabled;
+
+    /**
+     * whether Scan results use field-backed lightweight cells.
+     */
+    private final boolean         scanLightweightResultCellEnabled;
+
+    /**
      * whether test load is enabled.
      * Cached at construction time to avoid repeated configuration lookups.
      */
@@ -253,6 +264,12 @@ public class OHTable implements HTableInterface {
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.getLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+        this.scanLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
         this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
         this.testLoadSuffix = testLoadEnable
             ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
@@ -315,6 +332,12 @@ public class OHTable implements HTableInterface {
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.getLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+        this.scanLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
         this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
         this.testLoadSuffix = testLoadEnable
             ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
@@ -337,6 +360,19 @@ public class OHTable implements HTableInterface {
     @InterfaceAudience.Private
     public OHTable(final byte[] tableName, final ObTableClient obTableClient,
                    final ExecutorService executePool) {
+        this(tableName, obTableClient, executePool,
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+    }
+
+    OHTable(final byte[] tableName, final ObTableClient obTableClient,
+            final ExecutorService executePool, boolean getLightweightResultCellEnabled) {
+        this(tableName, obTableClient, executePool, getLightweightResultCellEnabled,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+    }
+
+    OHTable(final byte[] tableName, final ObTableClient obTableClient,
+            final ExecutorService executePool, boolean getLightweightResultCellEnabled,
+            boolean scanLightweightResultCellEnabled) {
         checkArgument(tableName != null, "tableNameString is blank.");
         checkArgument(executePool != null && !executePool.isShutdown(),
             "executePool is null or executePool is shutdown");
@@ -350,6 +386,8 @@ public class OHTable implements HTableInterface {
         this.metrics = null;
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.getLightweightResultCellEnabled = getLightweightResultCellEnabled;
+        this.scanLightweightResultCellEnabled = scanLightweightResultCellEnabled;
         this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
         this.testLoadSuffix = testLoadEnable
             ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
@@ -400,6 +438,12 @@ public class OHTable implements HTableInterface {
         }
         this.fillTimestampInClient = configuration.getBoolean(HBASE_HTABLE_AUTO_FILL_TIMESTAMP_IN_CLIENT, false);
         this.hotKeyGetOptimizeEnableGlobal = configuration.getBoolean(HBASE_HTABLE_HOTKEY_GET_OPTIMIZE_ENABLE_GLOBAL, false);
+        this.getLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
+        this.scanLightweightResultCellEnabled = configuration.getBoolean(
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED,
+            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
         this.testLoadEnable = configuration.getBoolean(HBASE_HTABLE_TEST_LOAD_ENABLE, false);
         this.testLoadSuffix = testLoadEnable
             ? configuration.get(HBASE_HTABLE_TEST_LOAD_SUFFIX, DEFAULT_HBASE_HTABLE_TEST_LOAD_SUFFIX)
@@ -865,21 +909,16 @@ public class OHTable implements HTableInterface {
         while (valueIdx < propertiesValues.size()) {
             // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
             // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
-            byte[][] familyAndQualifier = new byte[2][];
             try {
-                // split family and qualifier
-                familyAndQualifier = OHBaseFuncUtils
-                        .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+                byte[] rowKey = (byte[]) propertiesValues.get(valueIdx).getValue();
+                byte[] familyQualifier = (byte[]) propertiesValues.get(valueIdx + 1).getValue();
+                long timestamp = (Long) propertiesValues.get(valueIdx + 2).getValue();
+                byte[] value = (byte[]) propertiesValues.get(valueIdx + 3).getValue();
+                addResultCell(cells, rowKey, familyQualifier, timestamp, value, true,
+                    HConstants.EMPTY_BYTE_ARRAY);
             } catch (Exception e) {
                 throw new IOException(e);
             }
-            KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
-                    familyAndQualifier[0], // family
-                    familyAndQualifier[1], // qualifiermat
-                    (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
-                    (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
-            );
-            cells.add(kv);
             valueIdx += 4;
         }
         return cells;
@@ -968,41 +1007,171 @@ public class OHTable implements HTableInterface {
         return bt1.length - bt2.length;
     }
 
-    private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
-                                     List<KeyValue> keyValueList, boolean isTableGroup,
-                                     byte[] family, boolean checkExistenceOnly) throws Exception {
-        byte[][] familyAndQualifier = new byte[2][];
-        KeyValue kv = null;
+    private void addRowToResultCells(List<Cell> cells, List<ObObj> row, byte[] rowKey,
+                                     boolean isTableGroup, byte[] family) throws Exception {
+        byte[] qualifier = (byte[]) row.get(1).getValue();
+        long timestamp = (Long) row.get(2).getValue();
+        byte[] value = (byte[]) row.get(3).getValue();
+        addResultCell(cells, rowKey, qualifier, timestamp, value, isTableGroup, family);
+    }
+
+    private void addResultCell(List<Cell> cells, byte[] rowKey, byte[] qualifier, long timestamp,
+                               byte[] value, boolean isTableGroup, byte[] family) throws Exception {
+        if (getLightweightResultCellEnabled) {
+            if (isTableGroup) {
+                cells.add(OHBaseResultCell.createTableGroup(rowKey, qualifier, timestamp, value));
+            } else {
+                cells.add(OHBaseResultCell.create(rowKey, family, qualifier, timestamp, value));
+            }
+            return;
+        }
+        if (isTableGroup) {
+            cells
+                .add(OHBaseFuncUtils.createTableGroupKeyValue(rowKey, qualifier, timestamp, value));
+        } else {
+            cells.add(new KeyValue(rowKey, family, qualifier, timestamp, value));
+        }
+    }
+
+    /**
+     * A point Get uses an exact row range, so all returned cells must belong to the requested row.
+     * Validate the invariant once and reuse the returned rowkey while assembling result cells.
+     */
+    private boolean fillPointGetFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                           List<Cell> cells, boolean isTableGroup, byte[] family,
+                                           byte[] expectedRowKey, boolean checkExistenceOnly)
+                                                                                             throws Exception {
+        byte[] canonicalRowKey = null;
         while (clientQueryStreamResult.next()) {
             if (checkExistenceOnly) {
-                // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
-                keyValueList.add(new KeyValue());
-                return;
+                // An existence-only response contains an empty row when the requested row exists.
+                return true;
+            }
+
+            if (clientQueryStreamResult.isCurrentHBaseCell()) {
+                ObHBaseCellRow hbaseRow = clientQueryStreamResult.drainCurrentHBaseRow();
+                byte[] actualRowKey = hbaseRow.getRowKey();
+                if (canonicalRowKey == null) {
+                    if (!Bytes.equals(expectedRowKey, actualRowKey)) {
+                        throw new ObTableUnexpectedException(
+                            "point Get returned an unexpected rowkey, expected length="
+                                    + expectedRowKey.length + ", actual length="
+                                    + actualRowKey.length);
+                    }
+                    canonicalRowKey = actualRowKey;
+                }
+                addCompactRowToResultCells(cells, hbaseRow, canonicalRowKey, isTableGroup,
+                    family);
+                continue;
+            }
+
+            byte[] actualRowKey;
+            byte[] qualifier;
+            long timestamp;
+            byte[] value;
+            List<ObObj> row = clientQueryStreamResult.getRow();
+            actualRowKey = (byte[]) row.get(0).getValue();
+            qualifier = (byte[]) row.get(1).getValue();
+            timestamp = (Long) row.get(2).getValue();
+            value = (byte[]) row.get(3).getValue();
+            if (canonicalRowKey == null) {
+                if (!Bytes.equals(expectedRowKey, actualRowKey)) {
+                    throw new ObTableUnexpectedException(
+                        "point Get returned an unexpected rowkey, expected length="
+                                + expectedRowKey.length + ", actual length="
+                                + actualRowKey.length);
+                }
+                canonicalRowKey = actualRowKey;
+            }
+            addResultCell(cells, canonicalRowKey, qualifier, timestamp, value, isTableGroup, family);
+        }
+        return canonicalRowKey != null;
+    }
+
+    private void addCompactRowToResultCells(List<Cell> cells, ObHBaseCellRow hbaseRow,
+                                            byte[] canonicalRowKey, boolean isTableGroup,
+                                            byte[] family) throws Exception {
+        for (int sliceIndex = 0; sliceIndex < hbaseRow.getSliceCount(); sliceIndex++) {
+            ObHBaseCellBatch batch = hbaseRow.getBatch(sliceIndex);
+            int toIndex = hbaseRow.getToIndex(sliceIndex);
+            for (int index = hbaseRow.getFromIndex(sliceIndex); index < toIndex; index++) {
+                addResultCell(cells, canonicalRowKey, batch.getQualifier(index),
+                    batch.getTimestamp(index), batch.getValue(index), isTableGroup, family);
+            }
+        }
+    }
+
+    /**
+     * closestRowBefore may collect candidates from multiple partitions. Keep only cells belonging
+     * to the greatest returned rowkey without cloning the rowkey from a temporary result cell.
+     */
+    private boolean getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                     List<Cell> cells, boolean isTableGroup,
+                                     byte[] family, boolean checkExistenceOnly) throws Exception {
+        byte[] currentMaxRowKey = null;
+        while (clientQueryStreamResult.next()) {
+            if (checkExistenceOnly) {
+                // An existence-only response contains an empty row when a candidate row exists.
+                return true;
+            }
+
+            byte[] rowKey;
+            byte[] qualifier;
+            long timestamp;
+            byte[] value;
+            if (clientQueryStreamResult.isCurrentHBaseCell()) {
+                ObHBaseCellBatch batch = clientQueryStreamResult.getCurrentHBaseCellBatch();
+                int index = clientQueryStreamResult.getCurrentHBaseCellIndex();
+                rowKey = batch.getRowKey(index);
+                qualifier = batch.getQualifier(index);
+                timestamp = batch.getTimestamp(index);
+                value = batch.getValue(index);
             } else {
                 List<ObObj> row = clientQueryStreamResult.getRow();
-                if (kv == null
-                    || compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) <= 0) {
-                    if (kv != null
-                        && compareByteArray(kv.getRow(), (byte[]) row.get(0).getValue()) != 0) {
-                        keyValueList.clear();
-                    }
-                    if (isTableGroup) {
-                        // split family and qualifier
-                        familyAndQualifier = OHBaseFuncUtils
-                            .extractFamilyFromQualifier((byte[]) row.get(1).getValue());
-                    } else {
-                        familyAndQualifier[0] = family;
-                        familyAndQualifier[1] = (byte[]) row.get(1).getValue();
-                    }
-                    kv = new KeyValue((byte[]) row.get(0).getValue(),//K
-                        familyAndQualifier[0], // family
-                        familyAndQualifier[1], // qualifiermat
-                        (Long) row.get(2).getValue(), // T
-                        (byte[]) row.get(3).getValue() // V
-                    );
-                    keyValueList.add(kv);
-                }
+                rowKey = (byte[]) row.get(0).getValue();
+                qualifier = (byte[]) row.get(1).getValue();
+                timestamp = (Long) row.get(2).getValue();
+                value = (byte[]) row.get(3).getValue();
             }
+            if (currentMaxRowKey != null) {
+                int rowComparison = compareByteArray(currentMaxRowKey, rowKey);
+                if (rowComparison > 0) {
+                    continue;
+                }
+                if (rowComparison < 0) {
+                    cells.clear();
+                    currentMaxRowKey = rowKey;
+                }
+            } else {
+                currentMaxRowKey = rowKey;
+            }
+            addResultCell(cells, rowKey, qualifier, timestamp, value, isTableGroup, family);
+        }
+        return currentMaxRowKey != null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Result createGetResult(List<Cell> cells) {
+        if (getLightweightResultCellEnabled) {
+            return Result.create(cells);
+        }
+        return new Result((List<KeyValue>) (List<?>) cells);
+    }
+
+    private void addQueryResultToKeyValueList(ObTableQueryResult queryResult,
+                                              List<KeyValue> keyValues, byte[] family)
+                                                                                      throws Exception {
+        ObHBaseCellBatch batch = queryResult.getHBaseCellBatch();
+        if (batch != null) {
+            for (int i = 0; i < batch.size(); i++) {
+                keyValues.add(new KeyValue(batch.getRowKey(i), family, batch.getQualifier(i), batch
+                    .getTimestamp(i), batch.getValue(i)));
+            }
+            return;
+        }
+        for (List<ObObj> row : queryResult.getPropertiesRows()) {
+            keyValues.add(new KeyValue((byte[]) row.get(0).getValue(), family, (byte[]) row.get(1)
+                .getValue(), (Long) row.get(2).getValue(), (byte[]) row.get(3).getValue()));
         }
     }
 
@@ -1073,8 +1242,9 @@ public class OHTable implements HTableInterface {
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
                 obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
             public Result call() throws IOException {
-                List<KeyValue> keyValueList = new ArrayList<>();
+                List<Cell> cells = new ArrayList<>();
                 byte[] family = new byte[] {};
+                boolean exists = false;
                 ObTableQuery obTableQuery;
                 try {
                     if (get.getFamilyMap().keySet().isEmpty()
@@ -1093,7 +1263,12 @@ public class OHTable implements HTableInterface {
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                             .execute(request);
-                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family, get.isCheckExistenceOnly());
+                        if (get.isClosestRowBefore()) {
+                            exists = getMaxRowFromResult(clientQueryStreamResult, cells, true, family, get.isCheckExistenceOnly());
+                        } else {
+                            exists = fillPointGetFromResult(clientQueryStreamResult, cells,
+                                true, family, get.getRow(), get.isCheckExistenceOnly());
+                        }
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                                 .entrySet()) {
@@ -1114,8 +1289,14 @@ public class OHTable implements HTableInterface {
                                 getTargetTableName(tableNameString, Bytes.toString(family)), opType, isWeakRead(get));
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                     .execute(request);
-                            getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
+                            if (get.isClosestRowBefore()) {
+                                exists = getMaxRowFromResult(clientQueryStreamResult, cells, false,
                                 family, get.isCheckExistenceOnly());
+                            } else {
+                                exists = fillPointGetFromResult(clientQueryStreamResult, cells,
+                                    false, family, get.getRow(),
+                                    get.isCheckExistenceOnly());
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -1123,11 +1304,11 @@ public class OHTable implements HTableInterface {
                                           + Bytes.toString(family) + " error.", e);
                 }
                 if (get.isCheckExistenceOnly()) {
-                    return Result.create(null, !keyValueList.isEmpty());
+                    return Result.create(null, exists);
                 }
-                // sort keyValues
-                OHBaseFuncUtils.sortHBaseResult(keyValueList);
-                return new Result(keyValueList);
+                // sort result cells
+                OHBaseFuncUtils.sortHBaseResult(cells);
+                return createGetResult(cells);
             }
         };
         return executeServerCallable(serverCallable);
@@ -1217,7 +1398,8 @@ public class OHTable implements HTableInterface {
                                 clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                     .execute(request);
                                 return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                    tableNameString, family, true, metrics);
+                                    tableNameString, family, true, metrics,
+                                    scanLightweightResultCellEnabled);
                             } else {
                                 for (Map.Entry<byte[], NavigableSet<byte[]>> entry : scan.getFamilyMap()
                                     .entrySet()) {
@@ -1243,7 +1425,8 @@ public class OHTable implements HTableInterface {
                                     clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                         .execute(request);
                                     return new ClientStreamScanner(clientQueryAsyncStreamResult,
-                                        tableNameString, family, false, metrics);
+                                        tableNameString, family, false, metrics,
+                                        scanLightweightResultCellEnabled);
                                 }
                             }
                         } catch (Exception e) {
@@ -1303,7 +1486,8 @@ public class OHTable implements HTableInterface {
                             clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
                             ClientStreamScanner clientScanner = new ClientStreamScanner(
-                                clientQueryAsyncStreamResult, tableNameString, family, true, metrics);
+                                clientQueryAsyncStreamResult, tableNameString, family, true, metrics,
+                                scanLightweightResultCellEnabled);
                             resultScanners.add(clientScanner);
                         }
                         return resultScanners;
@@ -1328,7 +1512,7 @@ public class OHTable implements HTableInterface {
                                 clientQueryAsyncStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                     .execute(request);
                                 ClientStreamScanner clientScanner = new ClientStreamScanner(
-                                    clientQueryAsyncStreamResult, tableNameString, family, false, metrics);
+                                    clientQueryAsyncStreamResult, tableNameString, family, false, metrics, scanLightweightResultCellEnabled);
                                 resultScanners.add(clientScanner);
                             }
                             return resultScanners;
@@ -1627,15 +1811,7 @@ public class OHTable implements HTableInterface {
                     }
                     ObTableQueryResult queryResult = result.getAffectedEntity();
                     List<KeyValue> keyValues = new ArrayList<KeyValue>();
-                    for (List<ObObj> row : queryResult.getPropertiesRows()) {
-                        byte[] k = (byte[]) row.get(0).getValue();
-                        byte[] q = (byte[]) row.get(1).getValue();
-                        long t = (Long) row.get(2).getValue();
-                        byte[] v = (byte[]) row.get(3).getValue();
-                        KeyValue kv = new KeyValue(k, f, q, t, v);
-
-                        keyValues.add(kv);
-                    }
+                    addQueryResultToKeyValueList(queryResult, keyValues, f);
                     return new Result(keyValues);
                 } catch (Exception e) {
                     throw new IOException("append table " + tableNameString + " error.", e);
@@ -1684,14 +1860,7 @@ public class OHTable implements HTableInterface {
                     }
                     ObTableQueryResult queryResult = result.getAffectedEntity();
                     List<KeyValue> keyValues = new ArrayList<KeyValue>();
-                    for (List<ObObj> row : queryResult.getPropertiesRows()) {
-                        byte[] k = (byte[]) row.get(0).getValue();
-                        byte[] q = (byte[]) row.get(1).getValue();
-                        long t = (Long) row.get(2).getValue();
-                        byte[] v = (byte[]) row.get(3).getValue();
-                        KeyValue kv = new KeyValue(k, f, q, t, v);
-                        keyValues.add(kv);
-                    }
+                    addQueryResultToKeyValueList(queryResult, keyValues, f);
                     return new Result(keyValues);
                 } catch (Exception e) {
                     throw new IOException("increment table " + tableNameString + " error.", e);

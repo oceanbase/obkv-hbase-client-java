@@ -167,6 +167,18 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_USE_PUT_OPTIMIZATION = "hbase.htable.use.put.optimization";
 
+    /**
+     * use to specify whether point read results use field-backed lightweight cells.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_ENABLED = "hbase.htable.get.lightweight.result.cell.enabled";
+
+    /**
+     * use to specify whether Scan results use field-backed lightweight cells.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED = "hbase.htable.scan.lightweight.result.cell.enabled";
+
     /*-------------------------------------------------------------------------------------------------------------*/
 
     /**
@@ -195,5 +207,9 @@ public final class OHConstants {
     public static final int      DEFAULT_SOCKET_TIMEOUT                      = 20000;                                   // 20 seconds
 
     public static final boolean  HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT   = true;
+
+    public static final boolean  HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
+
+    public static final boolean  HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
 
 }
