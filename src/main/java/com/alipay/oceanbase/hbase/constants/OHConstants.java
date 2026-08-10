@@ -179,6 +179,25 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED = "hbase.htable.scan.lightweight.result.cell.enabled";
 
+    /**
+     * When autoFlush is enabled, put(Put)/put(List) bypass BufferedMutator and call
+     * innerBatchImpl directly. Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_ENABLED         = "hbase.htable.put.direct.autoflush.enabled";
+
+    /**
+     * When building Put V2 requests on a sync-complete path (autoFlush / direct put),
+     * skip CellUtil.clone* for contiguous qualifier/value byte arrays and share the
+     * Cell backing array until encode. Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_PUT_SKIP_CELL_CLONE_ENABLED          = "hbase.htable.put.skip.cell.clone.enabled";
+
+    /**
+     * Store Put V2 cells in compact parallel arrays and encode Q/T/V/(TTL) directly.
+     * Default is true (enabled).
+     */
+    public static final String   HBASE_HTABLE_PUT_COMPACT_CELL_ENABLED             = "hbase.htable.put.compact.cell.enabled";
+
     /*-------------------------------------------------------------------------------------------------------------*/
 
     /**
@@ -211,5 +230,11 @@ public final class OHConstants {
     public static final boolean  HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
 
     public static final boolean  HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
+
+    public static final boolean  HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_DEFAULT         = true;
+
+    public static final boolean  HBASE_HTABLE_PUT_SKIP_CELL_CLONE_DEFAULT          = true;
+
+    public static final boolean  HBASE_HTABLE_PUT_COMPACT_CELL_DEFAULT             = true;
 
 }

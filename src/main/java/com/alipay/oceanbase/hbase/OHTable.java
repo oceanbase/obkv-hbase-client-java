@@ -28,6 +28,7 @@ import com.alipay.oceanbase.hbase.result.OHBaseResultCell;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.util.ObBytesString;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
@@ -167,6 +168,23 @@ public class OHTable implements HTableInterface {
      * whether to enable put optimization path
      */
     private boolean              enablePutOptimization;
+
+    /**
+     * When autoFlush is on, bypass BufferedMutator queue/flush and call innerBatchImpl
+     * directly. Default true; set hbase.htable.put.direct.autoflush.enabled=false to
+     * restore the legacy path.
+     */
+    private boolean              enablePutDirectAutoFlush;
+
+    /**
+     * On sync-complete Put V2 paths (autoFlush), skip CellUtil.clone* for contiguous
+     * Q/V arrays. Default true; set hbase.htable.put.skip.cell.clone.enabled=false to
+     * always clone.
+     */
+    private boolean              enablePutSkipCellClone;
+
+    /** Use compact Q/T/V/(TTL) arrays for Put V2 request encoding. */
+    private boolean              enablePutCompactCell;
 
     // i.e., doPut checks the writebuffer every X Puts.
 
@@ -503,6 +521,12 @@ public class OHTable implements HTableInterface {
             WRITE_BUFFER_SIZE_DEFAULT);
         this.enablePutOptimization = this.configuration.getBoolean(HBASE_HTABLE_USE_PUT_OPTIMIZATION,
           HBASE_HTABLE_USE_PUT_OPTIMIZATION_DEFAULT);
+        this.enablePutDirectAutoFlush = this.configuration.getBoolean(
+            HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_ENABLED, HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_DEFAULT);
+        this.enablePutSkipCellClone = this.configuration.getBoolean(
+            HBASE_HTABLE_PUT_SKIP_CELL_CLONE_ENABLED, HBASE_HTABLE_PUT_SKIP_CELL_CLONE_DEFAULT);
+        this.enablePutCompactCell = this.configuration.getBoolean(
+            HBASE_HTABLE_PUT_COMPACT_CELL_ENABLED, HBASE_HTABLE_PUT_COMPACT_CELL_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -829,16 +853,20 @@ public class OHTable implements HTableInterface {
                 throw new AssertionError("results.length");
             }
         }
-        BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
-        List<Integer> resultMapSingleOp = new LinkedList<>();
         if (!ObGlobal.isHBaseBatchSupport()) {
+            BatchError batchError = new BatchError();
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
+            if (batchError.hasErrors()) {
+                throw batchError.makeException();
+            }
+            return;
+        }
+        if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions, opType);
             try {
@@ -851,48 +879,50 @@ public class OHTable implements HTableInterface {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else {
-            String realTableName = getTargetTableName(actions);
-            BatchOperation batch = buildBatchOperation(realTableName, actions,
-                    tableNameString.equals(realTableName), resultMapSingleOp);
-            batch.setHbaseOpType(opType);
-            BatchOperationResult tmpResults;
-            try {
-                tmpResults = batch.execute();
-            } catch (Exception e) {
-                throw new IOException(tableNameString + " table occurred unexpected error.", e);
-            }
-            int index = 0;
-            for (int i = 0; i != actions.size(); ++i) {
-                if (tmpResults.getResults().get(index) instanceof ObTableException) {
-                    if (results != null) {
-                        results[i] = tmpResults.getResults().get(index);
-                    }
-                    batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
-                } else if (actions.get(i) instanceof Get) {
-                    if (results != null) {
-                        // get results have been wrapped in MutationResult, need to fetch it
-                        if (tmpResults.getResults().get(index) instanceof MutationResult) {
-                            MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
-                            ObPayload innerResult = mutationResult.getResult();
-                            if (innerResult instanceof ObTableSingleOpResult) {
-                                ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
-                                List<Cell> cells = generateGetResult(singleOpResult);
-                                results[i] = Result.create(cells);
-                            } else {
-                                throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
-                            }
+            return;
+        }
+        BatchError batchError = new BatchError();
+        List<Integer> resultMapSingleOp = new LinkedList<>();
+        String realTableName = getTargetTableName(actions);
+        BatchOperation batch = buildBatchOperation(realTableName, actions,
+                tableNameString.equals(realTableName), resultMapSingleOp);
+        batch.setHbaseOpType(opType);
+        BatchOperationResult tmpResults;
+        try {
+            tmpResults = batch.execute();
+        } catch (Exception e) {
+            throw new IOException(tableNameString + " table occurred unexpected error.", e);
+        }
+        int index = 0;
+        for (int i = 0; i != actions.size(); ++i) {
+            if (tmpResults.getResults().get(index) instanceof ObTableException) {
+                if (results != null) {
+                    results[i] = tmpResults.getResults().get(index);
+                }
+                batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
+            } else if (actions.get(i) instanceof Get) {
+                if (results != null) {
+                    // get results have been wrapped in MutationResult, need to fetch it
+                    if (tmpResults.getResults().get(index) instanceof MutationResult) {
+                        MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
+                        ObPayload innerResult = mutationResult.getResult();
+                        if (innerResult instanceof ObTableSingleOpResult) {
+                            ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
+                            List<Cell> cells = generateGetResult(singleOpResult);
+                            results[i] = Result.create(cells);
                         } else {
-                            throw new ObTableUnexpectedException("Unexpected type of result in batch");
+                            throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
                         }
-                    }
-                } else {
-                    if (results != null) {
-                        results[i] = new Result();
+                    } else {
+                        throw new ObTableUnexpectedException("Unexpected type of result in batch");
                     }
                 }
-                index += resultMapSingleOp.get(i);
+            } else {
+                if (results != null) {
+                    results[i] = new Result();
+                }
             }
+            index += resultMapSingleOp.get(i);
         }
         if (batchError.hasErrors()) {
             throw batchError.makeException();
@@ -1549,6 +1579,9 @@ public class OHTable implements HTableInterface {
         execute(new OperationExecuteCallback<Void>(opType, 1 /* batchSize */) {
             @Override
             public Void execute() throws IOException {
+                if (tryDirectAutoFlushPuts(Collections.singletonList(put), opType)) {
+                    return null;
+                }
                 ((OHBufferedMutatorImpl) getBufferedMutator()).setOpType(opType);
                 getBufferedMutator().mutate(put);
                 if (autoFlush) {
@@ -1565,6 +1598,12 @@ public class OHTable implements HTableInterface {
         execute(new OperationExecuteCallback<Void>(opType, puts.size() /* batchSize */) {
             @Override
             public Void execute() throws IOException {
+                if (puts.isEmpty()) {
+                    return null;
+                }
+                if (tryDirectAutoFlushPuts(puts, opType)) {
+                    return null;
+                }
                 ((OHBufferedMutatorImpl) getBufferedMutator()).setOpType(opType);
                 getBufferedMutator().mutate(puts);
                 if (autoFlush) {
@@ -1576,20 +1615,97 @@ public class OHTable implements HTableInterface {
     }
 
     /**
+     * AutoFlush fast path: validate then innerBatchImpl, skipping BufferedMutator
+     * queue / heapSize / LinkedList / flush. If a pending buffer exists, flush it
+     * first so buffered Puts stay ordered ahead of the direct Put.
+     *
+     * @return true if the direct path handled the Puts; false to use legacy mutate+flush
+     */
+    private boolean tryDirectAutoFlushPuts(List<? extends Row> puts, OHOperationType opType)
+                                                                                       throws IOException {
+        if (!enablePutDirectAutoFlush || !autoFlush) {
+            return false;
+        }
+        for (Row row : puts) {
+            if (!(row instanceof Put)) {
+                return false;
+            }
+            validatePutMutation((Put) row);
+        }
+        if (!isWriteBufferEmpty()) {
+            flushCommits();
+            if (!isWriteBufferEmpty()) {
+                // Listener may have swallowed errors while leaving residual state;
+                // fall back to the legacy path rather than reorder writes.
+                return false;
+            }
+        }
+        Object[] results = null;
+        innerBatchImpl(puts, results, opType);
+        return true;
+    }
+
+    @VisibleForTesting
+    public boolean isWriteBufferEmpty() {
+        return mutator == null || mutator.isBufferEmpty();
+    }
+
+    @VisibleForTesting
+    public boolean isPutDirectAutoFlushEnabled() {
+        return enablePutDirectAutoFlush;
+    }
+
+    @VisibleForTesting
+    public boolean isPutSkipCellCloneEnabled() {
+        return enablePutSkipCellClone;
+    }
+
+    /**
+     * Put validation shared by the autoFlush direct path and BufferedMutator.
+     */
+    public void validatePutMutation(Put put) {
+        NavigableMap<byte[], List<Cell>> familyCellMap = put.getFamilyCellMap();
+        validatePut(put, familyCellMap, maxKeyValueSize);
+        if (isMultiFamilyWriteSupport()) {
+            checkFamilyViolation(familyCellMap.keySet(), true);
+        } else {
+            checkFamilyViolationForOneFamily(familyCellMap.keySet());
+        }
+    }
+
+    /**
+     * Same multi-CF capability gate as OHBufferedMutatorImpl historically used.
+     */
+    public static boolean isMultiFamilyWriteSupport() {
+        long multiCfSince425Bp1 = ObGlobal.calcVersion(4, (short) 2, (byte) 5, (byte) 1);
+        long before430 = ObGlobal.calcVersion(4, (short) 3, (byte) 0, (byte) 0);
+        long multiCfSince434 = ObGlobal.calcVersion(4, (short) 3, (byte) 4, (byte) 0);
+        return (ObGlobal.OB_VERSION >= multiCfSince425Bp1 && ObGlobal.OB_VERSION < before430)
+               || (ObGlobal.OB_VERSION >= multiCfSince434);
+    }
+
+    /**
      * 校验 put 里的参数是否合法，需要传入 family ，并且 keyvalue 的 size 不能太大
      * @param put the put
      */
     public static void validatePut(Put put, int maxKeyValueSize) {
+        validatePut(put, put.getFamilyCellMap(), maxKeyValueSize);
+    }
+
+    private static void validatePut(Put put, NavigableMap<byte[], List<Cell>> familyCellMap,
+                                    int maxKeyValueSize) {
         if (put.isEmpty()) {
             throw new IllegalArgumentException("No columns to insert");
         }
         if (maxKeyValueSize > 0) {
-            for (Map.Entry<byte[], List<KeyValue>> entry : put.getFamilyMap().entrySet()) {
+            for (Map.Entry<byte[], List<Cell>> entry : familyCellMap.entrySet()) {
                 if (entry.getKey() == null || entry.getKey().length == 0) {
                     throw new IllegalArgumentException("family is empty");
                 }
-                for (KeyValue kv : entry.getValue()) {
-                    if (kv.getLength() > maxKeyValueSize) {
+                for (Cell cell : entry.getValue()) {
+                    int cellLength = cell instanceof KeyValue ? ((KeyValue) cell).getLength()
+                        : KeyValueUtil.length(cell);
+                    if (cellLength > maxKeyValueSize) {
                         throw new IllegalArgumentException("KeyValue size too large");
                     }
                 }
@@ -2546,10 +2662,11 @@ public class OHTable implements HTableInterface {
         switch (kvType) {
             case Put:
                 String[] property_columns = V_COLUMNS;
-                Object[] property = new Object[] { CellUtil.cloneValue(kv) };
+                Object value = CellUtil.cloneValue(kv);
+                Object[] property = new Object[] { value };
                 if (TTL != Long.MAX_VALUE) {
                     property_columns = PROPERTY_COLUMNS;
-                    property = new Object[] { CellUtil.cloneValue(kv), TTL };
+                    property = new Object[] { value, TTL };
                 }
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
@@ -2769,13 +2886,14 @@ public class OHTable implements HTableInterface {
         return batch;
     }
 
-    private ObHbaseRequest buildHbaseRequest(List<? extends Row> actions, OHOperationType hbaseOpType)
-                                                                    throws FeatureNotSupportedException,
-                                                                    IllegalArgumentException,
-                                                                    IOException {
+    @VisibleForTesting
+    ObHbaseRequest buildHbaseRequest(List<? extends Row> actions, OHOperationType hbaseOpType)
+                                                                      throws FeatureNotSupportedException,
+                                                                      IllegalArgumentException,
+                                                                      IOException {
         ObHbaseRequest request = new ObHbaseRequest();
         ObTableOperationType opType = null;
-        List<ObObj> keys = new ArrayList<>();
+        List<ObObj> keys = new ArrayList<>(actions.size());
         List<ObHbaseCfRows> cfRowsArray = new ArrayList<>();
         Map<String, ObHbaseCfRows> cfRowsMap = new HashMap<>();
         int keyIndex = 0;
@@ -2791,30 +2909,45 @@ public class OHTable implements HTableInterface {
                 if (ttl != Long.MAX_VALUE) {
                     isCellTTL = true;
                 }
-                keys.add(ObObj.getInstance(put.getRow()));
+                ObObj ttlObj = isCellTTL && !enablePutCompactCell ? ObObj.hbasePutInt64(ttl)
+                    : null;
+                keys.add(ObObj.hbasePutVarchar(put.getRow()));
+                boolean shareCellBytes = enablePutSkipCellClone && autoFlush;
                 for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
                     String family = Bytes.toString(entry.getKey());
                     ObHbaseCfRows sameCfRows = cfRowsMap.get(family);
                     if (sameCfRows == null) {
                         sameCfRows = new ObHbaseCfRows();
+                        sameCfRows.reserveKeyRuns(actions.size());
                         String realTableName = getTargetTableName(tableNameString, family);
                         sameCfRows.setRealTableName(realTableName);
                         cfRowsMap.put(family, sameCfRows);
                         cfRowsArray.add(sameCfRows);
                     }
                     List<Cell> keyValueList = entry.getValue();
-                    List<ObHbaseCell> cells = new ArrayList<>();
-                    for (Cell kv : keyValueList) {
-                        ObHbaseCell cell = new ObHbaseCell(isCellTTL);
-                        cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
-                        cell.setT(ObObj.getInstance(-getEffectiveTimestampForWrite(kv.getTimestamp()))); // set timestamp as negative
-                        cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
-                        if (isCellTTL) {
-                            cell.setTTL(ObObj.getInstance(ttl));
+                    if (enablePutCompactCell) {
+                        sameCfRows.reserveAdditionalCompactCells(keyValueList.size());
+                        sameCfRows.beginCompactKeyCells(keyIndex, keyValueList.size(), ttl);
+                        for (Cell kv : keyValueList) {
+                            appendCompactPutCell(sameCfRows, kv, shareCellBytes);
                         }
-                        cells.add(cell);
+                    } else {
+                        sameCfRows.reserveAdditionalCells(keyValueList.size());
+                        sameCfRows.beginKeyCells(keyIndex, keyValueList.size());
+                        for (Cell kv : keyValueList) {
+                            ObHbaseCell cell = new ObHbaseCell(isCellTTL);
+                            cell.setQ(ObObj.hbasePutVarchar(bytesForPutCell(kv, shareCellBytes,
+                                true)));
+                            cell.setT(ObObj.hbasePutInt64(-getEffectiveTimestampForWrite(kv
+                                .getTimestamp())));
+                            cell.setV(ObObj.hbasePutVarchar(bytesForPutCell(kv, shareCellBytes,
+                                false)));
+                            if (isCellTTL) {
+                                cell.setTTL(ttlObj);
+                            }
+                            sameCfRows.appendCell(cell);
+                        }
                     }
-                    sameCfRows.add(keyIndex, cells.size(), cells);
                 }
             } else {
                 throw new FeatureNotSupportedException(
@@ -2831,15 +2964,65 @@ public class OHTable implements HTableInterface {
         return request;
     }
 
+    /**
+     * Put V2 Q/V payload for ObObj. When {@code share} is true, reference the Cell
+     * region without clone: contiguous arrays are returned as {@code byte[]}; sliced
+     * regions use an {@link ObBytesString} view. Encode copies once into the RPC buffer.
+     * Delayed-flush / non-autoFlush paths must pass share=false (clone to byte[]).
+     */
+    @VisibleForTesting
+    static Object bytesForPutCell(Cell cell, boolean share, boolean qualifier) {
+        if (share) {
+            byte[] array = qualifier ? cell.getQualifierArray() : cell.getValueArray();
+            int offset = qualifier ? cell.getQualifierOffset() : cell.getValueOffset();
+            int length = qualifier ? cell.getQualifierLength() : cell.getValueLength();
+            if (array == null) {
+                return new byte[0];
+            }
+            if (offset == 0 && length == array.length) {
+                return array;
+            }
+            return new ObBytesString(array, offset, length);
+        }
+        return qualifier ? CellUtil.cloneQualifier(cell) : CellUtil.cloneValue(cell);
+    }
+
+    private void appendCompactPutCell(ObHbaseCfRows cfRows, Cell cell, boolean shareCellBytes) {
+        byte[] qualifier;
+        int qualifierOffset;
+        int qualifierLength;
+        byte[] value;
+        int valueOffset;
+        int valueLength;
+        if (shareCellBytes) {
+            qualifier = cell.getQualifierArray();
+            qualifierOffset = cell.getQualifierOffset();
+            qualifierLength = cell.getQualifierLength();
+            value = cell.getValueArray();
+            valueOffset = cell.getValueOffset();
+            valueLength = cell.getValueLength();
+        } else {
+            qualifier = CellUtil.cloneQualifier(cell);
+            qualifierOffset = 0;
+            qualifierLength = qualifier.length;
+            value = CellUtil.cloneValue(cell);
+            valueOffset = 0;
+            valueLength = value.length;
+        }
+        cfRows.appendCompactCell(qualifier, qualifierOffset, qualifierLength,
+            -getEffectiveTimestampForWrite(cell.getTimestamp()), value, valueOffset, valueLength);
+    }
+
     public ObTableOperation buildObTableOperation(KeyValue kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
         KeyValue.Type kvType = KeyValue.Type.codeToType(kv.getType());
         String[] property_columns = V_COLUMNS;
-        Object[] property = new Object[] { CellUtil.cloneValue(kv) };
+        Object value = CellUtil.cloneValue(kv);
+        Object[] property = new Object[] { value };
         if (TTL != Long.MAX_VALUE) {
             property_columns = PROPERTY_COLUMNS;
-            property = new Object[] { CellUtil.cloneValue(kv), TTL };
+            property = new Object[] { value, TTL };
         }
         switch (kvType) {
             case Put:
