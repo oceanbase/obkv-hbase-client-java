@@ -179,6 +179,9 @@ public final class OHConstants {
      */
     public static final String   HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_ENABLED = "hbase.htable.scan.lightweight.result.cell.enabled";
 
+    /** Decode LS Batch Get K/Q/T/V results directly into a compact cell batch. */
+    public static final String   HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_ENABLED = "hbase.htable.batch.get.compact.decoder.enabled";
+
     /**
      * When autoFlush is enabled, put(Put)/put(List) bypass BufferedMutator and call
      * innerBatchImpl directly. Default is true (enabled).
@@ -230,6 +233,8 @@ public final class OHConstants {
     public static final boolean  HBASE_HTABLE_GET_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
 
     public static final boolean  HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT = true;
+
+    public static final boolean  HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_DEFAULT = true;
 
     public static final boolean  HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_DEFAULT         = true;
 

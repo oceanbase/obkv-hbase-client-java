@@ -186,6 +186,9 @@ public class OHTable implements HTableInterface {
     /** Use compact Q/T/V/(TTL) arrays for Put V2 request encoding. */
     private boolean              enablePutCompactCell;
 
+    /** Decode Batch Get K/Q/T/V results into compact arrays instead of per-field ObObj. */
+    private boolean              enableBatchGetCompactDecoder;
+
     // i.e., doPut checks the writebuffer every X Puts.
 
     /**
@@ -527,6 +530,9 @@ public class OHTable implements HTableInterface {
             HBASE_HTABLE_PUT_SKIP_CELL_CLONE_ENABLED, HBASE_HTABLE_PUT_SKIP_CELL_CLONE_DEFAULT);
         this.enablePutCompactCell = this.configuration.getBoolean(
             HBASE_HTABLE_PUT_COMPACT_CELL_ENABLED, HBASE_HTABLE_PUT_COMPACT_CELL_DEFAULT);
+        this.enableBatchGetCompactDecoder = this.configuration.getBoolean(
+            HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_ENABLED,
+            HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_DEFAULT);
     }
 
     public static OHConnectionConfiguration setUserDefinedNamespace(String tableNameString,
@@ -656,7 +662,7 @@ public class OHTable implements HTableInterface {
             @Override
             boolean[] execute() throws IOException {
                 boolean[] ret = new boolean[gets.size()];
-                List<Get> newGets = new ArrayList<>();
+                List<Get> newGets = new ArrayList<>(gets.size());
                 // if just checkExistOnly, batch get will not return any result or row count
                 // therefore we have to set checkExistOnly as false and so the result can be returned
                 for (Get get : gets) {
@@ -882,7 +888,15 @@ public class OHTable implements HTableInterface {
             return;
         }
         BatchError batchError = new BatchError();
-        List<Integer> resultMapSingleOp = new LinkedList<>();
+        boolean pureGetBatch = true;
+        for (Row action : actions) {
+            if (!(action instanceof Get)) {
+                pureGetBatch = false;
+                break;
+            }
+        }
+        List<Integer> resultMapSingleOp = pureGetBatch ? null
+            : new ArrayList<>(actions.size());
         String realTableName = getTargetTableName(actions);
         BatchOperation batch = buildBatchOperation(realTableName, actions,
                 tableNameString.equals(realTableName), resultMapSingleOp);
@@ -893,18 +907,25 @@ public class OHTable implements HTableInterface {
         } catch (Exception e) {
             throw new IOException(tableNameString + " table occurred unexpected error.", e);
         }
+        List<Object> batchResults = tmpResults.getResults();
+        if (pureGetBatch) {
+            consumePureGetBatchResults(actions, results, batchResults, batchError);
+            if (batchError.hasErrors()) {
+                throw batchError.makeException();
+            }
+            return;
+        }
         int index = 0;
         for (int i = 0; i != actions.size(); ++i) {
-            if (tmpResults.getResults().get(index) instanceof ObTableException) {
+            if (batchResults.get(index) instanceof ObTableException) {
                 if (results != null) {
-                    results[i] = tmpResults.getResults().get(index);
+                    results[i] = batchResults.get(index);
                 }
-                batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
+                batchError.add((ObTableException) batchResults.get(index), actions.get(i), null);
             } else if (actions.get(i) instanceof Get) {
                 if (results != null) {
-                    // get results have been wrapped in MutationResult, need to fetch it
-                    if (tmpResults.getResults().get(index) instanceof MutationResult) {
-                        MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
+                    if (batchResults.get(index) instanceof MutationResult) {
+                        MutationResult mutationResult = (MutationResult) batchResults.get(index);
                         ObPayload innerResult = mutationResult.getResult();
                         if (innerResult instanceof ObTableSingleOpResult) {
                             ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
@@ -929,27 +950,82 @@ public class OHTable implements HTableInterface {
         }
     }
 
-    private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
-        List<Cell> cells = new ArrayList<>();
+    @VisibleForTesting
+    void consumePureGetBatchResults(List<? extends Row> actions, Object[] results,
+                                    List<Object> batchResults, BatchError batchError)
+                                                                                         throws IOException {
+        if (batchResults.isEmpty() && actions.size() == 1) {
+            if (results != null) {
+                results[0] = Result.create(Collections.<Cell> emptyList());
+            }
+            return;
+        }
+        if (batchResults.size() != actions.size()) {
+            throw new ObTableUnexpectedException("Unexpected pure Get batch result count, expected="
+                                                 + actions.size() + ", actual="
+                                                 + batchResults.size());
+        }
+        for (int i = 0; i < actions.size(); i++) {
+            Object batchResult = batchResults.get(i);
+            if (batchResult instanceof ObTableException) {
+                if (results != null) {
+                    results[i] = batchResult;
+                }
+                batchError.add((ObTableException) batchResult, actions.get(i), null);
+                continue;
+            }
+            if (results == null) {
+                continue;
+            }
+            if (!(batchResult instanceof MutationResult)) {
+                throw new ObTableUnexpectedException("Unexpected type of result in pure Get batch");
+            }
+            ObPayload innerResult = ((MutationResult) batchResult).getResult();
+            if (!(innerResult instanceof ObTableSingleOpResult)) {
+                throw new ObTableUnexpectedException(
+                    "Unexpected type of inner result in pure Get batch");
+            }
+            results[i] = Result.create(generateGetResult((ObTableSingleOpResult) innerResult));
+        }
+    }
+
+    @VisibleForTesting
+    List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
         ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
+        ObHBaseCellBatch compactBatch = singleOpEntity.getHBaseCellBatch();
+        if (compactBatch != null) {
+            List<Cell> cells = new ArrayList<>(compactBatch.size());
+            try {
+                for (int cellIndex = 0; cellIndex < compactBatch.size(); cellIndex++) {
+                    addResultCell(cells, compactBatch.getRowKey(cellIndex),
+                        compactBatch.getQualifier(cellIndex), compactBatch.getTimestamp(cellIndex),
+                        compactBatch.getValue(cellIndex), true, HConstants.EMPTY_BYTE_ARRAY);
+                }
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+            return cells;
+        }
         // all values queried by this get are contained in properties
         // qualifier in batch get result is always appended after family
         List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
-        int valueIdx = 0;
-        while (valueIdx < propertiesValues.size()) {
-            // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
-            // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
-            try {
+        int propertyCount = propertiesValues.size();
+        if ((propertyCount & 3) != 0) {
+            throw new IOException("Malformed Batch Get K/Q/T/V result, property count="
+                                  + propertyCount);
+        }
+        List<Cell> cells = new ArrayList<>(propertyCount / 4);
+        try {
+            for (int valueIdx = 0; valueIdx < propertyCount; valueIdx += 4) {
                 byte[] rowKey = (byte[]) propertiesValues.get(valueIdx).getValue();
                 byte[] familyQualifier = (byte[]) propertiesValues.get(valueIdx + 1).getValue();
                 long timestamp = (Long) propertiesValues.get(valueIdx + 2).getValue();
                 byte[] value = (byte[]) propertiesValues.get(valueIdx + 3).getValue();
                 addResultCell(cells, rowKey, familyQualifier, timestamp, value, true,
                     HConstants.EMPTY_BYTE_ARRAY);
-            } catch (Exception e) {
-                throw new IOException(e);
             }
-            valueIdx += 4;
+        } catch (Exception e) {
+            throw new IOException(e);
         }
         return cells;
     }
@@ -1354,7 +1430,7 @@ public class OHTable implements HTableInterface {
                 if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
                     innerBatchImpl(gets, results, opType);
                 } else {
-                    List<Future<Result>> futures = new LinkedList<>();
+                    List<Future<Result>> futures = new ArrayList<>(gets.size());
                     for (int i = 0; i < gets.size(); i++) {
                         int index = i;
                         Future<Result> future = executePool.submit(() -> innerGetImpl(gets.get(index), opType)); // still use list type even executing gets one by one in loop
@@ -2874,13 +2950,16 @@ public class OHTable implements HTableInterface {
                 throw new FeatureNotSupportedException(
                     "not supported other type in batch yet,only support get, put and delete");
             }
-            resultMapSingleOp.add(singleOpResultNum);
+            if (resultMapSingleOp != null) {
+                resultMapSingleOp.add(singleOpResultNum);
+            }
         }
         // only set weak read consistency when all operations are Get and all Get operations are weak read
         if (getOperationNum == actions.size() && allGetIsWeakRead) {
             batch.setReadConsistency(ObReadConsistency.WEAK);
         }
         batch.setEntityType(ObTableEntityType.HKV);
+        batch.setHBaseBatchGetCompactDecoderEnabled(enableBatchGetCompactDecoder);
         batch.setServerCanRetry(OHBaseFuncUtils.serverCanRetry(obTableClient));
         batch.setNeedTabletId(OHBaseFuncUtils.needTabletId(obTableClient));
         return batch;
