@@ -27,17 +27,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_COMPACT_CELL_DEFAULT;
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_COMPACT_CELL_ENABLED;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -55,24 +51,22 @@ public class OHTableCompactPutCellTest {
     }
 
     @Test
-    public void testConfigNameAndDefault() throws Exception {
-        assertEquals("hbase.htable.put.compact.cell.enabled", HBASE_HTABLE_PUT_COMPACT_CELL_ENABLED);
-        assertTrue(HBASE_HTABLE_PUT_COMPACT_CELL_DEFAULT);
-        OHTable table = newTable();
-        assertTrue(getCompactEnabled(table));
-    }
-
-    @Test
-    public void testCompactRequestMatchesLegacyWithoutTtl() throws Exception {
+    public void testPutAlwaysUsesCompactCellsWithoutTtl() throws Exception {
         Put put = new Put(Bytes.toBytes("row"));
         put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("q1"), 1001L, Bytes.toBytes("value1"));
         put.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("qualifier-2"), 1002L,
             Bytes.toBytes("value-2"));
-        assertLegacyAndCompactEqual(put, OHOperationType.PUT);
+
+        ObHbaseRequest request = newTable().buildHbaseRequest(Collections.singletonList(put),
+            OHOperationType.PUT);
+
+        assertEquals(1, request.getCfRows().size());
+        assertTrue(request.getCfRows().get(0).hasCompactCells());
+        assertTrue(request.encode().length > 0);
     }
 
     @Test
-    public void testCompactRequestMatchesLegacyWithTtlAndMultipleRows() throws Exception {
+    public void testPutAlwaysUsesCompactCellsWithTtlAndMultipleRows() throws Exception {
         Put first = new Put(Bytes.toBytes("row-1"));
         first.setTTL(60000L);
         first.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("q1"), 2001L, Bytes.toBytes("value-1"));
@@ -81,22 +75,14 @@ public class OHTableCompactPutCellTest {
         Put second = new Put(Bytes.toBytes("row-2"));
         second.addColumn(Bytes.toBytes("cf"), Bytes.toBytes("q4"), 3001L, Bytes.toBytes("value-4"));
 
-        OHTable legacyTable = newTable();
-        OHTable compactTable = newTable();
-        setCompactEnabled(legacyTable, false);
-        setCompactEnabled(compactTable, true);
-        ObHbaseRequest legacy = legacyTable.buildHbaseRequest(Arrays.asList(first, second),
-            OHOperationType.PUT_LIST);
-        ObHbaseRequest compact = compactTable.buildHbaseRequest(Arrays.asList(first, second),
+        ObHbaseRequest compact = newTable().buildHbaseRequest(Arrays.asList(first, second),
             OHOperationType.PUT_LIST);
 
-        assertEquals(2, legacy.getCfRows().size());
         assertEquals(2, compact.getCfRows().size());
         for (int i = 0; i < compact.getCfRows().size(); i++) {
-            assertFalse(legacy.getCfRows().get(i).hasCompactCells());
             assertTrue(compact.getCfRows().get(i).hasCompactCells());
         }
-        assertArrayEquals(legacy.encode(), compact.encode());
+        assertTrue(compact.encode().length > 0);
     }
 
     @Test
@@ -108,7 +94,6 @@ public class OHTableCompactPutCellTest {
 
         OHTable compactTable = newTable();
         compactTable.setAutoFlush(false);
-        setCompactEnabled(compactTable, true);
         ObHbaseRequest compact = compactTable.buildHbaseRequest(Collections.singletonList(put),
             OHOperationType.PUT);
         byte[] encodedBeforeMutation = compact.encode();
@@ -122,34 +107,7 @@ public class OHTableCompactPutCellTest {
         assertArrayEquals(encodedBeforeMutation, compact.encode());
     }
 
-    private void assertLegacyAndCompactEqual(Put put, OHOperationType operationType)
-                                                                                    throws Exception {
-        OHTable legacyTable = newTable();
-        OHTable compactTable = newTable();
-        setCompactEnabled(legacyTable, false);
-        setCompactEnabled(compactTable, true);
-        ObHbaseRequest legacy = legacyTable.buildHbaseRequest(Collections.singletonList(put),
-            operationType);
-        ObHbaseRequest compact = compactTable.buildHbaseRequest(Collections.singletonList(put),
-            operationType);
-        assertFalse(legacy.getCfRows().get(0).hasCompactCells());
-        assertTrue(compact.getCfRows().get(0).hasCompactCells());
-        assertArrayEquals(legacy.encode(), compact.encode());
-    }
-
     private OHTable newTable() {
-        return new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executorService, true);
-    }
-
-    private static boolean getCompactEnabled(OHTable table) throws Exception {
-        Field field = OHTable.class.getDeclaredField("enablePutCompactCell");
-        field.setAccessible(true);
-        return field.getBoolean(table);
-    }
-
-    private static void setCompactEnabled(OHTable table, boolean enabled) throws Exception {
-        Field field = OHTable.class.getDeclaredField("enablePutCompactCell");
-        field.setAccessible(true);
-        field.setBoolean(table, enabled);
+        return new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executorService);
     }
 }

@@ -20,7 +20,6 @@ package com.alipay.oceanbase.hbase.result;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellBatch;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellRow;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
@@ -41,11 +40,11 @@ import static org.mockito.Mockito.when;
 public class ClientStreamScannerCompactResultTest {
 
     @Test
-    public void testCompactResultUsesKeyValueWhenLightweightCellIsDisabled() throws Exception {
+    public void testCompactResultUsesKeyValueAndDirectConsume() throws Exception {
         ObTableClientQueryAsyncStreamResult streamResult = compactStreamResult(compactRow(
             new String[] { "q-2", "q-1" }, new long[] { 101L, 102L }));
         ClientStreamScanner scanner = new ClientStreamScanner(streamResult, "test", bytes("f"),
-            false, null, false);
+            false, null);
 
         Result result = scanner.next();
 
@@ -58,47 +57,16 @@ public class ClientStreamScannerCompactResultTest {
     }
 
     @Test
-    public void testCompactResultUsesLightweightCellByDefault() throws Exception {
-        ObTableClientQueryAsyncStreamResult streamResult = compactStreamResult(compactRow(
-            new String[] { "q-1" }, new long[] { 102L }));
-        ClientStreamScanner scanner = new ClientStreamScanner(streamResult, "test", bytes("f"),
-            false, null);
-
-        Result result = scanner.next();
-
-        assertEquals(1, result.size());
-        assertTrue(result.rawCells()[0] instanceof OHBaseResultCell);
-    }
-
-    @Test
-    public void testCompactResultUsesLightweightCellWhenEnabled() throws Exception {
-        ObTableClientQueryAsyncStreamResult streamResult = compactStreamResult(compactRow(
-            new String[] { "q-1", "q-2" }, new long[] { 102L, 101L }));
-        ClientStreamScanner scanner = new ClientStreamScanner(streamResult, "test", bytes("f"),
-            false, null, true);
-
-        Result result = scanner.next();
-
-        assertEquals(2, result.size());
-        for (Cell cell : result.rawCells()) {
-            assertTrue(cell instanceof OHBaseResultCell);
-            assertArrayEquals(bytes("row-1"), CellUtil.cloneRow(cell));
-            assertArrayEquals(bytes("f"), CellUtil.cloneFamily(cell));
-        }
-        verify(streamResult, never()).getRow();
-        verify(streamResult, never()).getCacheRows();
-    }
-
-    @Test
     public void testCompactTableGroupResultUsesQualifierOffsets() throws Exception {
         ObTableClientQueryAsyncStreamResult streamResult = compactStreamResult(compactRow(
             new String[] { "f1\0q-1", "f2\0q-2" }, new long[] { 102L, 101L }));
         ClientStreamScanner scanner = new ClientStreamScanner(streamResult, "test", new byte[0],
-            true, null, true);
+            true, null);
 
         Result result = scanner.next();
 
         assertEquals(2, result.size());
+        assertTrue(result.rawCells()[0] instanceof KeyValue);
         assertArrayEquals(bytes("f1"), CellUtil.cloneFamily(result.rawCells()[0]));
         assertArrayEquals(bytes("q-1"), CellUtil.cloneQualifier(result.rawCells()[0]));
         assertArrayEquals(bytes("f2"), CellUtil.cloneFamily(result.rawCells()[1]));

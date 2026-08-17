@@ -36,8 +36,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_DEFAULT;
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_ENABLED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -57,31 +55,6 @@ public class OHTablePutDirectAutoFlushTest {
     @After
     public void tearDown() {
         executorService.shutdownNow();
-    }
-
-    @Test
-    public void testConfigNameAndDefault() {
-        assertEquals("hbase.htable.put.direct.autoflush.enabled",
-            HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_ENABLED);
-        assertTrue(HBASE_HTABLE_PUT_DIRECT_AUTOFLUSH_DEFAULT);
-    }
-
-    @Test
-    public void testDefaultEnablesDirectAutoFlush() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class),
-            executorService, true);
-        assertTrue(table.isPutDirectAutoFlushEnabled());
-        assertTrue(table.isWriteBufferEmpty());
-    }
-
-    @Test
-    public void testConfigCanDisableDirectAutoFlush() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class),
-            executorService, true);
-        Field enabled = OHTable.class.getDeclaredField("enablePutDirectAutoFlush");
-        enabled.setAccessible(true);
-        enabled.setBoolean(table, false);
-        assertFalse(table.isPutDirectAutoFlushEnabled());
     }
 
     @Test
@@ -190,20 +163,6 @@ public class OHTablePutDirectAutoFlushTest {
         assertFalse(table.isWriteBufferEmpty());
     }
 
-    @Test
-    public void testDirectDisabledFallsBackToMutator() throws Exception {
-        CapturingOHTable table = new CapturingOHTable(Bytes.toBytes("t"),
-            mock(ObTableClient.class), executorService);
-        Field enabled = OHTable.class.getDeclaredField("enablePutDirectAutoFlush");
-        enabled.setAccessible(true);
-        enabled.setBoolean(table, false);
-
-        table.put(newPut("row1", "cf", "q", "v"));
-
-        assertEquals(1, table.directBatchCalls.get()); // via flush path after mutate
-        assertTrue(getMutator(table) != null);
-    }
-
     private static Put newPut(String row, String family, String qualifier, String value) {
         Put put = new Put(Bytes.toBytes(row));
         put.addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), Bytes.toBytes(value));
@@ -229,7 +188,7 @@ public class OHTablePutDirectAutoFlushTest {
         volatile OHOperationType     lastOpType;
 
         CapturingOHTable(byte[] tableName, ObTableClient client, ExecutorService pool) {
-            super(tableName, client, pool, true);
+            super(tableName, client, pool);
         }
 
         @Override

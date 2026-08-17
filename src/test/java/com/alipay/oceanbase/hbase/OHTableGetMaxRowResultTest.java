@@ -28,7 +28,6 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableSingleOpEnt
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableSingleOpResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellBatch;
-import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellRow;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObTableQueryResult;
 import com.alipay.oceanbase.hbase.result.OHBaseResultCell;
 import io.netty.buffer.ByteBuf;
@@ -40,7 +39,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -61,7 +59,7 @@ public class OHTableGetMaxRowResultTest {
     @Before
     public void setUp() {
         executorService = Executors.newSingleThreadExecutor();
-        table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executorService, true);
+        table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executorService);
     }
 
     @After
@@ -103,11 +101,8 @@ public class OHTableGetMaxRowResultTest {
     @Test
     public void testPointGetConsumesCompactBatchWithoutMaterializingRows() throws Exception {
         byte[] expectedRowKey = Bytes.toBytes("row-1");
-        ObHBaseCellBatch firstBatch = compactBatch(row("row-1", "q1", 3L, "v1"));
-        ObHBaseCellBatch secondBatch = compactBatch(row("unexpected-later-row", "q2", 2L,
-            "v2"));
-        AbstractQueryStreamResult streamResult = compactPointGetStream(compactRow(firstBatch),
-            compactRow(secondBatch));
+        AbstractQueryStreamResult streamResult = compactStream(compactBatch(
+            row("row-1", "q1", 3L, "v1"), row("unexpected-later-row", "q2", 2L, "v2")));
         List<Cell> keyValues = new ArrayList<Cell>();
 
         boolean found = invokeFillPointGet(streamResult, keyValues, false, Bytes.toBytes("f"),
@@ -118,49 +113,7 @@ public class OHTableGetMaxRowResultTest {
         assertArrayEquals(expectedRowKey, keyValues.get(0).getRow());
         assertArrayEquals(expectedRowKey, keyValues.get(1).getRow());
         assertArrayEquals(Bytes.toBytes("q2"), keyValues.get(1).getQualifier());
-        verify(streamResult, times(3)).next();
-        verify(streamResult, times(2)).drainCurrentHBaseRow();
         verify(streamResult, never()).getRow();
-        verify(streamResult, never()).getCurrentHBaseCellBatch();
-        verify(streamResult, never()).getCurrentHBaseCellIndex();
-    }
-
-    @Test
-    public void testPointGetDrainsSameRowAcrossCachedBatchesOnce() throws Exception {
-        byte[] expectedRowKey = Bytes.toBytes("row-1");
-        ObHBaseCellBatch firstBatch = compactBatch(row("row-1", "q1", 4L, "v1"),
-            row("row-1", "q2", 3L, "v2"));
-        ObHBaseCellBatch secondBatch = compactBatch(row("row-1", "q3", 2L, "v3"),
-            row("row-1", "q4", 1L, "v4"));
-        AbstractQueryStreamResult streamResult = compactPointGetStream(compactRow(firstBatch,
-            secondBatch));
-        List<Cell> cells = new ArrayList<Cell>();
-
-        boolean found = invokeFillPointGet(streamResult, cells, false, Bytes.toBytes("f"),
-            expectedRowKey, false);
-
-        assertTrue(found);
-        assertEquals(4, cells.size());
-        assertArrayEquals(Bytes.toBytes("q1"), cells.get(0).getQualifier());
-        assertArrayEquals(Bytes.toBytes("q4"), cells.get(3).getQualifier());
-        verify(streamResult, times(2)).next();
-        verify(streamResult, times(1)).drainCurrentHBaseRow();
-        verify(streamResult, never()).getRow();
-    }
-
-    @Test
-    public void testDisabledLightweightCellUsesKeyValue() throws Exception {
-        OHTable fallbackTable = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class),
-            executorService, false);
-        AbstractQueryStreamResult streamResult = stream(row("row-1", "q1", 1L, "v1"));
-        List<Cell> cells = new ArrayList<Cell>();
-
-        boolean found = invokeFillPointGet(fallbackTable, streamResult, cells, false,
-            Bytes.toBytes("f"), Bytes.toBytes("row-1"), false);
-
-        assertTrue(found);
-        assertEquals(1, cells.size());
-        assertTrue(cells.get(0) instanceof KeyValue);
     }
 
     @Test
@@ -174,7 +127,6 @@ public class OHTableGetMaxRowResultTest {
 
         assertTrue(found);
         assertTrue(keyValues.isEmpty());
-        verify(streamResult, never()).drainCurrentHBaseRow();
         verify(streamResult, never()).getRow();
     }
 
@@ -232,7 +184,6 @@ public class OHTableGetMaxRowResultTest {
         assertEquals(2, keyValues.size());
         assertArrayEquals(Bytes.toBytes("row-3"), keyValues.get(0).getRow());
         assertArrayEquals(Bytes.toBytes("q2"), keyValues.get(1).getQualifier());
-        verify(streamResult, never()).drainCurrentHBaseRow();
         verify(streamResult, never()).getRow();
     }
 
@@ -403,33 +354,6 @@ public class OHTableGetMaxRowResultTest {
         when(streamResult.getCurrentHBaseCellBatch()).thenReturn(batch);
         when(streamResult.getCurrentHBaseCellIndex()).thenAnswer(invocation -> index.get());
         return streamResult;
-    }
-
-    private static AbstractQueryStreamResult compactPointGetStream(ObHBaseCellRow... rows)
-                                                                                         throws Exception {
-        AbstractQueryStreamResult streamResult = mock(AbstractQueryStreamResult.class);
-        Boolean[] remaining = new Boolean[Math.max(0, rows.length - 1)];
-        Arrays.fill(remaining, true);
-        when(streamResult.next()).thenReturn(true, remaining).thenReturn(false);
-        when(streamResult.isCurrentHBaseCell()).thenReturn(true);
-        when(streamResult.drainCurrentHBaseRow()).thenReturn(rows[0], Arrays.copyOfRange(rows, 1,
-            rows.length));
-        return streamResult;
-    }
-
-    private static ObHBaseCellRow compactRow(ObHBaseCellBatch... batches) throws Exception {
-        assertTrue(batches.length > 0);
-        Constructor<ObHBaseCellRow> constructor = ObHBaseCellRow.class
-            .getDeclaredConstructor(byte[].class);
-        constructor.setAccessible(true);
-        ObHBaseCellRow row = constructor.newInstance(batches[0].getRowKey(0));
-        Method addSlice = ObHBaseCellRow.class.getDeclaredMethod("addSlice",
-            ObHBaseCellBatch.class, int.class, int.class);
-        addSlice.setAccessible(true);
-        for (ObHBaseCellBatch batch : batches) {
-            addSlice.invoke(row, batch, 0, batch.size());
-        }
-        return row;
     }
 
     @SafeVarargs

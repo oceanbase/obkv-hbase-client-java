@@ -65,7 +65,7 @@ public class OHTablePutValidationTest {
     @Test
     public void testTableValidationDoesNotMaterializeDeprecatedFamilyMap() {
         OHTable table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class),
-            executorService, true);
+            executorService);
 
         table.validatePutMutation(newPut(FAMILY, "q", "value"));
     }

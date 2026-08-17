@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.*;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT;
 import static com.alipay.oceanbase.hbase.util.TableHBaseLoggerFactory.LCD;
 
 @InterfaceAudience.Private
@@ -61,42 +60,24 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private boolean                         isTableGroup = false;
 
-    private final boolean                   lightweightResultCellEnabled;
-
     private OHMetrics                       metrics;
 
     public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup, OHMetrics metrics) {
-        this(streamResult, tableName, family, isTableGroup, metrics,
-            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
-    }
-
-    public ClientStreamScanner(ObTableClientQueryStreamResult streamResult, String tableName,
-                               byte[] family, boolean isTableGroup, OHMetrics metrics,
-                               boolean lightweightResultCellEnabled) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.family = family;
         this.isTableGroup = isTableGroup;
         this.metrics = metrics;
-        this.lightweightResultCellEnabled = lightweightResultCellEnabled;
     }
 
     public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
                                byte[] family, boolean isTableGroup, OHMetrics metrics) {
-        this(streamResult, tableName, family, isTableGroup, metrics,
-            HBASE_HTABLE_SCAN_LIGHTWEIGHT_RESULT_CELL_DEFAULT);
-    }
-
-    public ClientStreamScanner(ObTableClientQueryAsyncStreamResult streamResult, String tableName,
-                               byte[] family, boolean isTableGroup, OHMetrics metrics,
-                               boolean lightweightResultCellEnabled) {
         this.streamResult = streamResult;
         this.tableName = tableName;
         this.family = family;
         this.isTableGroup = isTableGroup;
         this.metrics = metrics;
-        this.lightweightResultCellEnabled = lightweightResultCellEnabled;
     }
 
     @Override
@@ -143,14 +124,6 @@ public class ClientStreamScanner extends AbstractClientScanner {
 
     private void addCompactResultCell(List<Cell> cells, byte[] rowKey, byte[] qualifier,
                                       long timestamp, byte[] value) {
-        if (lightweightResultCellEnabled) {
-            if (isTableGroup) {
-                cells.add(OHBaseResultCell.createTableGroup(rowKey, qualifier, timestamp, value));
-            } else {
-                cells.add(OHBaseResultCell.create(rowKey, family, qualifier, timestamp, value));
-            }
-            return;
-        }
         if (isTableGroup) {
             cells
                 .add(OHBaseFuncUtils.createTableGroupKeyValue(rowKey, qualifier, timestamp, value));
@@ -159,12 +132,10 @@ public class ClientStreamScanner extends AbstractClientScanner {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private Result createCompactResult(List<Cell> cells) {
-        if (lightweightResultCellEnabled) {
-            return Result.create(cells);
-        }
-        return new Result((List<KeyValue>) (List<?>) cells);
+        @SuppressWarnings("unchecked")
+        List<KeyValue> keyValues = (List<KeyValue>) (List<?>) cells;
+        return new Result(keyValues);
     }
 
     private Result buildLegacyResult(List<ObObj> startRow) throws Exception {

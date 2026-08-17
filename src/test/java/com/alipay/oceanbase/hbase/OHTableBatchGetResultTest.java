@@ -18,6 +18,7 @@
 package com.alipay.oceanbase.hbase;
 
 import com.alipay.oceanbase.hbase.util.BatchError;
+import com.alipay.oceanbase.hbase.result.OHBaseResultCell;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.mutation.result.MutationResult;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableSingleOpEntity;
@@ -39,7 +40,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -51,7 +51,7 @@ public class OHTableBatchGetResultTest {
     @Before
     public void setUp() {
         executor = Executors.newSingleThreadExecutor();
-        table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executor, true);
+        table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class), executor);
     }
 
     @After
@@ -73,6 +73,7 @@ public class OHTableBatchGetResultTest {
         assertEquals(1, ((Result) results[1]).size());
         assertEquals("r1", Bytes.toString(((Result) results[0]).getRow()));
         assertEquals("r2", Bytes.toString(((Result) results[1]).getRow()));
+        assertTrue(((Result) results[0]).rawCells()[0] instanceof OHBaseResultCell);
     }
 
     @Test
@@ -95,7 +96,6 @@ public class OHTableBatchGetResultTest {
 
     @Test
     public void consumesCompactKqtvBatch() throws Exception {
-        assertTrue(HBASE_HTABLE_BATCH_GET_COMPACT_DECODER_DEFAULT);
         ObHBaseCellBatch batch = new ObHBaseCellBatch(2);
         batch.setCell(0, Bytes.toBytes("r1"), Bytes.toBytes("cf\0q1"), 100L, Bytes.toBytes("v0"));
         batch.setCell(1, Bytes.toBytes("r1"), Bytes.toBytes("cf\0q1"), 99L, Bytes.toBytes("v1"));
@@ -110,6 +110,7 @@ public class OHTableBatchGetResultTest {
         assertEquals("r1", Bytes.toString(cells.get(0).getRowArray(), cells.get(0).getRowOffset(),
             cells.get(0).getRowLength()));
         assertEquals(99L, cells.get(1).getTimestamp());
+        assertTrue(cells.get(0) instanceof OHBaseResultCell);
     }
 
     private static MutationResult wrappedResult(String row, String qualifier, int versions) {

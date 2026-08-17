@@ -20,6 +20,7 @@ package com.alipay.oceanbase.hbase;
 import com.alipay.oceanbase.rpc.ObTableClient;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObHbaseCell;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObHbaseCfRows;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObHbaseRequest;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperation;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.ObTableOperationType;
@@ -37,8 +38,6 @@ import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_SKIP_CELL_CLONE_DEFAULT;
-import static com.alipay.oceanbase.hbase.constants.OHConstants.HBASE_HTABLE_PUT_SKIP_CELL_CLONE_ENABLED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
@@ -59,20 +58,6 @@ public class OHTablePutSkipCellCloneTest {
     @After
     public void tearDown() {
         executorService.shutdownNow();
-    }
-
-    @Test
-    public void testConfigNameAndDefault() {
-        assertEquals("hbase.htable.put.skip.cell.clone.enabled",
-            HBASE_HTABLE_PUT_SKIP_CELL_CLONE_ENABLED);
-        assertTrue(HBASE_HTABLE_PUT_SKIP_CELL_CLONE_DEFAULT);
-    }
-
-    @Test
-    public void testDefaultEnablesSkipCellClone() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("test"), mock(ObTableClient.class),
-            executorService, true);
-        assertTrue(table.isPutSkipCellCloneEnabled());
     }
 
     @Test
@@ -131,8 +116,7 @@ public class OHTablePutSkipCellCloneTest {
 
     @Test
     public void testBuildHbaseRequestSharesViewOnAutoFlush() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService,
-            true);
+        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService);
         assertTrue(table.isAutoFlush());
         byte[] q = Bytes.toBytes("q1");
         byte[] v = Bytes.toBytes("v1");
@@ -142,40 +126,15 @@ public class OHTablePutSkipCellCloneTest {
 
         ObHbaseRequest request = table.buildHbaseRequest(Collections.singletonList(put),
             OHOperationType.PUT);
-        ObHbaseCell cell = request.getCfRows().get(0).getCells().get(0);
-        Object qVal = cell.getQ().getValue();
-        Object vVal = cell.getV().getValue();
-        // addColumn may pack KeyValue; assert we share the Cell backing region.
-        if (qVal instanceof byte[]) {
-            assertSame(src.getQualifierArray(), qVal);
-        } else {
-            ObBytesString qView = (ObBytesString) qVal;
-            assertSame(src.getQualifierArray(), qView.bytes);
-            assertEquals(src.getQualifierOffset(), qView.offset);
-            assertEquals(src.getQualifierLength(), qView.length());
-        }
-        if (vVal instanceof byte[]) {
-            assertSame(src.getValueArray(), vVal);
-        } else {
-            ObBytesString vView = (ObBytesString) vVal;
-            assertSame(src.getValueArray(), vView.bytes);
-            assertEquals(src.getValueOffset(), vView.offset);
-            assertEquals(src.getValueLength(), vView.length());
-        }
-        assertTrue(Bytes.equals(
-            q,
-            qVal instanceof byte[] ? (byte[]) qVal : Bytes.copy(((ObBytesString) qVal).bytes,
-                ((ObBytesString) qVal).offset, ((ObBytesString) qVal).length())));
-        assertTrue(Bytes.equals(
-            v,
-            vVal instanceof byte[] ? (byte[]) vVal : Bytes.copy(((ObBytesString) vVal).bytes,
-                ((ObBytesString) vVal).offset, ((ObBytesString) vVal).length())));
+        ObHbaseCfRows cfRows = request.getCfRows().get(0);
+        assertTrue(cfRows.hasCompactCells());
+        assertSame(src.getQualifierArray(), compactByteArrays(cfRows, "compactQualifierArrays")[0]);
+        assertSame(src.getValueArray(), compactByteArrays(cfRows, "compactValueArrays")[0]);
     }
 
     @Test
     public void testBuildHbaseRequestClonesWhenAutoFlushOff() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService,
-            true);
+        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService);
         table.setAutoFlush(false);
         byte[] q = Bytes.toBytes("q1");
         byte[] v = Bytes.toBytes("v1");
@@ -185,42 +144,19 @@ public class OHTablePutSkipCellCloneTest {
 
         ObHbaseRequest request = table.buildHbaseRequest(Collections.singletonList(put),
             OHOperationType.PUT);
-        ObHbaseCell cell = request.getCfRows().get(0).getCells().get(0);
-        assertTrue(cell.getQ().getValue() instanceof byte[]);
-        assertTrue(cell.getV().getValue() instanceof byte[]);
-        assertNotSame(src.getQualifierArray(), cell.getQ().getValue());
-        assertNotSame(src.getValueArray(), cell.getV().getValue());
-        assertTrue(Bytes.equals(q, (byte[]) cell.getQ().getValue()));
-        assertTrue(Bytes.equals(v, (byte[]) cell.getV().getValue()));
-    }
-
-    @Test
-    public void testConfigOffForcesCloneEvenWithAutoFlush() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService,
-            true);
-        Field enabled = OHTable.class.getDeclaredField("enablePutSkipCellClone");
-        enabled.setAccessible(true);
-        enabled.setBoolean(table, false);
-
-        byte[] q = Bytes.toBytes("q1");
-        byte[] v = Bytes.toBytes("v1");
-        Put put = new Put(Bytes.toBytes("row"));
-        put.addColumn(Bytes.toBytes("cf"), q, v);
-        Cell src = put.getFamilyCellMap().get(Bytes.toBytes("cf")).get(0);
-
-        ObHbaseRequest request = table.buildHbaseRequest(Collections.singletonList(put),
-            OHOperationType.PUT);
-        ObHbaseCell cell = request.getCfRows().get(0).getCells().get(0);
-        assertTrue(cell.getQ().getValue() instanceof byte[]);
-        assertTrue(cell.getV().getValue() instanceof byte[]);
-        assertNotSame(src.getQualifierArray(), cell.getQ().getValue());
-        assertNotSame(src.getValueArray(), cell.getV().getValue());
+        ObHbaseCfRows cfRows = request.getCfRows().get(0);
+        assertTrue(cfRows.hasCompactCells());
+        byte[] qualifier = compactByteArrays(cfRows, "compactQualifierArrays")[0];
+        byte[] value = compactByteArrays(cfRows, "compactValueArrays")[0];
+        assertNotSame(src.getQualifierArray(), qualifier);
+        assertNotSame(src.getValueArray(), value);
+        assertTrue(Bytes.equals(q, qualifier));
+        assertTrue(Bytes.equals(v, value));
     }
 
     @Test
     public void testLegacyTtlReusesSingleValueClone() throws Exception {
-        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService,
-            true);
+        OHTable table = new OHTable(Bytes.toBytes("t"), mock(ObTableClient.class), executorService);
         byte[] value = Bytes.toBytes("payload");
         KeyValue kv = new KeyValue(Bytes.toBytes("row"), Bytes.toBytes("cf"), Bytes.toBytes("q"),
             value);
@@ -239,5 +175,12 @@ public class OHTablePutSkipCellCloneTest {
     private static Cell contiguousCell(byte[] row, byte[] family, byte[] qualifier, byte[] value) {
         return new KeyValue(row, 0, row.length, family, 0, family.length, qualifier, 0,
             qualifier.length, System.currentTimeMillis(), KeyValue.Type.Put, value, 0, value.length);
+    }
+
+    private static byte[][] compactByteArrays(ObHbaseCfRows cfRows, String fieldName)
+                                                                                     throws Exception {
+        Field field = ObHbaseCfRows.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (byte[][]) field.get(cfRows);
     }
 }
