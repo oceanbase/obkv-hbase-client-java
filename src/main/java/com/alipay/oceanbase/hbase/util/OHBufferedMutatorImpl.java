@@ -181,8 +181,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
         if (mt instanceof Put) {
             // family empty check is in validatePut
-            HTable.validatePut((Put) mt, maxKeyValueSize);
-            OHTable.checkFamilyViolation(mt.getFamilyCellMap().keySet(), true);
+            ohTable.validatePutMutation((Put) mt);
         } else {
             OHTable.checkFamilyViolation(mt.getFamilyCellMap().keySet(), false);
         }

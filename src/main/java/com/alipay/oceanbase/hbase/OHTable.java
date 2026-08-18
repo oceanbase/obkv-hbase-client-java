@@ -24,9 +24,11 @@ import com.alipay.oceanbase.hbase.filter.HBaseFilterUtils;
 import com.alipay.oceanbase.hbase.metrics.MetricsImporter;
 import com.alipay.oceanbase.hbase.metrics.OHMetrics;
 import com.alipay.oceanbase.hbase.result.ClientStreamScanner;
+import com.alipay.oceanbase.hbase.result.OHBaseResultCell;
 import com.alipay.oceanbase.hbase.util.*;
 import com.alipay.oceanbase.rpc.ObGlobal;
 import com.alipay.oceanbase.rpc.ObTableClient;
+import com.alipay.oceanbase.rpc.util.ObBytesString;
 import com.alipay.oceanbase.rpc.exception.ObTableException;
 import com.alipay.oceanbase.rpc.exception.ObTableUnexpectedException;
 import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
@@ -594,7 +596,7 @@ public class OHTable implements Table {
             @Override
             boolean[] execute() throws IOException {
                 boolean[] ret = new boolean[gets.size()];
-                List<Get> newGets = new ArrayList<>();
+                List<Get> newGets = new ArrayList<>(gets.size());
                 // if just checkExistOnly, batch get will not return any result or row count
                 // therefore we have to set checkExistOnly as false and so the result can be returned
                 for (Get get : gets) {
@@ -791,16 +793,20 @@ public class OHTable implements Table {
                 throw new AssertionError("results.length");
             }
         }
-        BatchError batchError = new BatchError();
         obTableClient.setRuntimeBatchExecutor(executePool);
-        List<Integer> resultMapSingleOp = new LinkedList<>();
         if (!ObGlobal.isHBaseBatchSupport()) {
+            BatchError batchError = new BatchError();
             try {
                 compatOldServerBatch(actions, results, batchError);
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
+            if (batchError.hasErrors()) {
+                throw batchError.makeException();
+            }
+            return;
+        }
+        if (OHBaseFuncUtils.isAllPut(opType, actions) && OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             // only support Put now
             ObHbaseRequest request = buildHbaseRequest(actions, opType);
             try {
@@ -813,80 +819,147 @@ public class OHTable implements Table {
             } catch (Exception e) {
                 throw new IOException(tableNameString + " table occurred unexpected error." , e);
             }
-        } else {
-            String realTableName = getTargetTableName(actions);
-            BatchOperation batch = buildBatchOperation(realTableName, actions,
-                    tableNameString.equals(realTableName), resultMapSingleOp);
-            batch.setHbaseOpType(opType);
-            BatchOperationResult tmpResults;
-            try {
-                tmpResults = batch.execute();
-            } catch (Exception e) {
-                throw new IOException(tableNameString + " table occurred unexpected error.", e);
+            return;
+        }
+        BatchError batchError = new BatchError();
+        boolean pureGetBatch = true;
+        for (Row action : actions) {
+            if (!(action instanceof Get)) {
+                pureGetBatch = false;
+                break;
             }
-            int index = 0;
-            for (int i = 0; i != actions.size(); ++i) {
-                if (tmpResults.getResults().get(index) instanceof ObTableException) {
-                    if (results != null) {
-                        results[i] = tmpResults.getResults().get(index);
-                    }
-                    batchError.add((ObTableException) tmpResults.getResults().get(index), actions.get(i), null);
-                } else if (actions.get(i) instanceof Get) {
-                    if (results != null) {
-                        // get results have been wrapped in MutationResult, need to fetch it
-                        if (tmpResults.getResults().get(index) instanceof MutationResult) {
-                            MutationResult mutationResult = (MutationResult) tmpResults.getResults().get(index);
-                            ObPayload innerResult = mutationResult.getResult();
-                            if (innerResult instanceof ObTableSingleOpResult) {
-                                ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
-                                List<Cell> cells = generateGetResult(singleOpResult);
-                                results[i] = Result.create(cells);
-                            } else {
-                                throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
-                            }
+        }
+        List<Integer> resultMapSingleOp = pureGetBatch ? null
+            : new ArrayList<>(actions.size());
+        String realTableName = getTargetTableName(actions);
+        BatchOperation batch = buildBatchOperation(realTableName, actions,
+                tableNameString.equals(realTableName), resultMapSingleOp);
+        batch.setHbaseOpType(opType);
+        BatchOperationResult tmpResults;
+        try {
+            tmpResults = batch.execute();
+        } catch (Exception e) {
+            throw new IOException(tableNameString + " table occurred unexpected error.", e);
+        }
+        List<Object> batchResults = tmpResults.getResults();
+        if (pureGetBatch) {
+            consumePureGetBatchResults(actions, results, batchResults, batchError);
+            if (batchError.hasErrors()) {
+                throw batchError.makeException();
+            }
+            return;
+        }
+        int index = 0;
+        for (int i = 0; i != actions.size(); ++i) {
+            if (batchResults.get(index) instanceof ObTableException) {
+                if (results != null) {
+                    results[i] = batchResults.get(index);
+                }
+                batchError.add((ObTableException) batchResults.get(index), actions.get(i), null);
+            } else if (actions.get(i) instanceof Get) {
+                if (results != null) {
+                    if (batchResults.get(index) instanceof MutationResult) {
+                        MutationResult mutationResult = (MutationResult) batchResults.get(index);
+                        ObPayload innerResult = mutationResult.getResult();
+                        if (innerResult instanceof ObTableSingleOpResult) {
+                            ObTableSingleOpResult singleOpResult = (ObTableSingleOpResult) innerResult;
+                            List<Cell> cells = generateGetResult(singleOpResult);
+                            results[i] = Result.create(cells);
                         } else {
-                            throw new ObTableUnexpectedException("Unexpected type of result in batch");
+                            throw new ObTableUnexpectedException("Unexpected type of result in MutationResult");
                         }
-                    }
-                } else {
-                    if (results != null) {
-                        results[i] = new Result();
+                    } else {
+                        throw new ObTableUnexpectedException("Unexpected type of result in batch");
                     }
                 }
-                index += resultMapSingleOp.get(i);
+            } else {
+                if (results != null) {
+                    results[i] = new Result();
+                }
             }
+            index += resultMapSingleOp.get(i);
         }
         if (batchError.hasErrors()) {
             throw batchError.makeException();
         }
     }
 
-    private List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
-        List<Cell> cells = new ArrayList<>();
+    @VisibleForTesting
+    void consumePureGetBatchResults(List<? extends Row> actions, Object[] results,
+                                    List<Object> batchResults, BatchError batchError)
+                                                                                     throws IOException {
+        if (batchResults.isEmpty() && actions.size() == 1) {
+            if (results != null) {
+                results[0] = Result.create(Collections.<Cell> emptyList());
+            }
+            return;
+        }
+        if (batchResults.size() != actions.size()) {
+            throw new ObTableUnexpectedException(
+                "Unexpected pure Get batch result count, expected=" + actions.size() + ", actual="
+                        + batchResults.size());
+        }
+        for (int i = 0; i < actions.size(); i++) {
+            Object batchResult = batchResults.get(i);
+            if (batchResult instanceof ObTableException) {
+                if (results != null) {
+                    results[i] = batchResult;
+                }
+                batchError.add((ObTableException) batchResult, actions.get(i), null);
+                continue;
+            }
+            if (results == null) {
+                continue;
+            }
+            if (!(batchResult instanceof MutationResult)) {
+                throw new ObTableUnexpectedException("Unexpected type of result in pure Get batch");
+            }
+            ObPayload innerResult = ((MutationResult) batchResult).getResult();
+            if (!(innerResult instanceof ObTableSingleOpResult)) {
+                throw new ObTableUnexpectedException(
+                    "Unexpected type of inner result in pure Get batch");
+            }
+            results[i] = Result.create(generateGetResult((ObTableSingleOpResult) innerResult));
+        }
+    }
+
+    @VisibleForTesting
+    List<Cell> generateGetResult(ObTableSingleOpResult getResult) throws IOException {
         ObTableSingleOpEntity singleOpEntity = getResult.getEntity();
-        // all values queried by this get are contained in properties
-        // qualifier in batch get result is always appended after family
-        List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
-        int valueIdx = 0;
-        while (valueIdx < propertiesValues.size()) {
-            // values in propertiesValues like: [ K, Q, T, V, K, Q, T, V ... ]
-            // we need to retrieve K Q T V and construct them to cells: [ cell_0, cell_1, ... ]
-            byte[][] familyAndQualifier = new byte[2][];
+        ObHBaseCellBatch compactBatch = singleOpEntity.getHBaseCellBatch();
+        if (compactBatch != null) {
+            List<Cell> cells = new ArrayList<>(compactBatch.size());
             try {
-                // split family and qualifier
-                familyAndQualifier = OHBaseFuncUtils
-                        .extractFamilyFromQualifier((byte[]) propertiesValues.get(valueIdx + 1).getValue());
+                for (int cellIndex = 0; cellIndex < compactBatch.size(); cellIndex++) {
+                    addResultCell(cells, compactBatch.getRowKey(cellIndex),
+                        compactBatch.getQualifier(cellIndex), compactBatch.getTimestamp(cellIndex),
+                        compactBatch.getValue(cellIndex), true, HConstants.EMPTY_BYTE_ARRAY);
+                }
             } catch (Exception e) {
                 throw new IOException(e);
             }
-            KeyValue kv = new KeyValue((byte[]) propertiesValues.get(valueIdx).getValue(),//K
-                    familyAndQualifier[0], // family
-                    familyAndQualifier[1], // qualifiermat
-                    (Long) propertiesValues.get(valueIdx + 2).getValue(), // T
-                    (byte[]) propertiesValues.get(valueIdx + 3).getValue()//  V
-            );
-            cells.add(kv);
-            valueIdx += 4;
+            return cells;
+        }
+        // all values queried by this get are contained in properties
+        // qualifier in batch get result is always appended after family
+        List<ObObj> propertiesValues = singleOpEntity.getPropertiesValues();
+        int propertyCount = propertiesValues.size();
+        if ((propertyCount & 3) != 0) {
+            throw new IOException("Malformed Batch Get K/Q/T/V result, property count="
+                                  + propertyCount);
+        }
+        List<Cell> cells = new ArrayList<>(propertyCount / 4);
+        try {
+            for (int valueIdx = 0; valueIdx < propertyCount; valueIdx += 4) {
+                byte[] rowKey = (byte[]) propertiesValues.get(valueIdx).getValue();
+                byte[] familyQualifier = (byte[]) propertiesValues.get(valueIdx + 1).getValue();
+                long timestamp = (Long) propertiesValues.get(valueIdx + 2).getValue();
+                byte[] value = (byte[]) propertiesValues.get(valueIdx + 3).getValue();
+                addResultCell(cells, rowKey, familyQualifier, timestamp, value, true,
+                    HConstants.EMPTY_BYTE_ARRAY);
+            }
+        } catch (Exception e) {
+            throw new IOException(e);
         }
         return cells;
     }
@@ -957,41 +1030,135 @@ public class OHTable implements Table {
         return bt1.length - bt2.length;
     }
 
-    private void getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
-                                     List<Cell> keyValueList, boolean isTableGroup, byte[] family)
-                                                                                                  throws Exception {
-        byte[][] familyAndQualifier = new byte[2][];
-        KeyValue kv = null;
+    private void addRowToResultCells(List<Cell> cells, List<ObObj> row, byte[] rowKey,
+                                     boolean isTableGroup, byte[] family) throws Exception {
+        byte[] qualifier = (byte[]) row.get(1).getValue();
+        long timestamp = (Long) row.get(2).getValue();
+        byte[] value = (byte[]) row.get(3).getValue();
+        addResultCell(cells, rowKey, qualifier, timestamp, value, isTableGroup, family);
+    }
+
+    private void addResultCell(List<Cell> cells, byte[] rowKey, byte[] qualifier, long timestamp,
+                               byte[] value, boolean isTableGroup, byte[] family) throws Exception {
+        if (isTableGroup) {
+            cells.add(OHBaseResultCell.createTableGroup(rowKey, qualifier, timestamp, value));
+        } else {
+            cells.add(OHBaseResultCell.create(rowKey, family, qualifier, timestamp, value));
+        }
+    }
+
+    /**
+     * A point Get uses an exact row range, so all returned cells must belong to the requested row.
+     * Validate the invariant once and reuse the returned rowkey while assembling result cells.
+     */
+    private boolean fillPointGetFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                           List<Cell> cells, boolean isTableGroup, byte[] family,
+                                           byte[] expectedRowKey, boolean checkExistenceOnly)
+                                                                                             throws Exception {
+        byte[] canonicalRowKey = null;
         while (clientQueryStreamResult.next()) {
-            List<ObObj> row = clientQueryStreamResult.getRow();
-            if (row.isEmpty()) {
-                // Currently, checkExistOnly is set, and if the row exists, it returns an empty row.
-                keyValueList.add(new KeyValue());
-                return;
-            } else {
-                if (kv == null
-                    || compareByteArray(CellUtil.cloneRow(kv), (byte[]) row.get(0).getValue()) <= 0) {
-                    if (kv != null
-                        && compareByteArray(CellUtil.cloneRow(kv), (byte[]) row.get(0).getValue()) != 0) {
-                        keyValueList.clear();
-                    }
-                    if (isTableGroup) {
-                        // split family and qualifier
-                        familyAndQualifier = OHBaseFuncUtils
-                            .extractFamilyFromQualifier((byte[]) row.get(1).getValue());
-                    } else {
-                        familyAndQualifier[0] = family;
-                        familyAndQualifier[1] = (byte[]) row.get(1).getValue();
-                    }
-                    kv = new KeyValue((byte[]) row.get(0).getValue(),//K
-                        familyAndQualifier[0], // family
-                        familyAndQualifier[1], // qualifiermat
-                        (Long) row.get(2).getValue(), // T
-                        (byte[]) row.get(3).getValue() // V
-                    );
-                    keyValueList.add(kv);
-                }
+            if (checkExistenceOnly) {
+                // An existence-only response contains an empty row when the requested row exists.
+                return true;
             }
+
+            byte[] actualRowKey;
+            byte[] qualifier;
+            long timestamp;
+            byte[] value;
+            if (clientQueryStreamResult.isCurrentHBaseCell()) {
+                ObHBaseCellBatch batch = clientQueryStreamResult.getCurrentHBaseCellBatch();
+                int index = clientQueryStreamResult.getCurrentHBaseCellIndex();
+                actualRowKey = batch.getRowKey(index);
+                qualifier = batch.getQualifier(index);
+                timestamp = batch.getTimestamp(index);
+                value = batch.getValue(index);
+            } else {
+                List<ObObj> row = clientQueryStreamResult.getRow();
+                actualRowKey = (byte[]) row.get(0).getValue();
+                qualifier = (byte[]) row.get(1).getValue();
+                timestamp = (Long) row.get(2).getValue();
+                value = (byte[]) row.get(3).getValue();
+            }
+            if (canonicalRowKey == null) {
+                if (!Bytes.equals(expectedRowKey, actualRowKey)) {
+                    throw new ObTableUnexpectedException(
+                        "point Get returned an unexpected rowkey, expected length="
+                                + expectedRowKey.length + ", actual length=" + actualRowKey.length);
+                }
+                canonicalRowKey = actualRowKey;
+            }
+            addResultCell(cells, canonicalRowKey, qualifier, timestamp, value, isTableGroup, family);
+        }
+        return canonicalRowKey != null;
+    }
+
+    /**
+     * closestRowBefore may collect candidates from multiple partitions. Keep only cells belonging
+     * to the greatest returned rowkey without cloning the rowkey from a temporary result cell.
+     */
+    private boolean getMaxRowFromResult(AbstractQueryStreamResult clientQueryStreamResult,
+                                        List<Cell> cells, boolean isTableGroup, byte[] family,
+                                        boolean checkExistenceOnly) throws Exception {
+        byte[] currentMaxRowKey = null;
+        while (clientQueryStreamResult.next()) {
+            if (checkExistenceOnly) {
+                // An existence-only response contains an empty row when a candidate row exists.
+                return true;
+            }
+
+            byte[] rowKey;
+            byte[] qualifier;
+            long timestamp;
+            byte[] value;
+            if (clientQueryStreamResult.isCurrentHBaseCell()) {
+                ObHBaseCellBatch batch = clientQueryStreamResult.getCurrentHBaseCellBatch();
+                int index = clientQueryStreamResult.getCurrentHBaseCellIndex();
+                rowKey = batch.getRowKey(index);
+                qualifier = batch.getQualifier(index);
+                timestamp = batch.getTimestamp(index);
+                value = batch.getValue(index);
+            } else {
+                List<ObObj> row = clientQueryStreamResult.getRow();
+                rowKey = (byte[]) row.get(0).getValue();
+                qualifier = (byte[]) row.get(1).getValue();
+                timestamp = (Long) row.get(2).getValue();
+                value = (byte[]) row.get(3).getValue();
+            }
+            if (currentMaxRowKey != null) {
+                int rowComparison = compareByteArray(currentMaxRowKey, rowKey);
+                if (rowComparison > 0) {
+                    continue;
+                }
+                if (rowComparison < 0) {
+                    cells.clear();
+                    currentMaxRowKey = rowKey;
+                }
+            } else {
+                currentMaxRowKey = rowKey;
+            }
+            addResultCell(cells, rowKey, qualifier, timestamp, value, isTableGroup, family);
+        }
+        return currentMaxRowKey != null;
+    }
+
+    private Result createGetResult(List<Cell> cells) {
+        return Result.create(cells);
+    }
+
+    private void addQueryResultToKeyValueList(ObTableQueryResult queryResult, List<Cell> keyValues,
+                                              byte[] family) throws Exception {
+        ObHBaseCellBatch batch = queryResult.getHBaseCellBatch();
+        if (batch != null) {
+            for (int i = 0; i < batch.size(); i++) {
+                keyValues.add(new KeyValue(batch.getRowKey(i), family, batch.getQualifier(i), batch
+                    .getTimestamp(i), batch.getValue(i)));
+            }
+            return;
+        }
+        for (List<ObObj> row : queryResult.getPropertiesRows()) {
+            keyValues.add(new KeyValue((byte[]) row.get(0).getValue(), family, (byte[]) row.get(1)
+                .getValue(), (Long) row.get(2).getValue(), (byte[]) row.get(3).getValue()));
         }
     }
 
@@ -1052,8 +1219,9 @@ public class OHTable implements Table {
         ServerCallable<Result> serverCallable = new ServerCallable<Result>(configuration,
                 obTableClient, tableNameString, get.getRow(), get.getRow(), operationTimeout) {
             public Result call() throws IOException {
-                List<Cell> keyValueList = new ArrayList<>();
+                List<Cell> cells = new ArrayList<>();
                 byte[] family = new byte[] {};
+                boolean exists = false;
                 ObTableQuery obTableQuery;
                 try {
                     if (get.getFamilyMap().keySet().isEmpty()
@@ -1072,7 +1240,13 @@ public class OHTable implements Table {
 
                         ObTableClientQueryAsyncStreamResult clientQueryStreamResult = (ObTableClientQueryAsyncStreamResult) obTableClient
                                 .execute(request);
-                        getMaxRowFromResult(clientQueryStreamResult, keyValueList, true, family);
+                        if (get.isClosestRowBefore()) {
+                            exists = getMaxRowFromResult(clientQueryStreamResult, cells, true,
+                                family, get.isCheckExistenceOnly());
+                        } else {
+                            exists = fillPointGetFromResult(clientQueryStreamResult, cells,
+                                true, family, get.getRow(), get.isCheckExistenceOnly());
+                        }
                     } else {
                         for (Map.Entry<byte[], NavigableSet<byte[]>> entry : get.getFamilyMap()
                                 .entrySet()) {
@@ -1094,8 +1268,14 @@ public class OHTable implements Table {
                                     configuration), isWeakRead(get), opType);
                             ObTableClientQueryStreamResult clientQueryStreamResult = (ObTableClientQueryStreamResult) obTableClient
                                     .execute(request);
-                            getMaxRowFromResult(clientQueryStreamResult, keyValueList, false,
-                                    family);
+                            if (get.isClosestRowBefore()) {
+                                exists = getMaxRowFromResult(clientQueryStreamResult, cells, false,
+                                    family, get.isCheckExistenceOnly());
+                            } else {
+                                exists = fillPointGetFromResult(clientQueryStreamResult, cells,
+                                    false, family, get.getRow(),
+                                    get.isCheckExistenceOnly());
+                            }
                         }
                     }
                 } catch (Exception e) {
@@ -1103,11 +1283,11 @@ public class OHTable implements Table {
                             + Bytes.toString(family) + " error.", e);
                 }
                 if (get.isCheckExistenceOnly()) {
-                    return Result.create(null, !keyValueList.isEmpty());
+                    return Result.create(null, exists);
                 }
-                // sort keyValues
-                OHBaseFuncUtils.sortHBaseResult(keyValueList);
-                return Result.create(keyValueList);
+                // sort result cells
+                OHBaseFuncUtils.sortHBaseResult(cells);
+                return createGetResult(cells);
             }
         };
         return executeServerCallable(serverCallable);
@@ -1123,8 +1303,19 @@ public class OHTable implements Table {
                 if (ObGlobal.isHBaseBatchGetSupport()) { // get only supported in BatchSupport version
                     innerBatchImpl(gets, results, opType);
                 } else {
+                    List<Future<Result>> futures = new ArrayList<>(gets.size());
                     for (int i = 0; i < gets.size(); i++) {
-                        results[i] = innerGetImpl(gets.get(i), opType); // still use list type even executing gets one by one in loop
+                        int index = i;
+                        Future<Result> future = executePool.submit(() -> innerGetImpl(
+                            gets.get(index), opType));
+                        futures.add(future);
+                    }
+                    for (int i = 0; i < gets.size(); i++) {
+                        try {
+                            results[i] = futures.get(i).get();
+                        } catch (Exception e) {
+                            throw new RuntimeException("gets occur error. index:{" + i + "}", e);
+                        }
                     }
                 }
                 return results;
@@ -1360,9 +1551,11 @@ public class OHTable implements Table {
     }
 
     private void doPut(List<Put> puts, OHOperationType opType) throws IOException {
+        if (puts.isEmpty()) {
+            return;
+        }
         for (Put put : puts) {
-            validatePut(put);
-            checkFamilyViolation(put.getFamilyCellMap().keySet(), true);
+            validatePutMutation(put);
         }
         if (OHBaseFuncUtils.isHBasePutPefSupport(obTableClient, enablePutOptimization)) {
             flushCommitsV2(puts, opType);
@@ -1372,22 +1565,37 @@ public class OHTable implements Table {
     }
 
     /**
+     * Put validation shared by direct Table puts and BufferedMutator.
+     */
+    public void validatePutMutation(Put put) {
+        NavigableMap<byte[], List<Cell>> familyCellMap = put.getFamilyCellMap();
+        validatePut(put, familyCellMap, maxKeyValueSize);
+        checkFamilyViolation(familyCellMap.keySet(), true);
+    }
+
+    /**
      * 校验 put 里的参数是否合法，需要传入 family ，并且 keyvalue 的 size 不能太大
      * @param put the put
      */
-    private void validatePut(Put put) {
+    public static void validatePut(Put put, int maxKeyValueSize) {
+        validatePut(put, put.getFamilyCellMap(), maxKeyValueSize);
+    }
+
+    private static void validatePut(Put put, NavigableMap<byte[], List<Cell>> familyCellMap,
+                                    int maxKeyValueSize) {
         if (put.isEmpty()) {
             throw new IllegalArgumentException("No columns to insert");
         }
 
         if (maxKeyValueSize > 0) {
-            for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
+            for (Map.Entry<byte[], List<Cell>> entry : familyCellMap.entrySet()) {
                 if (entry.getKey() == null || entry.getKey().length == 0) {
                     throw new IllegalArgumentException("family is empty");
                 }
-                for (Cell kv : entry.getValue()) {
-                    if (kv.getRowLength() + kv.getValueLength() + kv.getQualifierLength()
-                        + Bytes.toBytes(kv.getTimestamp()).length + kv.getFamilyLength() > maxKeyValueSize) {
+                for (Cell cell : entry.getValue()) {
+                    int cellLength = cell instanceof KeyValue ? ((KeyValue) cell).getLength()
+                        : KeyValueUtil.length(cell);
+                    if (cellLength > maxKeyValueSize) {
                         throw new IllegalArgumentException("KeyValue size too large");
                     }
                 }
@@ -1627,15 +1835,7 @@ public class OHTable implements Table {
                     }
                     ObTableQueryResult queryResult = result.getAffectedEntity();
                     List<Cell> keyValues = new ArrayList<Cell>();
-                    for (List<ObObj> row : queryResult.getPropertiesRows()) {
-                        byte[] k = (byte[]) row.get(0).getValue();
-                        byte[] q = (byte[]) row.get(1).getValue();
-                        long t = (Long) row.get(2).getValue();
-                        byte[] v = (byte[]) row.get(3).getValue();
-                        KeyValue kv = new KeyValue(k, f, q, t, v);
-
-                        keyValues.add(kv);
-                    }
+                    addQueryResultToKeyValueList(queryResult, keyValues, f);
                     return Result.create(keyValues);
                 } catch (Exception e) {
                     throw new IOException("append table " + tableNameString + " error.", e);
@@ -1684,14 +1884,7 @@ public class OHTable implements Table {
                     }
                     ObTableQueryResult queryResult = result.getAffectedEntity();
                     List<Cell> keyValues = new ArrayList<Cell>();
-                    for (List<ObObj> row : queryResult.getPropertiesRows()) {
-                        byte[] k = (byte[]) row.get(0).getValue();
-                        byte[] q = (byte[]) row.get(1).getValue();
-                        long t = (Long) row.get(2).getValue();
-                        byte[] v = (byte[]) row.get(3).getValue();
-                        KeyValue kv = new KeyValue(k, f, q, t, v);
-                        keyValues.add(kv);
-                    }
+                    addQueryResultToKeyValueList(queryResult, keyValues, f);
                     return Result.create(keyValues);
                 } catch (Exception e) {
                     throw new IOException("increment table " + tableNameString + " error.", e);
@@ -2330,10 +2523,11 @@ public class OHTable implements Table {
         switch (kvType) {
             case Put:
                 String[] propertyColumns = V_COLUMNS;
-                Object[] property = new Object[] { CellUtil.cloneValue(newCell) };
+                Object value = CellUtil.cloneValue(newCell);
+                Object[] property = new Object[] { value };
                 if (TTL != Long.MAX_VALUE) {
                     propertyColumns = PROPERTY_COLUMNS;
-                    property = new Object[] { CellUtil.cloneValue(newCell), TTL };
+                    property = new Object[] { value, TTL };
                 }
                 return com.alipay.oceanbase.rpc.mutation.Mutation.getInstance(operationType,
                     ROW_KEY_COLUMNS,
@@ -2516,7 +2710,9 @@ public class OHTable implements Table {
                 throw new FeatureNotSupportedException(
                     "not supported other type in batch yet,only support get, put and delete");
             }
-            resultMapSingleOp.add(singleOpResultNum);
+            if (resultMapSingleOp != null) {
+                resultMapSingleOp.add(singleOpResultNum);
+            }
         }
         // only set weak read consistency when all operations are Get and all Get operations are weak read
         if (getOperationNum == actions.size() && allGetIsWeakRead) {
@@ -2528,13 +2724,14 @@ public class OHTable implements Table {
         return batch;
     }
 
-    private ObHbaseRequest buildHbaseRequest(List<? extends Row> actions, OHOperationType hbaseOpType)
+    @VisibleForTesting
+    ObHbaseRequest buildHbaseRequest(List<? extends Row> actions, OHOperationType hbaseOpType)
                                                                     throws FeatureNotSupportedException,
                                                                     IllegalArgumentException,
                                                                     IOException {
         ObHbaseRequest request = new ObHbaseRequest();
         ObTableOperationType opType = null;
-        List<ObObj> keys = new ArrayList<>();
+        List<ObObj> keys = new ArrayList<>(actions.size());
         List<ObHbaseCfRows> cfRowsArray = new ArrayList<>();
         Map<String, ObHbaseCfRows> cfRowsMap = new HashMap<>();
         int keyIndex = 0;
@@ -2545,35 +2742,28 @@ public class OHTable implements Table {
                 if (put.isEmpty()) {
                     throw new IllegalArgumentException("No columns to put for item");
                 }
-                boolean isCellTTL = false;
                 long ttl = put.getTTL();
-                if (ttl != Long.MAX_VALUE) {
-                    isCellTTL = true;
-                }
-                keys.add(ObObj.getInstance(put.getRow()));
+                keys.add(ObObj.hbasePutVarchar(put.getRow()));
+                // HBase 2.0 builds and executes this request synchronously, so the encoder can
+                // reference Cell Q/V regions until they are copied into the RPC buffer.
+                boolean shareCellBytes = true;
                 for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap().entrySet()) {
                     String family = Bytes.toString(entry.getKey());
                     ObHbaseCfRows sameCfRows = cfRowsMap.get(family);
                     if (sameCfRows == null) {
                         sameCfRows = new ObHbaseCfRows();
+                        sameCfRows.reserveKeyRuns(actions.size());
                         String realTableName = getTargetTableName(tableNameString, family, configuration);
                         sameCfRows.setRealTableName(realTableName);
                         cfRowsMap.put(family, sameCfRows);
                         cfRowsArray.add(sameCfRows);
                     }
                     List<Cell> keyValueList = entry.getValue();
-                    List<ObHbaseCell> cells = new ArrayList<>();
+                    sameCfRows.reserveAdditionalCompactCells(keyValueList.size());
+                    sameCfRows.beginCompactKeyCells(keyIndex, keyValueList.size(), ttl);
                     for (Cell kv : keyValueList) {
-                        ObHbaseCell cell = new ObHbaseCell(isCellTTL);
-                        cell.setQ(ObObj.getInstance(CellUtil.cloneQualifier(kv)));
-                        cell.setT(ObObj.getInstance(-getEffectiveTimestampForWrite(kv.getTimestamp()))); // set timestamp as negative
-                        cell.setV(ObObj.getInstance(CellUtil.cloneValue(kv)));
-                        if (isCellTTL) {
-                            cell.setTTL(ObObj.getInstance(ttl));
-                        }
-                        cells.add(cell);
+                        appendCompactPutCell(sameCfRows, kv, shareCellBytes);
                     }
-                    sameCfRows.add(keyIndex, cells.size(), cells);
                 }
             } else {
                 throw new FeatureNotSupportedException(
@@ -2590,15 +2780,66 @@ public class OHTable implements Table {
         return request;
     }
 
-    private ObTableOperation buildObTableOperation(Cell kv,
+    /**
+     * Put V2 Q/V payload for ObObj. When {@code share} is true, reference the Cell
+     * region without clone: contiguous arrays are returned as {@code byte[]}; sliced
+     * regions use an {@link ObBytesString} view. Encode copies once into the RPC buffer.
+     * HBase 2.0 callers may share only while building and executing the request synchronously;
+     * callers that retain the payload beyond the current call must pass {@code share=false}.
+     */
+    @VisibleForTesting
+    static Object bytesForPutCell(Cell cell, boolean share, boolean qualifier) {
+        if (share) {
+            byte[] array = qualifier ? cell.getQualifierArray() : cell.getValueArray();
+            int offset = qualifier ? cell.getQualifierOffset() : cell.getValueOffset();
+            int length = qualifier ? cell.getQualifierLength() : cell.getValueLength();
+            if (array == null) {
+                return new byte[0];
+            }
+            if (offset == 0 && length == array.length) {
+                return array;
+            }
+            return new ObBytesString(array, offset, length);
+        }
+        return qualifier ? CellUtil.cloneQualifier(cell) : CellUtil.cloneValue(cell);
+    }
+
+    private void appendCompactPutCell(ObHbaseCfRows cfRows, Cell cell, boolean shareCellBytes) {
+        byte[] qualifier;
+        int qualifierOffset;
+        int qualifierLength;
+        byte[] value;
+        int valueOffset;
+        int valueLength;
+        if (shareCellBytes) {
+            qualifier = cell.getQualifierArray();
+            qualifierOffset = cell.getQualifierOffset();
+            qualifierLength = cell.getQualifierLength();
+            value = cell.getValueArray();
+            valueOffset = cell.getValueOffset();
+            valueLength = cell.getValueLength();
+        } else {
+            qualifier = CellUtil.cloneQualifier(cell);
+            qualifierOffset = 0;
+            qualifierLength = qualifier.length;
+            value = CellUtil.cloneValue(cell);
+            valueOffset = 0;
+            valueLength = value.length;
+        }
+        cfRows.appendCompactCell(qualifier, qualifierOffset, qualifierLength,
+            -getEffectiveTimestampForWrite(cell.getTimestamp()), value, valueOffset, valueLength);
+    }
+
+    ObTableOperation buildObTableOperation(Cell kv,
                                                          ObTableOperationType operationType,
                                                          Long TTL) {
         Cell.Type kvType = kv.getType();
         String[] propertyColumns = V_COLUMNS;
-        Object[] property = new Object[] { CellUtil.cloneValue(kv) };
+        Object value = CellUtil.cloneValue(kv);
+        Object[] property = new Object[] { value };
         if (TTL != Long.MAX_VALUE) {
             propertyColumns = PROPERTY_COLUMNS;
-            property = new Object[] { CellUtil.cloneValue(kv), TTL };
+            property = new Object[] { value, TTL };
         }
         switch (kvType) {
             case Put:
