@@ -33,8 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.alipay.oceanbase.rpc.ObGlobal.*;
-
 @InterfaceAudience.Private
 public class OHBufferedMutatorImpl implements BufferedMutator {
     private static final Logger           LOGGER                 = TableHBaseLoggerFactory
@@ -56,8 +54,6 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
     private int                           rpcTimeout;
     private int                           operationTimeout;
     private OHOperationType               opType                 = OHOperationType.INVALID;
-    private static final long             OB_VERSION_4_2_5_1     = calcVersion(4, (short) 2,
-                                                                     (byte) 5, (byte) 1);
 
     public OHBufferedMutatorImpl(OHConnectionImpl ohConnection, BufferedMutatorParams params,
                                  OHTable ohTable) throws IOException {
@@ -174,12 +170,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
         }
         if (mt instanceof Put) {
             // family empty check is in validatePut
-            OHTable.validatePut((Put) mt, maxKeyValueSize);
-            if (isMultiFamilySupport()) {
-                OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), true);
-            } else {
-                OHTable.checkFamilyViolationForOneFamily(mt.getFamilyMap().keySet());
-            }
+            ohTable.validatePutMutation((Put) mt);
         } else {
             if (isMultiFamilySupport()) {
                 OHTable.checkFamilyViolation(mt.getFamilyMap().keySet(), false);
@@ -304,8 +295,7 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
      * Only 4_2_5 BP1 - 4_3_0 and after 4_3_4 support multi-cf
      * */
     boolean isMultiFamilySupport() {
-        return (OB_VERSION >= OB_VERSION_4_2_5_1 && OB_VERSION < OB_VERSION_4_3_0_0)
-               || (OB_VERSION >= OB_VERSION_4_3_4_0);
+        return OHTable.isMultiFamilyWriteSupport();
     }
 
     /**
@@ -334,6 +324,10 @@ public class OHBufferedMutatorImpl implements BufferedMutator {
 
     public long getCurrentBufferSize() {
         return currentAsyncBufferSize.get();
+    }
+
+    public boolean isBufferEmpty() {
+        return asyncWriteBuffer.isEmpty() && currentAsyncBufferSize.get() == 0L;
     }
 
     @Deprecated
