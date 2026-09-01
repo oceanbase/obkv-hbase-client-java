@@ -25,6 +25,8 @@ import com.alipay.oceanbase.rpc.location.model.partition.ObPair;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.ObObj;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.OHOperationType;
 import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.AbstractQueryStreamResult;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellBatch;
+import com.alipay.oceanbase.rpc.protocol.payload.impl.execute.query.ObHBaseCellRow;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryAsyncStreamResult;
 import com.alipay.oceanbase.rpc.stream.ObTableClientQueryStreamResult;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -89,55 +91,13 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 return null;
             }
             checkStatus();
-            List<ObObj> startRow;
-            if (streamResult.next()) {
-                startRow = streamResult.getRow();
-            } else {
+            if (!streamResult.next()) {
                 return null;
             }
-
-            byte[][] familyAndQualifier = new byte[2][];
-            if (this.isTableGroup) {
-                // split family and qualifier
-                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow
-                    .get(1).getValue());
-                this.family = familyAndQualifier[0];
-            } else {
-                familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();
+            if (streamResult.isCurrentHBaseCell()) {
+                return buildCompactResult(streamResult.drainCurrentHBaseRow());
             }
-
-            byte[] sk = (byte[]) startRow.get(0).getValue();
-            byte[] sq = familyAndQualifier[1];
-            long st = (Long) startRow.get(2).getValue();
-            byte[] sv = (byte[]) startRow.get(3).getValue();
-            KeyValue startKeyValue = new KeyValue(sk, family, sq, st, sv);
-            List<Cell> keyValues = new ArrayList<Cell>();
-            keyValues.add(startKeyValue);
-            while (!streamResult.getCacheRows().isEmpty() && streamResult.next()) {
-                List<ObObj> row = streamResult.getRow();
-                if (this.isTableGroup) {
-                    // split family and qualifier
-                    familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row
-                        .get(1).getValue());
-                    this.family = familyAndQualifier[0];
-                } else {
-                    familyAndQualifier[1] = (byte[]) row.get(1).getValue();
-                }
-                byte[] k = (byte[]) row.get(0).getValue();
-                byte[] q = familyAndQualifier[1];
-                long t = (Long) row.get(2).getValue();
-                byte[] v = (byte[]) row.get(3).getValue();
-                if (Arrays.equals(sk, k)) {
-                    // when rowKey is equal to the previous rowKey ,merge the result into the same result
-                    keyValues.add(new KeyValue(k, family, q, t, v));
-                } else {
-                    streamResult.getCacheRows().addFirst(row);
-                    break;
-                }
-            }
-            // sort keyValues
-            OHBaseFuncUtils.sortHBaseResult(keyValues);
-            return Result.create(keyValues);
+            return buildLegacyResult(streamResult.getRow());
         } catch (Exception e) {
             if (importer != null) {
                 importer.setIsFailedOp(true);
@@ -158,6 +118,79 @@ public class ClientStreamScanner extends AbstractClientScanner {
                 }
             }
         }
+    }
+
+    private Result buildCompactResult(ObHBaseCellRow hbaseRow) {
+        List<Cell> cells = new ArrayList<Cell>(hbaseRow.getCellCount());
+        byte[] rowKey = hbaseRow.getRowKey();
+        for (int sliceIndex = 0; sliceIndex < hbaseRow.getSliceCount(); sliceIndex++) {
+            ObHBaseCellBatch batch = hbaseRow.getBatch(sliceIndex);
+            int toIndex = hbaseRow.getToIndex(sliceIndex);
+            for (int index = hbaseRow.getFromIndex(sliceIndex); index < toIndex; index++) {
+                addCompactResultCell(cells, rowKey, batch.getQualifier(index),
+                    batch.getTimestamp(index), batch.getValue(index));
+            }
+        }
+        OHBaseFuncUtils.sortHBaseResult(cells);
+        return createCompactResult(cells);
+    }
+
+    private void addCompactResultCell(List<Cell> cells, byte[] rowKey, byte[] qualifier,
+                                      long timestamp, byte[] value) {
+        if (isTableGroup) {
+            cells
+                .add(OHBaseFuncUtils.createTableGroupKeyValue(rowKey, qualifier, timestamp, value));
+        } else {
+            cells.add(new KeyValue(rowKey, family, qualifier, timestamp, value));
+        }
+    }
+
+    private Result createCompactResult(List<Cell> cells) {
+        return Result.create(cells);
+    }
+
+    private Result buildLegacyResult(List<ObObj> startRow) throws Exception {
+        byte[][] familyAndQualifier = new byte[2][];
+        if (this.isTableGroup) {
+            // split family and qualifier
+            familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) startRow
+                .get(1).getValue());
+            this.family = familyAndQualifier[0];
+        } else {
+            familyAndQualifier[1] = (byte[]) startRow.get(1).getValue();
+        }
+
+        byte[] sk = (byte[]) startRow.get(0).getValue();
+        byte[] sq = familyAndQualifier[1];
+        long st = (Long) startRow.get(2).getValue();
+        byte[] sv = (byte[]) startRow.get(3).getValue();
+        KeyValue startKeyValue = new KeyValue(sk, family, sq, st, sv);
+        List<Cell> keyValues = new ArrayList<Cell>();
+        keyValues.add(startKeyValue);
+        while (!streamResult.getCacheRows().isEmpty() && streamResult.next()) {
+            List<ObObj> row = streamResult.getRow();
+            if (this.isTableGroup) {
+                // split family and qualifier
+                familyAndQualifier = OHBaseFuncUtils.extractFamilyFromQualifier((byte[]) row
+                    .get(1).getValue());
+                this.family = familyAndQualifier[0];
+            } else {
+                familyAndQualifier[1] = (byte[]) row.get(1).getValue();
+            }
+            byte[] k = (byte[]) row.get(0).getValue();
+            byte[] q = familyAndQualifier[1];
+            long t = (Long) row.get(2).getValue();
+            byte[] v = (byte[]) row.get(3).getValue();
+            if (Arrays.equals(sk, k)) {
+                // when rowKey is equal to the previous rowKey ,merge the result into the same result
+                keyValues.add(new KeyValue(k, family, q, t, v));
+            } else {
+                streamResult.getCacheRows().addFirst(row);
+                break;
+            }
+        }
+        OHBaseFuncUtils.sortHBaseResult(keyValues);
+        return Result.create(keyValues);
     }
 
     @Override
