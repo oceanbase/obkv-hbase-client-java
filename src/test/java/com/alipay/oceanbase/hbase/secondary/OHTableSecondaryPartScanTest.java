@@ -27,12 +27,13 @@ import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.ValueFilter;
 import org.junit.*;
 
+import java.io.IOException;
 import java.util.*;
 
 import static com.alipay.oceanbase.hbase.util.ObHTableSecondaryPartUtil.*;
 import static com.alipay.oceanbase.hbase.util.ObHTableTestUtil.FOR_EACH;
 import static org.apache.hadoop.hbase.util.Bytes.toBytes;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 public class OHTableSecondaryPartScanTest {
     private static List<String>              tableNames       = new LinkedList<String>();
@@ -220,19 +221,49 @@ public class OHTableSecondaryPartScanTest {
             Result result = scanner.next();
             Assert.assertEquals(null, result);
         }
-
-        // 8. scan in reverse
-        {
-            Scan scan = new Scan(keys[1].getBytes(), "putKey".getBytes());
-            scan.addFamily(family.getBytes());
-            scan.setReversed(true);
-            try {
-                hTable.getScanner(scan);
-            } catch (Exception e) {
-                Assert.assertTrue(e.getCause().getMessage().contains("secondary partitioned hbase table with reverse query not supported"));
+        
+        hTable.close();
+    }
+    
+    public static void testReverseScanImpl(String tableName) throws Exception {
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(getTableName(tableName));
+        hTable.init();
+        // 0. prepare data
+        String family = getColumnFamilyName(tableName);
+        long ts = System.currentTimeMillis();
+        String keys[] = { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5" };
+        String columns[] = { "putColumn1", "putColumn2" };
+        for (String key : keys) {
+            for (String column : columns) {
+                Put put = new Put(toBytes(key));
+                put.add(family.getBytes(), column.getBytes(), ts, toBytes("value" + key + column));
+                hTable.put(put);
             }
         }
-        hTable.close();
+        
+        // 1. scan in reverse
+        Scan scan = new Scan();
+        scan.setReversed(true);
+        if (tableName.contains("secondary")) {
+            try {
+                ResultScanner scanner = hTable.getScanner(scan);
+                fail("unexpected, should failed before");
+            } catch (Exception e) {
+                assertTrue(e.getCause().getMessage().contains("secondary partitioned hbase table with reverse query not supported"));
+            }
+        } else {
+            ResultScanner scanner = hTable.getScanner(scan);
+            List<Cell> cells = getCellsFromScanner(scanner);
+            Assert.assertEquals(keys.length * columns.length, cells.size());
+            // check value
+            System.out.println(cells);
+            int cellidx = 0;
+            for (int i = keys.length - 1; i >= 0; i --) {
+                for (String column : columns) {
+                    AssertKeyValue(keys[i], family, column, ts, "value" + keys[i] + column, cells.get(cellidx++));
+                }
+            }
+        }
     }
 
     public static void testMultiCFScanImpl(Map.Entry<String, List<String>> entry) throws Exception {
@@ -486,6 +517,60 @@ public class OHTableSecondaryPartScanTest {
         }
         hTable.close();
     }
+    
+    public static void testMultiCFReverseScanImpl(Map.Entry<String, List<String>> entry) throws Exception {
+        String groupName = getTableName(entry.getKey());
+        OHTableClient hTable = ObHTableTestUtil.newOHTableClient(groupName);
+        hTable.init();
+        long ts = System.currentTimeMillis();
+
+        String keys[] = { "putKey1", "putKey2", "putKey3", "putKey4", "putKey5" };
+        String columns[] = { "putColumn1", "putColumn2" };
+        String values[] = { "putValue1", "putValue2" };
+        long tss[] = { ts, ts + 1 };
+        long lastTs = tss[1];
+        String latestValue = values[1];
+        List<String> tableNames = entry.getValue();
+        
+        for (String key : keys) {
+            Put put = new Put(toBytes(key));
+            for (String tableName : tableNames) {
+                String family = getColumnFamilyName(tableName);
+                for (String column : columns) {
+                    put.addColumn(toBytes(family), toBytes(column), ts, toBytes("value" + key + family + column));
+                }
+            }
+            hTable.put(put);
+        }
+        
+        if (groupName.contains("secondary")) {
+            try {
+                Scan scan = new Scan();
+                scan.setReversed(true);
+                ResultScanner scanner = hTable.getScanner(scan);
+                fail("unexpected, should failed before");
+            } catch (IOException e) {
+                assertTrue(e.getCause().getMessage().contains("secondary partitioned hbase table with reverse query not supported"));
+            }
+        } else {
+            Scan scan = new Scan();
+            scan.setReversed(true);
+            ResultScanner scanner = hTable.getScanner(scan);
+            List<Cell> cells = getCellsFromScanner(scanner);
+            assertEquals(keys.length * 2 * tableNames.size(), cells.size());
+            System.out.println(cells);
+            int cellidx = 0;
+            for (int i = keys.length - 1; i >= 0; i --) {
+                for (String tableName : tableNames) {
+                    String family = getColumnFamilyName(tableName);
+                    for (String column : columns) {
+                        AssertKeyValue(keys[i], family, column, ts, "value" + keys[i] + family + column, cells.get(cellidx++));
+                    }
+                }
+            }
+        }
+        
+    }
 
     @Test
     public void testScan() throws Throwable {
@@ -493,7 +578,17 @@ public class OHTableSecondaryPartScanTest {
     }
 
     @Test
+    public void testReverseScan() throws Throwable {
+        FOR_EACH(tableNames, OHTableSecondaryPartScanTest::testReverseScanImpl);
+    }
+    
+    @Test
     public void testMultiCFScan() throws Throwable {
         FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testMultiCFScanImpl);
+    }
+    
+    @Test
+    public void testMiltiCFReverseScan() throws Throwable {
+        FOR_EACH(group2tableNames, OHTableSecondaryPartScanTest::testMultiCFReverseScanImpl);
     }
 }
