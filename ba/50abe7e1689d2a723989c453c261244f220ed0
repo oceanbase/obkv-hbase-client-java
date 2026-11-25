@@ -1,0 +1,14 @@
+pom.xml
+  h_1cb3ac17cffb9e 7,30,431
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ba50abe7e1689d2a723989c453c261244f220ed0",
+  "prompts": {},
+  "humans": {
+    "h_1cb3ac17cffb9e": {
+      "author": "junye <xf375358@oceanbase.com>"
+    }
+  }
+}
